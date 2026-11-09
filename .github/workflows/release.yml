@@ -1,0 +1,50 @@
+name: Release
+
+# 打 tag（v*）就自动出一个可安装的 APK，挂到 GitHub Release。
+# 应用内的「检查更新」读的就是这个 Release 的 latest。
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # 仓库里没放 gradlew，直接用 setup-gradle 装指定版本，省掉提交二进制文件
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Assemble release
+        run: gradle :app:assembleRelease --no-daemon
+
+      - name: Rename APK
+        run: |
+          mkdir -p out
+          cp app/build/outputs/apk/release/app-release.apk "out/dingzhang-${GITHUB_REF_NAME}.apk"
+          ls -lh out
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dingzhang-apk
+          path: out/*.apk
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: out/*.apk
+          generate_release_notes: true
+          draft: false

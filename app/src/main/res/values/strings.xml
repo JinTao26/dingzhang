@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">叮账</string>
+    <string name="nls_label">叮账 · 通知识别</string>
+    <string name="a11y_label">叮账 · 自动记账</string>
+    <string name="a11y_desc">用于在支付宝、微信的支付结果页和账单详情页读取金额、商户、时间，自动生成一笔账。仅在支付相关页面工作，不读取聊天内容。</string>
+</resources>

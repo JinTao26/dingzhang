@@ -1,0 +1,779 @@
+package com.dingzhang.app.ui.screens
+
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.FileDownload
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.core.app.NotificationManagerCompat
+import com.dingzhang.app.DingZhangApp
+import com.dingzhang.app.BuildConfig
+import com.dingzhang.app.core.model.Categories
+import com.dingzhang.app.core.model.Dates
+import com.dingzhang.app.core.model.Money
+import com.dingzhang.app.data.Exporter
+import com.dingzhang.app.ingest.BillImporter
+import com.dingzhang.app.ingest.ImportResult
+import com.dingzhang.app.ingest.IngestPipeline
+import com.dingzhang.app.ui.AppData
+import com.dingzhang.app.ui.components.DzCard
+import com.dingzhang.app.ui.components.MascotFace
+import com.dingzhang.app.ui.theme.Dz
+import com.dingzhang.app.update.UpdateChecker
+import kotlinx.coroutines.launch
+
+@Composable
+fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val settings = IngestPipeline.settings
+
+    var importing by remember { mutableStateOf(false) }
+    var result by remember { mutableStateOf<ImportResult?>(null) }
+    var confirmClear by remember { mutableStateOf(false) }
+
+    // 每次进入本页实时读系统权限状态，用户从设置页回来就能看到变化
+    val a11yOn = isA11yEnabled(ctx)
+    val nlsOn = isNlsEnabled(ctx)
+
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            importing = true
+            val r = BillImporter.import(ctx, uri)
+            importing = false
+            result = r
+            DingZhangApp.bumpDataVersion()
+        }
+    }
+
+    var checking by remember { mutableStateOf(false) }
+    var updateResult by remember { mutableStateOf<UpdateChecker.Result?>(null) }
+
+    // 导出走系统的「新建文档」，用户自己选存哪儿，不申请存储权限
+    val csvSaver = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val n = try {
+                Exporter.writeCsv(ctx, uri)
+            } catch (e: Exception) {
+                -1
+            }
+            Toast.makeText(
+                ctx,
+                if (n > 0) "已导出 $n 笔到 CSV" else "导出失败了",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
+    val backupSaver = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val n = try {
+                Exporter.writeBackup(ctx, uri)
+            } catch (e: Exception) {
+                -1
+            }
+            Toast.makeText(
+                ctx,
+                if (n > 0) "已备份 $n 笔（含分类规则）" else "备份失败了",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
+    val restorePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val r = Exporter.restore(ctx, uri)
+            DingZhangApp.bumpDataVersion()
+            Toast.makeText(ctx, r.message, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 96.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("我的", style = MaterialTheme.typography.headlineLarge, color = Dz.Ink)
+                Text(
+                    "让自动记账更准一点的开关都在这儿",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Dz.InkFaint,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
+            MascotFace(52.dp)
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // ---------- 通道 ----------
+        DzCard {
+            Text("自动记账通道", style = MaterialTheme.typography.titleLarge, color = Dz.Ink)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "两个通道一起开最稳：无障碍读支付页面（准），通知监听兜底（快）",
+                style = MaterialTheme.typography.bodySmall,
+                color = Dz.InkFaint
+            )
+            Spacer(Modifier.height(12.dp))
+
+            ChannelRow(
+                title = "无障碍读取",
+                desc = "读微信 / 支付宝的支付结果页和账单详情页，能拿到商户、金额和单号",
+                systemGranted = a11yOn,
+                appEnabled = settings?.accessibilityChannel ?: true,
+                onToggle = { v ->
+                    settings?.accessibilityChannel = v
+                    DingZhangApp.bumpDataVersion()
+                },
+                onGrant = { openSystem(ctx, android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS) }
+            )
+            Spacer(Modifier.height(6.dp))
+            ChannelRow(
+                title = "通知监听",
+                desc = "解析支付通知做实时兜底。部分机型微信只推「支付凭证」不带金额，所以只当补充",
+                systemGranted = nlsOn,
+                appEnabled = settings?.notificationChannel ?: true,
+                onToggle = { v ->
+                    settings?.notificationChannel = v
+                    DingZhangApp.bumpDataVersion()
+                },
+                onGrant = { openSystem(ctx, android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS) }
+            )
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        // ---------- 导入账单 ----------
+        DzCard {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("导入官方账单", style = MaterialTheme.typography.titleLarge, color = Dz.Ink)
+                Spacer(Modifier.weight(1f))
+                if (data.lastImportAt > 0) {
+                    Text(
+                        Dates.relativeLabel(data.lastImportAt),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Dz.InkFaint
+                    )
+                }
+            }
+            Text(
+                "微信/支付宝里导出账单（zip 或 csv 都行），导入后能补全历史、并把之前漏记的记录对上号",
+                style = MaterialTheme.typography.bodySmall,
+                color = Dz.InkFaint,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+            Spacer(Modifier.height(12.dp))
+            Button(
+                onClick = { picker.launch(arrayOf("*/*")) },
+                enabled = !importing,
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Dz.Sakura, contentColor = Color.White),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                if (importing) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        color = Color.White,
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("正在导入…")
+                } else {
+                    Icon(Icons.Rounded.FileDownload, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("选择账单文件")
+                }
+            }
+            result?.let { r ->
+                Spacer(Modifier.height(10.dp))
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(if (r.dataRows > 0) Dz.MintSoft else Dz.WarnSoft)
+                        .padding(12.dp)
+                ) {
+                    Text(r.fileName, style = MaterialTheme.typography.labelMedium, color = Dz.Ink, maxLines = 1)
+                    Text(
+                        r.message,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Dz.InkSoft,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                    val range = BillImporter.describeRange(r.earliest, r.latest)
+                    if (range.isNotBlank()) {
+                        Text(range, style = MaterialTheme.typography.labelSmall, color = Dz.InkFaint)
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        // ---------- 参数 ----------
+        DzCard {
+            Text("记账口味", style = MaterialTheme.typography.titleLarge, color = Dz.Ink)
+            Spacer(Modifier.height(10.dp))
+
+            Text("小于这个金额不记账", style = MaterialTheme.typography.bodyMedium, color = Dz.InkSoft)
+            Spacer(Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(100L to "1 元", 500L to "5 元", 1000L to "10 元").forEach { (cents, label) ->
+                    SettingChip(
+                        label = label,
+                        active = (settings?.ignoreBelowCents ?: 100L) == cents
+                    ) {
+                        settings?.ignoreBelowCents = cents
+                        DingZhangApp.bumpDataVersion()
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(14.dp))
+            Text("每月预算", style = MaterialTheme.typography.bodyMedium, color = Dz.InkSoft)
+            Spacer(Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(100_000L to "1000", 300_000L to "3000", 500_000L to "5000", 1_000_000L to "1万")
+                    .forEach { (cents, label) ->
+                        SettingChip(
+                            label = label,
+                            active = (settings?.monthlyBudgetCents ?: 300_000L) == cents
+                        ) {
+                            settings?.monthlyBudgetCents = cents
+                            DingZhangApp.bumpDataVersion()
+                        }
+                    }
+            }
+
+            if (data.ignoredPayees.isNotEmpty()) {
+                Spacer(Modifier.height(14.dp))
+                Text("不记账的商户", style = MaterialTheme.typography.bodyMedium, color = Dz.InkSoft)
+                Spacer(Modifier.height(6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    data.ignoredPayees.take(6).forEach { p ->
+                        Text(
+                            p,
+                            fontSize = 11.sp,
+                            color = Dz.InkSoft,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(9.dp))
+                                .background(Dz.Cream)
+                                .padding(horizontal = 9.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        // ---------- 学会的说法 ----------
+        DzCard {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("它学会的说法", style = MaterialTheme.typography.titleLarge, color = Dz.Ink)
+                Spacer(Modifier.weight(1f))
+                Text("${data.rules.size} 条", style = MaterialTheme.typography.labelSmall, color = Dz.InkFaint)
+            }
+            Text(
+                "你每改一次分类，它就记住「这个说法 -> 这个分类」，下次自动命中",
+                style = MaterialTheme.typography.bodySmall,
+                color = Dz.InkFaint,
+                modifier = Modifier.padding(top = 4.dp, bottom = 10.dp)
+            )
+            if (data.rules.isEmpty()) {
+                Text(
+                    "还没学会什么。去明细里点一笔改分类试试",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Dz.InkFaint
+                )
+            } else {
+                data.rules.take(12).forEach { rule ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            rule.pattern,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Dz.Ink,
+                            maxLines = 1,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Text(
+                            "→ ${Categories.of(rule.categoryId).name}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Dz.SakuraDeep
+                        )
+                        Text(
+                            " ${rule.hitCount}次",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Dz.InkFaint
+                        )
+                        Icon(
+                            Icons.Rounded.DeleteOutline,
+                            contentDescription = "删除这条规则",
+                            tint = Dz.InkFaint,
+                            modifier = Modifier
+                                .padding(start = 8.dp)
+                                .size(18.dp)
+                                .clickable {
+                                    IngestPipeline.dao?.deleteRule(rule.id)
+                                    DingZhangApp.bumpDataVersion()
+                                }
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        // ---------- 数据与备份 ----------
+        DzCard {
+            Text("你的数据，你带走", style = MaterialTheme.typography.titleLarge, color = Dz.Ink)
+            Text(
+                "换手机、或者想迁到别的记账 App 都能导出去。备份文件连分类规则一起带走",
+                style = MaterialTheme.typography.bodySmall,
+                color = Dz.InkFaint,
+                modifier = Modifier.padding(top = 4.dp, bottom = 10.dp)
+            )
+            ActionRow("导出明细 CSV", "给 Excel 或别的记账 App 用") {
+                csvSaver.launch(Exporter.defaultCsvName())
+            }
+            Spacer(Modifier.height(6.dp))
+            ActionRow("完整备份 JSON", "含流水、分类规则和预算设置") {
+                backupSaver.launch(Exporter.defaultBackupName())
+            }
+            Spacer(Modifier.height(6.dp))
+            ActionRow("从备份恢复", "已存在的记录自动跳过，不会记重") {
+                restorePicker.launch(arrayOf("application/json", "*/*"))
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        // ---------- 原理 & 限制 ----------
+        DzCard {
+            Text("它是怎么自动记账的", style = MaterialTheme.typography.titleLarge, color = Dz.Ink)
+            Spacer(Modifier.height(8.dp))
+            ExplainLine("①", "无障碍", "读支付结果页，最准，实时")
+            ExplainLine("②", "通知", "读支付通知，最快，但有的机型不带金额")
+            ExplainLine("③", "账单", "你导出的官方流水，最权威，用来补历史和核对")
+            ExplainLine("④", "手记", "兜底，顺便教会它新说法")
+            Spacer(Modifier.height(10.dp))
+            Text(
+                "说清楚做不到的：微信/支付宝没有面向个人的开放流水接口，所以不存在「后台自动同步」。" +
+                    "淘宝页面被 App 主动屏蔽了无障碍，读不到；云闪付的支付页也不会主动弹出来。" +
+                    "这些情况请用账单导入补。Android 13 以上侧载的 App，「通知使用权」和「无障碍」" +
+                    "会被收进「受限设置」，需要在系统设置里手动解除限制。",
+                style = MaterialTheme.typography.bodySmall,
+                color = Dz.InkFaint
+            )
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        // ---------- 危险操作 ----------
+        DzCard {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("清空所有流水", style = MaterialTheme.typography.titleMedium, color = Dz.Ink)
+                    Text(
+                        "共 ${data.monthTxns.size} 笔（本月）。清空后不可恢复",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Dz.InkFaint
+                    )
+                }
+                Text(
+                    "清空",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Dz.Expense,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Dz.Expense.copy(alpha = 0.10f))
+                        .clickable { confirmClear = true }
+                        .padding(horizontal = 14.dp, vertical = 8.dp)
+                )
+            }
+            Spacer(Modifier.height(10.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "叮账 ${BuildConfig.VERSION_NAME} · 数据只存在这台手机，不上传",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Dz.InkFaint,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    if (checking) "检查中…" else "检查更新",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Dz.SakuraDeep,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable(enabled = !checking) {
+                            scope.launch {
+                                checking = true
+                                updateResult = UpdateChecker.check(BuildConfig.VERSION_NAME)
+                                checking = false
+                            }
+                        }
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                )
+            }
+        }
+    }
+
+    if (confirmClear) {
+        Dialog(onDismissRequest = { confirmClear = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false)) {
+            Column(
+                Modifier
+                    .fillMaxWidth(0.9f)
+                    .clip(RoundedCornerShape(26.dp))
+                    .background(Dz.Card)
+                    .padding(20.dp)
+            ) {
+                Text("确定要清空吗", style = MaterialTheme.typography.titleLarge, color = Dz.Ink)
+                Text(
+                    "所有流水都会被删掉，学会的分类规则会保留。",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Dz.InkSoft,
+                    modifier = Modifier.padding(top = 6.dp, bottom = 16.dp)
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Dz.Cream)
+                            .clickable { confirmClear = false }
+                            .padding(vertical = 11.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("算了", style = MaterialTheme.typography.labelLarge, color = Dz.InkSoft)
+                    }
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Dz.Expense)
+                            .clickable {
+                                IngestPipeline.dao?.clearAll()
+                                DingZhangApp.bumpDataVersion()
+                                confirmClear = false
+                                Toast.makeText(ctx, "已清空", Toast.LENGTH_SHORT).show()
+                            }
+                            .padding(vertical = 11.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("清空", style = MaterialTheme.typography.labelLarge, color = Color.White)
+                    }
+                }
+            }
+        }
+    }
+
+    // ---------- 版本更新 ----------
+    updateResult?.let { r ->
+        Dialog(
+            onDismissRequest = { updateResult = null },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Column(
+                Modifier
+                    .fillMaxWidth(0.9f)
+                    .clip(RoundedCornerShape(26.dp))
+                    .background(Dz.Card)
+                    .padding(20.dp)
+            ) {
+                Text(
+                    if (r.hasUpdate) "有新版本了" else "版本检查",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = Dz.Ink
+                )
+                Text(
+                    when {
+                        r.hasUpdate -> "当前 ${r.currentVersion} → 最新 ${r.latestVersion ?: ""}"
+                        r.latestVersion != null -> "已是最新版本 ${r.currentVersion}"
+                        else -> r.message
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Dz.InkFaint,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+                if (r.hasUpdate && r.notes.isNotBlank()) {
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        r.notes,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Dz.InkSoft,
+                        modifier = Modifier
+                            .heightIn(max = 200.dp)
+                            .verticalScroll(rememberScrollState())
+                    )
+                }
+                if (r.hasUpdate && r.apkUrl == null) {
+                    Text(
+                        "这个版本没附 APK 包，去 Release 页看构建产物",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Dz.InkFaint,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+                Spacer(Modifier.height(16.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Dz.Cream)
+                            .clickable { updateResult = null }
+                            .padding(vertical = 11.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("知道了", style = MaterialTheme.typography.labelLarge, color = Dz.InkSoft)
+                    }
+                    if (r.hasUpdate) {
+                        Box(
+                            Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(Dz.Sakura)
+                                .clickable {
+                                    openUrl(ctx, r.pageUrl)
+                                    updateResult = null
+                                }
+                                .padding(vertical = 11.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("去下载", style = MaterialTheme.typography.labelLarge, color = Color.White)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActionRow(title: String, desc: String, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(Dz.Cream)
+            .clickable { onClick() }
+            .padding(start = 12.dp, end = 8.dp, top = 10.dp, bottom = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, color = Dz.Ink)
+            Text(desc, style = MaterialTheme.typography.labelSmall, color = Dz.InkFaint)
+        }
+        Icon(
+            Icons.Rounded.ChevronRight,
+            contentDescription = null,
+            tint = Dz.InkSoft,
+            modifier = Modifier.size(18.dp)
+        )
+    }
+}
+
+private fun openUrl(ctx: Context, url: String) {
+    try {
+        ctx.startActivity(
+            Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
+    } catch (e: Exception) {
+        Toast.makeText(ctx, "打不开链接：$url", Toast.LENGTH_LONG).show()
+    }
+}
+
+@Composable
+private fun ChannelRow(
+    title: String,
+    desc: String,
+    systemGranted: Boolean,
+    appEnabled: Boolean,
+    onToggle: (Boolean) -> Unit,
+    onGrant: () -> Unit
+) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(Dz.Cream)
+            .padding(horizontal = 14.dp, vertical = 12.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(
+                        when {
+                            !appEnabled -> Dz.InkFaint
+                            systemGranted -> Dz.Mint
+                            else -> Dz.Warn
+                        }
+                    )
+            )
+            Column(Modifier.weight(1f).padding(start = 10.dp)) {
+                Text(title, style = MaterialTheme.typography.titleMedium, color = Dz.Ink)
+                Text(
+                    desc,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Dz.InkFaint
+                )
+            }
+            Switch(
+                checked = appEnabled,
+                onCheckedChange = onToggle,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = Color.White,
+                    checkedTrackColor = Dz.Sakura
+                )
+            )
+        }
+        if (!systemGranted) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Dz.WarnSoft)
+                    .clickable { onGrant() }
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "系统还没授权，点这里去开",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Dz.Warn,
+                    modifier = Modifier.weight(1f)
+                )
+                Text("去开启", style = MaterialTheme.typography.labelMedium, color = Dz.Warn)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingChip(label: String, active: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (active) Dz.SakuraSoft else Dz.Cream)
+            .clickable { onClick() }
+            .padding(horizontal = 14.dp, vertical = 7.dp)
+    ) {
+        Text(
+            label,
+            fontSize = 12.sp,
+            fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
+            color = if (active) Dz.SakuraDeep else Dz.InkSoft
+        )
+    }
+}
+
+@Composable
+private fun ExplainLine(mark: String, name: String, desc: String) {
+    Row(Modifier.padding(vertical = 3.dp), verticalAlignment = Alignment.Top) {
+        Text(mark, fontSize = 12.sp, color = Dz.Sakura, fontWeight = FontWeight.Bold)
+        Text(
+            name,
+            fontSize = 12.sp,
+            color = Dz.Ink,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(start = 6.dp, end = 6.dp)
+        )
+        Text(desc, fontSize = 12.sp, color = Dz.InkFaint, modifier = Modifier.weight(1f))
+    }
+}
+
+private fun isA11yEnabled(ctx: Context): Boolean {
+    return try {
+        val s = android.provider.Settings.Secure.getString(
+            ctx.contentResolver,
+            android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+        ) ?: return false
+        s.contains(ctx.packageName)
+    } catch (e: Exception) {
+        false
+    }
+}
+
+private fun isNlsEnabled(ctx: Context): Boolean = try {
+    NotificationManagerCompat.getEnabledListenerPackages(ctx).contains(ctx.packageName)
+} catch (e: Exception) {
+    false
+}
+
+private fun openSystem(ctx: Context, action: String) {
+    try {
+        ctx.startActivity(Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    } catch (e: Exception) {
+        Toast.makeText(ctx, "打不开设置页，请到系统设置里手动开启", Toast.LENGTH_LONG).show()
+    }
+}
