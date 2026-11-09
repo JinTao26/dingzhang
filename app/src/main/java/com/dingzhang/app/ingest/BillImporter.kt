@@ -31,7 +31,8 @@ data class ImportResult(
  * - 导入时如果发现某笔已经由通知/无障碍记过，不新增记录，而是把那笔升级成「已对账」
  *   并补上交易单号和准确的商户名（见 IngestPipeline 的去重分支）。
  *
- * 支持两种文件：微信/支付宝导出的 .zip（内含 csv），以及直接选的 .csv。
+ * 认四种：.zip（里面套 csv / txt / xlsx 都行）、.csv、.txt、.xlsx。
+ * 微信「用于个人对账」给的是 Excel，支付宝多半是 GBK 的 csv，两种都要吃下来。
  */
 object BillImporter {
 

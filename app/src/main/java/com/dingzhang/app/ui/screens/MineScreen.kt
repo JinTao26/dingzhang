@@ -22,12 +22,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.FileDownload
@@ -139,6 +141,9 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
             }
         }
     }
+
+    // 0 = 主页，1 = 意见反馈，2 = 自动记账原理
+    var subPage by remember { mutableStateOf(0) }
 
     // 每次进入本页实时读系统权限状态，用户从设置页回来就能看到变化
     val a11yOn = isA11yEnabled(ctx)
@@ -329,7 +334,7 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                 }
             }
             Text(
-                "微信/支付宝里导出账单（zip 或 csv 都行），导入后能补全历史、并把之前漏记的记录对上号",
+                "微信/支付宝导出的账单都认：zip（套着 csv 或 xlsx）、csv、txt、xlsx。导入后能补全历史，并把之前漏记的跟已有记录对上号",
                 style = MaterialTheme.typography.bodySmall,
                 color = Dz.InkFaint,
                 modifier = Modifier.padding(top = 4.dp)
@@ -585,68 +590,19 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
 
         Spacer(Modifier.height(12.dp))
 
-        // ---------- 反馈 ----------
+        // ---------- 两个次级页面的入口 ----------
         DzCard {
-            var feedback by remember { mutableStateOf("") }
-            Text("意见反馈", style = MaterialTheme.typography.titleLarge, color = Dz.Ink)
+            Text("更多", style = MaterialTheme.typography.titleLarge, color = Dz.Ink)
             Text(
-                "哪个分类认错了、哪笔没记上、哪句文案别扭，都能从这儿直接发到作者邮箱。" +
-                    "会自动附上机型和开关状态，省得你再描述环境",
+                "细节挪进单独页面了，这一页不用再一路划到底",
                 style = MaterialTheme.typography.bodySmall,
                 color = Dz.InkFaint,
                 modifier = Modifier.padding(top = 4.dp, bottom = 10.dp)
             )
-            OutlinedTextField(
-                value = feedback,
-                onValueChange = { feedback = it },
-                placeholder = { Text("说说哪里不对…", color = Dz.InkFaint, fontSize = 13.sp) },
-                textStyle = MaterialTheme.typography.bodyMedium,
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 96.dp)
-            )
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Button(
-                    onClick = { submitFeedback(ctx, feedback) },
-                    enabled = feedback.isNotBlank(),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Dz.Sakura, contentColor = Color.White),
-                    modifier = Modifier.padding(top = 10.dp)
-                ) { Text("发到邮箱") }
-                TextButton(
-                    onClick = { copyFeedback(ctx, feedbackBody(ctx, feedback)) },
-                    enabled = feedback.isNotBlank(),
-                    modifier = Modifier.padding(top = 10.dp)
-                ) { Text("复制", color = Dz.InkSoft) }
-            }
+            ActionRow("意见反馈", "发到作者邮箱，自动带上机型和各通道开关") { subPage = 1 }
+            Spacer(Modifier.height(6.dp))
+            ActionRow("自动记账原理与限制", "五条通道各管什么、哪些做不到") { subPage = 2 }
         }
-
-        Spacer(Modifier.height(12.dp))
-
-        // ---------- 原理 & 限制 ----------
-        DzCard {
-            Text("它是怎么自动记账的", style = MaterialTheme.typography.titleLarge, color = Dz.Ink)
-            Spacer(Modifier.height(8.dp))
-            ExplainLine("①", "无障碍", "读支付结果页，最准，实时")
-            ExplainLine("②", "通知", "读支付通知，最快，但有的机型不带金额")
-            ExplainLine("③", "账单", "你导出的官方流水，最权威，用来补历史和核对")
-            ExplainLine("④", "手记", "兜底，顺便教会它新说法")
-            Spacer(Modifier.height(10.dp))
-            Text(
-                "说清楚做不到的：微信/支付宝没有面向个人的开放流水接口，所以不存在「后台自动同步」。" +
-                    "淘宝页面被 App 主动屏蔽了无障碍，读不到；云闪付的支付页也不会主动弹出来。" +
-                    "这些情况请用账单导入补。Android 13 以上侧载的 App，「通知使用权」和「无障碍」" +
-                    "会被收进「受限设置」，需要在系统设置里手动解除限制。",
-                style = MaterialTheme.typography.bodySmall,
-                color = Dz.InkFaint
-            )
-        }
-
-        Spacer(Modifier.height(12.dp))
 
         // ---------- 危险操作 ----------
         DzCard {
@@ -769,6 +725,24 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                     }
                 }
             }
+        }
+    }
+
+    // ---------- 次级页面 ----------
+    if (subPage == 1) {
+        Dialog(
+            onDismissRequest = { subPage = 0 },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            FeedbackPage(ctx) { subPage = 0 }
+        }
+    }
+    if (subPage == 2) {
+        Dialog(
+            onDismissRequest = { subPage = 0 },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            PrinciplePage { subPage = 0 }
         }
     }
 
@@ -1032,5 +1006,125 @@ private fun openSystem(ctx: Context, action: String) {
         ctx.startActivity(Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     } catch (e: Exception) {
         Toast.makeText(ctx, "打不开设置页，请到系统设置里手动开启", Toast.LENGTH_LONG).show()
+    }
+}
+
+/** 次级页顶栏：返回 + 标题。 */
+@Composable
+private fun SubPageBar(title: String, onClose: () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            Modifier
+                .size(34.dp)
+                .clip(CircleShape)
+                .background(Dz.Card)
+                .clickable { onClose() },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Rounded.ArrowBack,
+                contentDescription = "返回",
+                tint = Dz.InkSoft,
+                modifier = Modifier.size(19.dp)
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Text(title, style = MaterialTheme.typography.titleLarge, color = Dz.Ink)
+    }
+}
+
+@Composable
+private fun FeedbackPage(ctx: Context, onClose: () -> Unit) {
+    Column(
+        Modifier
+            .fillMaxSize()
+            .background(Dz.Cream)
+            .systemBarsPadding()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 18.dp, vertical = 10.dp)
+    ) {
+        SubPageBar("意见反馈", onClose)
+        Spacer(Modifier.height(14.dp))
+
+        var feedback by remember { mutableStateOf("") }
+        DzCard {
+            Text(
+                "哪个分类认错了、哪笔没记上、哪句文案别扭，都能从这儿直接发到作者邮箱。" +
+                    "会自动附上机型和开关状态，省得你再描述环境",
+                style = MaterialTheme.typography.bodySmall,
+                color = Dz.InkFaint,
+                modifier = Modifier.padding(bottom = 10.dp)
+            )
+            OutlinedTextField(
+                value = feedback,
+                onValueChange = { feedback = it },
+                placeholder = { Text("说说哪里不对…", color = Dz.InkFaint, fontSize = 13.sp) },
+                textStyle = MaterialTheme.typography.bodyMedium,
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 150.dp)
+            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Button(
+                    onClick = { submitFeedback(ctx, feedback) },
+                    enabled = feedback.isNotBlank(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Dz.Sakura,
+                        contentColor = Color.White
+                    ),
+                    modifier = Modifier.padding(top = 10.dp)
+                ) { Text("发到邮箱") }
+                TextButton(
+                    onClick = { copyFeedback(ctx, feedbackBody(ctx, feedback)) },
+                    enabled = feedback.isNotBlank(),
+                    modifier = Modifier.padding(top = 10.dp)
+                ) { Text("复制", color = Dz.InkSoft) }
+            }
+            Text(
+                FEEDBACK_MAIL,
+                style = MaterialTheme.typography.labelSmall,
+                color = Dz.InkFaint,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+        }
+        Spacer(Modifier.height(24.dp))
+    }
+}
+
+@Composable
+private fun PrinciplePage(onClose: () -> Unit) {
+    Column(
+        Modifier
+            .fillMaxSize()
+            .background(Dz.Cream)
+            .systemBarsPadding()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 18.dp, vertical = 10.dp)
+    ) {
+        SubPageBar("自动记账原理与限制", onClose)
+        Spacer(Modifier.height(14.dp))
+
+        DzCard {
+            ExplainLine("①", "无障碍", "读支付结果页，最准，实时")
+            ExplainLine("②", "通知", "读支付通知，最快，但有的机型不带金额")
+            ExplainLine("③", "银行提醒", "手机银行推送、公众号、短信，管不经过微信支付宝的钱")
+            ExplainLine("④", "账单", "你导出的官方流水，最权威，用来补历史和核对")
+            ExplainLine("⑤", "手记", "兜底，顺便教会它新说法")
+            Spacer(Modifier.height(12.dp))
+            Text(
+                "说清楚做不到的：微信/支付宝没有面向个人的开放流水接口，所以不存在「后台自动同步」。" +
+                    "淘宝页面被 App 主动屏蔽了无障碍，读不到；云闪付的支付页也不会主动弹出来。" +
+                    "这些情况请用账单导入补。Android 13 以上侧载的 App，「通知使用权」和「无障碍」" +
+                    "会被收进「受限设置」，需要在系统设置里手动解除限制。",
+                style = MaterialTheme.typography.bodySmall,
+                color = Dz.InkFaint
+            )
+        }
+        Spacer(Modifier.height(24.dp))
     }
 }
