@@ -61,8 +61,10 @@ import com.dingzhang.app.ui.screens.BillsScreen
 import com.dingzhang.app.ui.screens.HomeScreen
 import com.dingzhang.app.ui.screens.MineScreen
 import com.dingzhang.app.ui.screens.StatsScreen
+import com.dingzhang.app.ui.components.StarfieldBackdrop
 import com.dingzhang.app.ui.components.UpdateDialog
 import com.dingzhang.app.ui.theme.Dz
+import com.dingzhang.app.ui.theme.ThemeController
 import com.dingzhang.app.update.UpdateChecker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -190,6 +192,8 @@ private fun loadAppData(month: String): AppData {
 
 @Composable
 fun AppRoot() {
+    // 星空物语要多铺一层背景，其它主题走原来的纯色底
+    val starry = ThemeController.current.id == "starfield"
     var tab by remember { mutableStateOf(0) }
     var showAdd by remember { mutableStateOf(false) }
     var month by remember { mutableStateOf(Dates.monthOf(System.currentTimeMillis())) }
@@ -215,15 +219,20 @@ fun AppRoot() {
     }
 
     if (showAdd) {
-        AddScreen(
-            onClose = { showAdd = false },
-            onSaved = { showAdd = false }
-        )
+        Box(Modifier.fillMaxSize().background(Dz.Cream)) {
+            if (starry) StarfieldBackdrop(Modifier.fillMaxSize())
+            AddScreen(
+                onClose = { showAdd = false },
+                onSaved = { showAdd = false }
+            )
+        }
         return
     }
 
-    Scaffold(
-        containerColor = Dz.Cream,
+    Box(Modifier.fillMaxSize().background(Dz.Cream)) {
+        if (starry) StarfieldBackdrop(Modifier.fillMaxSize())
+        Scaffold(
+        containerColor = if (starry) Color.Transparent else Dz.Cream,
         bottomBar = { DzBottomBar(tab) { tab = it } },
         floatingActionButton = {
             FloatingActionButton(
@@ -252,6 +261,7 @@ fun AppRoot() {
                 else -> MineScreen(data, month, onMonthChange = { month = it })
             }
         }
+    }
     }
 
     // 开屏的更新提示。用户选「暂不更新」就记住这个版本，下次打开不再问

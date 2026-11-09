@@ -54,20 +54,20 @@ object ThemePacks {
     )
 
     /**
-     * 提瓦特：深蓝夜空 + 鎏金描边 + 元素色点缀，圆角收紧。
-     * 只取「星图 / 金线 / 元素」这套视觉语法，不含任何官方角色、立绘或 Logo。
+     * 星空物语：深空蓝底 + 一层星屑。星星本身由 StarfieldBackdrop 画在背景层，
+     * 这里只管配色 —— 底色压得够深，星星才浮得出来。
      */
-    val TEYVAT = ThemePack(
-        id = "teyvat", name = "提瓦特", tagline = "深蓝夜空 + 鎏金，圆角收窄", dark = true,
-        primary = Color(0xFFD9B96F), primaryDeep = Color(0xFFF0D9A0), primarySoft = Color(0xFF2E3550),
-        secondary = Color(0xFFB39BEA), secondarySoft = Color(0xFF2C2850),
-        accent = Color(0xFF74C8AC), accentSoft = Color(0xFF1E3632),
-        bg = Color(0xFF131A2B), card = Color(0xFF1D2540),
-        ink = Color(0xFFEDE4D0), inkSoft = Color(0xFFA6A292), inkFaint = Color(0xFF6C6A5E),
-        line = Color(0xFF313D5C),
-        warn = Color(0xFFE8B33C), warnSoft = Color(0xFF3A2F18),
-        expense = Color(0xFFE8806F), income = Color(0xFF79D6BE),
-        rLarge = 12, rMedium = 10, rSmall = 6
+    val STARFIELD = ThemePack(
+        id = "starfield", name = "星空物语", tagline = "深空底 + 星屑，夜里记账像看星空", dark = true,
+        primary = Color(0xFF8FB4FF), primaryDeep = Color(0xFFC9DCFF), primarySoft = Color(0xFF22305C),
+        secondary = Color(0xFFB79CFF), secondarySoft = Color(0xFF2B2352),
+        accent = Color(0xFFFFD98A), accentSoft = Color(0xFF3A3320),
+        bg = Color(0xFF0C1228), card = Color(0xFF161E3E),
+        ink = Color(0xFFEDF2FF), inkSoft = Color(0xFFA3AFD6), inkFaint = Color(0xFF6A76A0),
+        line = Color(0xFF242E56),
+        warn = Color(0xFFF5C05A), warnSoft = Color(0xFF3A2F18),
+        expense = Color(0xFFFF8DA6), income = Color(0xFF6EE0BE),
+        rLarge = 22, rMedium = 16, rSmall = 11
     )
 
     /** 薄荷：白底 + 薄荷绿，白天看着最省眼的浅色方案。 */
@@ -98,9 +98,13 @@ object ThemePacks {
         rLarge = 28, rMedium = 20, rSmall = 14
     )
 
-    val ALL = listOf(SAKURA, TEYVAT, MINT, YOZAKURA)
+    val ALL = listOf(SAKURA, STARFIELD, MINT, YOZAKURA)
 
-    fun byId(id: String?): ThemePack = ALL.firstOrNull { it.id == id } ?: SAKURA
+    fun byId(id: String?): ThemePack {
+        // 老版本第二套叫 teyvat，改版后统一走星空物语，别让已经选过的人被重置回樱粉
+        val fixed = if (id == "teyvat") "starfield" else id
+        return ALL.firstOrNull { it.id == fixed } ?: SAKURA
+    }
 }
 
 /**

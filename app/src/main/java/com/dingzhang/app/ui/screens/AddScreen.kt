@@ -54,6 +54,7 @@ import com.dingzhang.app.ingest.IngestPipeline
 import com.dingzhang.app.ui.components.CategoryBadge
 import com.dingzhang.app.ui.components.ui
 import com.dingzhang.app.ui.theme.Dz
+import com.dingzhang.app.ui.theme.ThemeController
 
 private val addExpenseIds = listOf(
     "food", "drink", "transport", "shopping", "home", "fun",
@@ -82,7 +83,8 @@ fun AddScreen(onClose: () -> Unit, onSaved: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Dz.Cream)
+            // 星空物语底下由 AppRoot 铺星空，这里透明才不会盖住星星
+            .background(if (ThemeController.current.id == "starfield") Color.Transparent else Dz.Cream)
             .systemBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 18.dp, vertical = 10.dp)
