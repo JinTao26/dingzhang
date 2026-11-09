@@ -307,14 +307,16 @@ fun BillsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
             txn = txn,
             onDismiss = { selected = null },
             onPickCategory = { catId ->
-                val learned = IngestPipeline.correctCategory(txn.id, catId)
+                val r = IngestPipeline.correctCategory(txn.id, catId)
                 DingZhangApp.bumpDataVersion()
                 selected = null
-                Toast.makeText(
-                    ctx,
-                    if (learned != null) "记住了：以后「$learned」算 ${Categories.of(catId).name}" else "已改分类",
-                    Toast.LENGTH_SHORT
-                ).show()
+                val name = Categories.of(catId).name
+                val msg = buildString {
+                    if (r.learned != null) append("记住了：以后「${r.learned}」算 $name")
+                    else append("已改成 $name")
+                    if (r.updated > 0) append("，同类 ${r.updated} 笔也一起改了")
+                }
+                Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show()
             },
             onRenamePayee = { newName ->
                 IngestPipeline.dao?.updatePayee(txn.id, newName)

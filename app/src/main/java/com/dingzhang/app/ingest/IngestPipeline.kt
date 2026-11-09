@@ -188,10 +188,19 @@ object IngestPipeline {
 
     /** 用户改了某笔的分类：锁定它，并把「这个说法 -> 这个分类」记成规则。 */
     @Synchronized
-    fun correctCategory(txnId: Long, newCategoryId: String): String? {
-        val dao = daoRef ?: return null
-        val txn = dao.get(txnId) ?: return null
-        if (txn.categoryLocked && txn.categoryId == newCategoryId) return null
+    /** 改分类的结果：学到了什么说法、顺手回溯了多少笔。 */
+    data class CorrectResult(val learned: String?, val updated: Int)
+
+    /**
+     * 用户改分类。
+     *
+     * 改一次就要全跟着改：同一个商户的历史记录一起挪到新分类（同一渠道的退款也一起走），
+     * 否则用户得一条条手动点，改到第十条就放弃了。
+     */
+    fun correctCategory(txnId: Long, newCategoryId: String): CorrectResult {
+        val dao = daoRef ?: return CorrectResult(null, 0)
+        val txn = dao.get(txnId) ?: return CorrectResult(null, 0)
+        if (txn.categoryLocked && txn.categoryId == newCategoryId) return CorrectResult(null, 0)
         dao.updateCategory(txnId, newCategoryId, locked = true)
 
         val kind = if (Categories.isIncome(newCategoryId)) TxnKind.INCOME else TxnKind.EXPENSE
@@ -200,7 +209,20 @@ object IngestPipeline {
             dao.upsertRule(learned, newCategoryId, kind)
             Log.d(TAG, "学会: 「$learned」 -> $newCategoryId")
         }
-        return learned
+
+        // 回溯：同商户名的历史记录（退款按原商户名记的，也在里面）
+        var updated = 0
+        val payee = txn.payee.trim()
+        if (payee.length >= 2) {
+            dao.listByPayee(payee, txn.id).forEach { sib ->
+                if (sib.categoryId == newCategoryId) return@forEach
+                // 已经锁过的照旧锁着，没锁的保持没锁，只换分类
+                dao.updateCategory(sib.id, newCategoryId, locked = sib.categoryLocked)
+                updated++
+            }
+        }
+        if (updated > 0) Log.d(TAG, "回溯 $updated 笔「$payee」 -> $newCategoryId")
+        return CorrectResult(learned, updated)
     }
 
     fun confirm(txnId: Long) {

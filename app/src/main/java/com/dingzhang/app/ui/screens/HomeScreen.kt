@@ -1,5 +1,7 @@
 package com.dingzhang.app.ui.screens
 
+import android.widget.Toast
+
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -34,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -46,9 +49,12 @@ import com.dingzhang.app.core.model.Money
 import com.dingzhang.app.core.model.Source
 import com.dingzhang.app.core.model.Txn
 import com.dingzhang.app.core.model.TxnKind
+import com.dingzhang.app.DingZhangApp
 import com.dingzhang.app.data.RecurringDetector
+import com.dingzhang.app.ingest.IngestPipeline
 import com.dingzhang.app.ui.AppData
 import com.dingzhang.app.ui.components.CategoryBadge
+import com.dingzhang.app.ui.components.CategoryPickerDialog
 import com.dingzhang.app.ui.components.DzCard
 import com.dingzhang.app.ui.components.EmptyHint
 import com.dingzhang.app.ui.components.EnergyBar
@@ -67,11 +73,33 @@ fun HomeScreen(
     onGoTab: (Int) -> Unit
 ) {
     var showPicker by remember { mutableStateOf(false) }
+    var pickTxn by remember { mutableStateOf<Txn?>(null) }
+    val ctx = LocalContext.current
     if (showPicker) {
         MonthPickerDialog(
             month = month,
             onDismiss = { showPicker = false },
             onPick = { onMonthChange(it) }
+        )
+    }
+
+    pickTxn?.let { txn ->
+        CategoryPickerDialog(
+            payee = txn.payee,
+            currentId = txn.categoryId,
+            onPick = { catId ->
+                val r = IngestPipeline.correctCategory(txn.id, catId)
+                DingZhangApp.bumpDataVersion()
+                pickTxn = null
+                val name = Categories.of(catId).name
+                val msg = buildString {
+                    if (r.learned != null) append("记住了：以后「${r.learned}」算 $name")
+                    else append("已改成 $name")
+                    if (r.updated > 0) append("，同类 ${r.updated} 笔也一起改了")
+                }
+                Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show()
+            },
+            onDismiss = { pickTxn = null }
         )
     }
     Column(
@@ -334,7 +362,7 @@ fun HomeScreen(
         } else {
             DzCard(padding = 6.dp) {
                 data.recent.take(9).forEach { txn ->
-                    TxnRow(txn)
+                    TxnRow(txn, onClick = { pickTxn = txn })
                 }
             }
         }

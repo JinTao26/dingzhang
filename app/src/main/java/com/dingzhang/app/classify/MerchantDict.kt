@@ -99,6 +99,54 @@ object MerchantDict {
         "内部划转", "充值到零钱", "银行卡转入"
     ).map { it.copy(kind = "transfer") }
 
+
+    /**
+     * 通用后缀：店名里带这些词，基本能定分类。
+     * 词典再全也覆盖不了街边小店（「加贝购物超市」「老李面馆」「康泰药房」），
+     * 但这类名字的后缀很稳定，用它兜底能明显减少「其他」。
+     * 长词优先，避免「宠物医院」被「医院」抢走。
+     */
+    private val suffixHints: List<Pair<String, String>> = listOf(
+        "超市" to "shopping", "生活超市" to "shopping", "购物广场" to "shopping",
+        "便利店" to "shopping", "百货" to "shopping", "商行" to "shopping",
+        "商贸" to "shopping", "批发" to "shopping", "专卖店" to "shopping",
+        "旗舰店" to "shopping", "购物中心" to "shopping", "商城" to "shopping",
+        "市场" to "shopping", "菜市场" to "food", "农贸" to "food",
+        "食品" to "food", "零食" to "food", "生鲜" to "food", "水果" to "food",
+        "餐厅" to "food", "餐饮" to "food", "饭店" to "food", "小吃" to "food",
+        "面馆" to "food", "米粉" to "food", "米线" to "food", "快餐" to "food",
+        "食堂" to "food", "烧烤" to "food", "火锅" to "food", "烘焙" to "food",
+        "面包" to "food", "蛋糕" to "food", "甜品" to "food", "饼屋" to "food",
+        "卤味" to "food", "熟食" to "food", "烧腊" to "food", "饺子" to "food",
+        "奶茶" to "drink", "咖啡" to "drink", "茶饮" to "drink", "饮品" to "drink",
+        "茶社" to "drink", "酒馆" to "drink", "酒吧" to "fun",
+        "药房" to "health", "药店" to "health", "大药房" to "health",
+        "诊所" to "health", "医院" to "health", "口腔" to "health",
+        "眼科" to "health", "中医" to "health", "体检" to "health",
+        "美容" to "health", "药妆" to "health",
+        "宠物" to "pet", "宠物医院" to "pet", "宠物店" to "pet",
+        "书店" to "study", "文具" to "study", "图文" to "study",
+        "印刷" to "study", "培训" to "study", "教育" to "study",
+        "学校" to "study", "自习室" to "study", "考研" to "study",
+        "影城" to "fun", "影院" to "fun", "网吧" to "fun", "网咖" to "fun",
+        "电竞" to "fun", "剧本" to "fun", "密室" to "fun", "桌游" to "fun",
+        "健身" to "fun", "游泳" to "fun", "球馆" to "fun",
+        "加油站" to "transport", "油站" to "transport", "充电站" to "transport",
+        "停车场" to "transport", "汽修" to "transport", "洗车" to "transport",
+        "汽车服务" to "transport", "轮胎" to "transport", "驾校" to "transport",
+        "五金" to "home", "建材" to "home", "家居" to "home", "家具" to "home",
+        "装饰" to "home", "装修" to "home", "电器" to "digital", "数码" to "digital",
+        "通讯" to "digital", "手机店" to "digital", "电脑城" to "digital",
+        "眼镜" to "health", "珠宝" to "shopping", "钟表" to "shopping",
+        "服饰" to "shopping", "鞋业" to "shopping", "箱包" to "shopping",
+        "洗衣" to "home", "干洗" to "home", "快递" to "shopping", "驿站" to "shopping",
+        "物流" to "shopping", "理发" to "health", "美发" to "health",
+        "足浴" to "fun", "洗浴" to "fun", "按摩" to "health",
+        "烟酒" to "shopping", "酒业" to "shopping", "茶叶" to "shopping",
+        "粮油" to "food", "副食" to "food", "肉店" to "food", "海鲜" to "food",
+        "水产" to "food", "冷饮" to "drink", "冰淇淋" to "drink"
+    ).sortedByDescending { it.first.length }
+
     /** 长度降序，长的先赢。 */
     private val ordered: List<Entry> = (transfer + income + expense).sortedByDescending { it.keyword.length }
 
@@ -106,6 +154,10 @@ object MerchantDict {
         val hay = text.lowercase()
         for (entry in ordered) {
             if (hay.contains(entry.keyword)) return entry
+        }
+        // 词典里没有的小店，看名字后缀
+        for ((w, cat) in suffixHints) {
+            if (hay.contains(w)) return Entry(w, cat)
         }
         return null
     }
