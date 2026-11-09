@@ -213,7 +213,7 @@ fun AppRoot() {
         val s = IngestPipeline.settings ?: return@LaunchedEffect
         while (true) {
             val due = s.autoCheckUpdate &&
-                System.currentTimeMillis() - s.lastUpdateCheckAt >= 12L * 3600_000
+                System.currentTimeMillis() - s.lastUpdateCheckAt >= 6L * 3600_000
             if (due) {
                 delay(1200)   // 别跟首屏抢帧
                 val r = try {

@@ -184,6 +184,8 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
     }
 
     var checking by remember { mutableStateOf(false) }
+    var lastCheck by remember { mutableStateOf(settings?.lastUpdateCheckAt ?: 0L) }
+    var skippedVer by remember { mutableStateOf(settings?.skipVersion.orEmpty()) }
     var updateResult by remember { mutableStateOf<UpdateChecker.Result?>(null) }
     var autoCheck by remember { mutableStateOf(settings?.autoCheckUpdate ?: true) }
 
@@ -630,12 +632,43 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
             }
             Spacer(Modifier.height(10.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    "叮账 ${BuildConfig.VERSION_NAME} · 数据只存在这台手机，不上传",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Dz.InkFaint,
-                    modifier = Modifier.weight(1f)
-                )
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "叮账 ${BuildConfig.VERSION_NAME} · 数据只存在这台手机，不上传",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Dz.InkFaint
+                    )
+                    Text(
+                        "上次检查：${agoText(lastCheck)}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Dz.InkFaint,
+                        modifier = Modifier.padding(top = 1.dp)
+                    )
+                    if (skippedVer.isNotBlank()) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                "已跳过 $skippedVer 的更新提示",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Dz.Warn
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                "恢复提示",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Dz.SakuraDeep,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        settings?.skipVersion = ""
+                                        skippedVer = ""
+                                        Toast.makeText(ctx, "已恢复更新提示", Toast.LENGTH_SHORT).show()
+                                    }
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
                 Text(
                     if (checking) "检查中…" else "检查更新",
                     style = MaterialTheme.typography.labelMedium,
@@ -645,7 +678,16 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                         .clickable(enabled = !checking) {
                             scope.launch {
                                 checking = true
-                                updateResult = UpdateChecker.check(BuildConfig.VERSION_NAME)
+                                val r = UpdateChecker.check(BuildConfig.VERSION_NAME)
+                                if (r.ok) {
+                                    settings?.lastUpdateCheckAt = System.currentTimeMillis()
+                                    lastCheck = System.currentTimeMillis()
+                                    if (r.latestVersion != null && r.latestVersion != skippedVer) {
+                                        settings?.skipVersion = ""
+                                        skippedVer = ""
+                                    }
+                                }
+                                updateResult = r
                                 checking = false
                             }
                         }
@@ -1215,5 +1257,17 @@ private fun HelpStep(no: String, text: String) {
             fontWeight = FontWeight.Bold
         )
         Text(text, style = MaterialTheme.typography.bodySmall, color = Dz.InkSoft)
+    }
+}
+
+/** 「还没检查过 / 刚刚 / 12 分钟前 / 3 小时前 / 5 天前」 */
+private fun agoText(ms: Long): String {
+    if (ms <= 0L) return "还没检查过"
+    val d = System.currentTimeMillis() - ms
+    return when {
+        d < 60_000L -> "刚刚"
+        d < 3600_000L -> "${d / 60_000} 分钟前"
+        d < 86_400_000L -> "${d / 3600_000} 小时前"
+        else -> "${d / 86_400_000L} 天前"
     }
 }
