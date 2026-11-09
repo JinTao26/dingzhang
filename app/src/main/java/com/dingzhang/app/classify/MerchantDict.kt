@@ -82,10 +82,16 @@ object MerchantDict {
         ))
     }
 
-    private val income: List<Entry> = e("income",
-        "工资", "薪水", "奖金", "绩效", "报销", "退款", "收款", "收到", "转入", "利息", "分红",
-        "兼职", "外快", "稿费", "补贴", "返现", "中奖", "结款", "劳务费", "收款成功", "退货退款"
-    ).map { it.copy(kind = "income") }
+    // 收入也分类了：工资 / 奖金 / 理财 / 报销 / 红包 / 其他收入。
+    // 「退款」故意不在这里 —— 退款是 REFUND，要从支出里减，不能算成收入。
+    private val income: List<Entry> = buildList {
+        addAll(e("salary", "工资", "薪水", "月薪", "发薪", "代发工资", "劳务派遣").map { it.copy(kind = "income") })
+        addAll(e("bonus", "年终奖", "奖金", "绩效", "提成", "佣金", "项目奖").map { it.copy(kind = "income") })
+        addAll(e("invest", "理财收益", "基金收益", "余额宝收益", "利息", "分红", "股息", "国债").map { it.copy(kind = "income") })
+        addAll(e("reimburse", "报销", "差旅补贴", "退税款", "发票报销").map { it.copy(kind = "income") })
+        addAll(e("gift", "收红包", "红包", "礼金", "压岁钱", "返现", "中奖").map { it.copy(kind = "income") })
+        addAll(e("income", "收款成功", "收款", "收到", "转入", "兼职", "外快", "稿费", "结款", "劳务费").map { it.copy(kind = "income") })
+    }
 
     /** 不计收支的划转类。 */
     private val transfer: List<Entry> = e("other",

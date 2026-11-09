@@ -23,10 +23,15 @@ import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.MenuBook
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Pets
+import androidx.compose.material.icons.rounded.ReceiptLong
+import androidx.compose.material.icons.rounded.Redeem
 import androidx.compose.material.icons.rounded.Restaurant
 import androidx.compose.material.icons.rounded.Savings
 import androidx.compose.material.icons.rounded.ShoppingBag
 import androidx.compose.material.icons.rounded.SportsEsports
+import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.TrendingUp
+import androidx.compose.material.icons.rounded.Work
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -65,6 +70,11 @@ fun categoryIcon(id: String): ImageVector = when (id) {
     "social" -> Icons.Rounded.CardGiftcard
     "pet" -> Icons.Rounded.Pets
     "digital" -> Icons.Rounded.Memory
+    "salary" -> Icons.Rounded.Work
+    "bonus" -> Icons.Rounded.Star
+    "invest" -> Icons.Rounded.TrendingUp
+    "reimburse" -> Icons.Rounded.ReceiptLong
+    "gift" -> Icons.Rounded.Redeem
     "income" -> Icons.Rounded.Savings
     else -> Icons.Rounded.MoreHoriz
 }

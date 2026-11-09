@@ -330,8 +330,10 @@ private fun TxnDetailDialog(
                 modifier = Modifier.padding(top = 2.dp, bottom = 10.dp)
             )
 
-            val allIds = expenseIds + "income"
-            for (row in 0 until 4) {
+            // 支出 12 个 + 收入 6 个，改分类时都能选到
+            val allIds = expenseIds + Categories.incomeAll.map { it.id }
+            val allRows = (allIds.size + 3) / 4
+            for (row in 0 until allRows) {
                 Row(
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)

@@ -1,5 +1,6 @@
 package com.dingzhang.app.classify
 
+import com.dingzhang.app.core.model.Categories
 import com.dingzhang.app.core.model.LearnedRule
 import com.dingzhang.app.core.model.TxnKind
 
@@ -42,7 +43,7 @@ object CategoryEngine {
         for (r in sorted) {
             if (r.pattern.isBlank()) continue
             if (text.contains(r.pattern, ignoreCase = true)) {
-                val kind = r.kind ?: if (r.categoryId == "income") TxnKind.INCOME else TxnKind.EXPENSE
+                val kind = r.kind ?: if (Categories.isIncome(r.categoryId)) TxnKind.INCOME else TxnKind.EXPENSE
                 return Result(r.categoryId, kind, r.pattern, true, 1.0f)
             }
         }

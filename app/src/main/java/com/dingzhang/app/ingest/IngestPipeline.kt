@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.dingzhang.app.classify.CategoryEngine
 import com.dingzhang.app.classify.RuleLearning
+import com.dingzhang.app.core.model.Categories
 import com.dingzhang.app.core.model.Source
 import com.dingzhang.app.core.model.Txn
 import com.dingzhang.app.core.model.TxnKind
@@ -175,7 +176,7 @@ object IngestPipeline {
         if (txn.categoryLocked && txn.categoryId == newCategoryId) return null
         dao.updateCategory(txnId, newCategoryId, locked = true)
 
-        val kind = if (newCategoryId == "income") TxnKind.INCOME else TxnKind.EXPENSE
+        val kind = if (Categories.isIncome(newCategoryId)) TxnKind.INCOME else TxnKind.EXPENSE
         val learned = RuleLearning.best(txn.payee, txn.note)
         if (learned != null) {
             dao.upsertRule(learned, newCategoryId, kind)

@@ -25,7 +25,16 @@ object Categories {
     val pet = Category("pet", "宠物", "pet", 0xFFE2B98F.toInt())
     val digital = Category("digital", "数码", "digital", 0xFF93D9E8.toInt())
     val other = Category("other", "其他", "other", 0xFFC9C4D2.toInt())
-    val income = Category("income", "收入", "income", 0xFF7DE2C3.toInt())
+
+    // ---- 收入分类 ----
+    // id 落库后不能改。income 是老数据的兜底（以前所有收入都记在它下面），
+    // 现在显示为「其他收入」，语义不变。
+    val salary = Category("salary", "工资", "salary", 0xFF7DE2C3.toInt())
+    val bonus = Category("bonus", "奖金", "bonus", 0xFFFFD86F.toInt())
+    val invest = Category("invest", "理财", "invest", 0xFF9BD1FF.toInt())
+    val reimburse = Category("reimburse", "报销", "reimburse", 0xFFC6E67A.toInt())
+    val gift = Category("gift", "红包", "gift", 0xFFFF9EB5.toInt())
+    val income = Category("income", "其他收入", "income", 0xFFC9C4D2.toInt())
 
     /** 支出分类，同时决定记账页的图标网格顺序。 */
     val expenseAll = listOf(
@@ -33,11 +42,17 @@ object Categories {
         health, study, social, pet, digital, other
     )
 
-    val all = expenseAll + income
+    /** 收入分类，同时决定记账页「收入」那一栏的图标顺序。income 放最后，它是兜底。 */
+    val incomeAll = listOf(salary, bonus, invest, reimburse, gift, income)
+
+    val all = expenseAll + incomeAll
 
     private val byId = all.associateBy { it.id }
 
     fun of(id: String?): Category = byId[id] ?: other
 
-    fun isExpenseCategory(id: String): Boolean = id != income.id
+    fun isExpenseCategory(id: String): Boolean = expenseAll.any { it.id == id }
+
+    /** 是不是收入方向的分类。老包里只有 income，新包细分成了工资/奖金/理财/报销/红包。 */
+    fun isIncome(id: String?): Boolean = incomeAll.any { it.id == id }
 }

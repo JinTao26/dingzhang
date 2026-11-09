@@ -36,6 +36,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -53,10 +55,13 @@ import com.dingzhang.app.ui.components.CategoryBadge
 import com.dingzhang.app.ui.components.ui
 import com.dingzhang.app.ui.theme.Dz
 
-private val addCategoryIds = listOf(
+private val addExpenseIds = listOf(
     "food", "drink", "transport", "shopping", "home", "fun",
-    "health", "study", "social", "pet", "digital", "other", "income"
+    "health", "study", "social", "pet", "digital", "other"
 )
+
+// 收入也分了类：工资 / 奖金 / 理财 / 报销 / 红包 / 其他收入
+private val addIncomeIds = listOf("salary", "bonus", "invest", "reimburse", "gift", "income")
 
 @Composable
 fun AddScreen(onClose: () -> Unit, onSaved: () -> Unit) {
@@ -64,9 +69,15 @@ fun AddScreen(onClose: () -> Unit, onSaved: () -> Unit) {
     var amountText by remember { mutableStateOf("") }
     var categoryId by remember { mutableStateOf("food") }
     var note by remember { mutableStateOf("") }
+    var incomeMode by remember { mutableStateOf(false) }
 
-    val isIncome = categoryId == "income"
+    // 接系统返回键：不用非得去点左上角那个 ×
+    BackHandler { onClose() }
+
+    val isIncome = Categories.isIncome(categoryId)
     val accent = if (isIncome) Dz.Income else Dz.Sakura
+    val gridIds = if (incomeMode) addIncomeIds else addExpenseIds
+    val gridRows = (gridIds.size + 3) / 4
 
     Column(
         modifier = Modifier
@@ -153,20 +164,31 @@ fun AddScreen(onClose: () -> Unit, onSaved: () -> Unit) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("算什么", style = MaterialTheme.typography.titleMedium, color = Dz.Ink)
             Spacer(Modifier.weight(1f))
-            Text(
-                if (isIncome) "这笔记成收入" else "选一个最像的",
-                style = MaterialTheme.typography.labelSmall,
-                color = Dz.InkFaint
-            )
+            Row(
+                Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Dz.Cream)
+                    .padding(3.dp),
+                horizontalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                ModeChip("支出", !incomeMode) {
+                    incomeMode = false
+                    categoryId = addExpenseIds.first()
+                }
+                ModeChip("收入", incomeMode) {
+                    incomeMode = true
+                    categoryId = addIncomeIds.first()
+                }
+            }
         }
         Spacer(Modifier.height(10.dp))
 
-        for (row in 0 until 4) {
+        for (row in 0 until gridRows) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 for (col in 0 until 4) {
                     val idx = row * 4 + col
-                    if (idx < addCategoryIds.size) {
-                        val id = addCategoryIds[idx]
+                    if (idx < gridIds.size) {
+                        val id = gridIds[idx]
                         val on = categoryId == id
                         val cat = Categories.of(id)
                         Column(
@@ -279,6 +301,25 @@ fun AddScreen(onClose: () -> Unit, onSaved: () -> Unit) {
             color = Dz.InkFaint,
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
+
+@Composable
+private fun RowScope.ModeChip(text: String, active: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (active) Dz.Card else Color.Transparent)
+            .clickable { onClick() }
+            .padding(horizontal = 10.dp, vertical = 5.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text,
+            style = MaterialTheme.typography.labelSmall,
+            color = if (active) Dz.SakuraDeep else Dz.InkFaint,
+            fontWeight = if (active) FontWeight.Bold else FontWeight.Normal
         )
     }
 }

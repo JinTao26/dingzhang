@@ -2,6 +2,7 @@ package com.dingzhang.app.data
 
 import android.content.ContentValues
 import android.database.Cursor
+import com.dingzhang.app.core.model.Categories
 import com.dingzhang.app.core.model.CategoryTotal
 import com.dingzhang.app.core.model.Dates
 import com.dingzhang.app.core.model.LearnedRule
@@ -65,7 +66,7 @@ class TxnDao(private val helper: DbHelper) {
         val cv = ContentValues().apply {
             put("category_id", categoryId)
             put("category_locked", if (locked) 1 else 0)
-            if (categoryId == "income") {
+            if (Categories.isIncome(categoryId)) {
                 put("kind", TxnKind.INCOME.db)
             } else {
                 // 从收入改成支出分类时，方向也跟着改回来
