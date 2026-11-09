@@ -467,69 +467,6 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
 
         Spacer(Modifier.height(12.dp))
 
-        // ---------- 学会的说法 ----------
-        DzCard {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("它学会的说法", style = MaterialTheme.typography.titleLarge, color = Dz.Ink)
-                Spacer(Modifier.weight(1f))
-                Text("${data.rules.size} 条", style = MaterialTheme.typography.labelSmall, color = Dz.InkFaint)
-            }
-            Text(
-                "你每改一次分类，它就记住「这个说法 -> 这个分类」，下次自动命中",
-                style = MaterialTheme.typography.bodySmall,
-                color = Dz.InkFaint,
-                modifier = Modifier.padding(top = 4.dp, bottom = 10.dp)
-            )
-            if (data.rules.isEmpty()) {
-                Text(
-                    "还没学会什么。去明细里点一笔改分类试试",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Dz.InkFaint
-                )
-            } else {
-                data.rules.take(12).forEach { rule ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 5.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            rule.pattern,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Dz.Ink,
-                            maxLines = 1,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Text(
-                            "→ ${Categories.of(rule.categoryId).name}",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = Dz.SakuraDeep
-                        )
-                        Text(
-                            " ${rule.hitCount}次",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Dz.InkFaint
-                        )
-                        Icon(
-                            Icons.Rounded.DeleteOutline,
-                            contentDescription = "删除这条规则",
-                            tint = Dz.InkFaint,
-                            modifier = Modifier
-                                .padding(start = 8.dp)
-                                .size(18.dp)
-                                .clickable {
-                                    IngestPipeline.dao?.deleteRule(rule.id)
-                                    DingZhangApp.bumpDataVersion()
-                                }
-                        )
-                    }
-                }
-            }
-        }
-
-        Spacer(Modifier.height(12.dp))
-
         // ---------- 外观 ----------
         DzCard {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -734,7 +671,7 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
             ) {
                 Text("确定要清空吗", style = MaterialTheme.typography.titleLarge, color = Dz.Ink)
                 Text(
-                    "所有流水都会被删掉，学会的分类规则会保留。",
+                    "所有流水都会被删掉，分类规则会保留。",
                     style = MaterialTheme.typography.bodyMedium,
                     color = Dz.InkSoft,
                     modifier = Modifier.padding(top = 6.dp, bottom = 16.dp)
