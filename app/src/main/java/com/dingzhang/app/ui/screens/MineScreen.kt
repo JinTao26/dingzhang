@@ -590,7 +590,7 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
             var feedback by remember { mutableStateOf("") }
             Text("意见反馈", style = MaterialTheme.typography.titleLarge, color = Dz.Ink)
             Text(
-                "哪个分类认错了、哪笔没记上、哪句文案别扭，都能从这儿直接发到仓库 Issues。" +
+                "哪个分类认错了、哪笔没记上、哪句文案别扭，都能从这儿直接发到作者邮箱。" +
                     "会自动附上机型和开关状态，省得你再描述环境",
                 style = MaterialTheme.typography.bodySmall,
                 color = Dz.InkFaint,
@@ -616,7 +616,7 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                     shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Dz.Sakura, contentColor = Color.White),
                     modifier = Modifier.padding(top = 10.dp)
-                ) { Text("发到 GitHub") }
+                ) { Text("发到邮箱") }
                 TextButton(
                     onClick = { copyFeedback(ctx, feedbackBody(ctx, feedback)) },
                     enabled = feedback.isNotBlank(),
@@ -909,19 +909,28 @@ private fun feedbackBody(ctx: Context, text: String): String {
     }
 }
 
+/** 反馈直发作者邮箱。不走 GitHub —— 国内不一定连得上。 */
+private const val FEEDBACK_MAIL = "2462634730@qq.com"
+
 private fun submitFeedback(ctx: Context, text: String) {
     if (text.isBlank()) return
     val body = feedbackBody(ctx, text)
-    val url = "https://github.com/JinTao26/dingzhang/issues/new?title=" +
-        Uri.encode("反馈：" + text.trim().take(24)) +
-        "&body=" + Uri.encode(body)
+    val mail = Intent(
+        Intent.ACTION_SENDTO,
+        Uri.parse("mailto:" + FEEDBACK_MAIL)
+    ).apply {
+        putExtra(Intent.EXTRA_SUBJECT, "叮账反馈：" + text.trim().take(24))
+        putExtra(Intent.EXTRA_TEXT, body)
+    }
     try {
-        ctx.startActivity(
-            Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        )
+        ctx.startActivity(mail.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     } catch (e: Exception) {
         copyFeedback(ctx, body)
-        Toast.makeText(ctx, "打不开 GitHub，内容已复制到剪贴板", Toast.LENGTH_LONG).show()
+        Toast.makeText(
+            ctx,
+            "没找到邮件 App，内容已复制，可以手动发到 $FEEDBACK_MAIL",
+            Toast.LENGTH_LONG
+        ).show()
     }
 }
 

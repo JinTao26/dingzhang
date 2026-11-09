@@ -1,12 +1,14 @@
 package com.dingzhang.app.ui.components
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -47,7 +49,10 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
+import com.dingzhang.app.R
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.dingzhang.app.core.model.Categories
@@ -148,43 +153,18 @@ fun EnergyBar(ratio: Float, modifier: Modifier = Modifier, height: Dp = 9.dp) {
  */
 @Composable
 fun MascotFace(size: Dp = 56.dp) {
-    Canvas(modifier = Modifier.size(size)) {
-        val w = this.size.width
-        val cx = w / 2f
-        val cy = w * 0.56f
-        val r = w * 0.38f
-
-        // 呆毛
-        val ahoge = Path().apply {
-            moveTo(cx - r * 0.10f, cy - r * 0.92f)
-            quadraticBezierTo(cx + r * 0.10f, cy - r * 1.55f, cx + r * 0.40f, cy - r * 1.05f)
-        }
-        drawPath(ahoge, color = Dz.Ink, style = Stroke(width = w * 0.045f, cap = StrokeCap.Round))
-
-        // 脸
-        drawCircle(color = Color(0xFFFFFDFE), radius = r, center = Offset(cx, cy))
-        drawCircle(
-            color = Dz.SakuraSoft, radius = r, center = Offset(cx, cy),
-            style = Stroke(width = w * 0.038f)
+    Box(
+        Modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(Dz.SakuraSoft)
+    ) {
+        Image(
+            painter = painterResource(R.drawable.mascot_face),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
         )
-
-        // 眼睛 + 高光
-        val eyeR = r * 0.14f
-        drawCircle(Dz.Ink, eyeR, Offset(cx - r * 0.34f, cy + r * 0.04f))
-        drawCircle(Dz.Ink, eyeR, Offset(cx + r * 0.34f, cy + r * 0.04f))
-        drawCircle(Color.White, eyeR * 0.40f, Offset(cx - r * 0.30f, cy - r * 0.04f))
-        drawCircle(Color.White, eyeR * 0.40f, Offset(cx + r * 0.38f, cy - r * 0.04f))
-
-        // 腮红
-        drawCircle(Dz.Sakura.copy(alpha = 0.26f), r * 0.17f, Offset(cx - r * 0.64f, cy + r * 0.34f))
-        drawCircle(Dz.Sakura.copy(alpha = 0.26f), r * 0.17f, Offset(cx + r * 0.64f, cy + r * 0.34f))
-
-        // 微笑
-        val mouth = Path().apply {
-            moveTo(cx - r * 0.13f, cy + r * 0.36f)
-            quadraticBezierTo(cx, cy + r * 0.56f, cx + r * 0.13f, cy + r * 0.36f)
-        }
-        drawPath(mouth, color = Dz.Ink, style = Stroke(width = w * 0.030f, cap = StrokeCap.Round))
     }
 }
 
