@@ -1,5 +1,7 @@
 package com.dingzhang.app.ui.screens
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -53,6 +55,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.core.content.ContextCompat
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -140,6 +143,29 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
     // 每次进入本页实时读系统权限状态，用户从设置页回来就能看到变化
     val a11yOn = isA11yEnabled(ctx)
     val nlsOn = isNlsEnabled(ctx)
+
+    // 银行短信要一条运行时权限；部分机型（小米/华为等）需要用户自己去系统设置里放开
+    var smsGranted by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECEIVE_SMS) ==
+                PackageManager.PERMISSION_GRANTED
+        )
+    }
+    val smsPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        smsGranted = granted
+        if (granted) {
+            settings?.smsChannel = true
+            DingZhangApp.bumpDataVersion()
+        } else {
+            Toast.makeText(
+                ctx,
+                "短信权限没给成。到 系统设置 → 应用 → 叮账 → 权限 里手动允许「短信」再来开这条",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
@@ -268,6 +294,22 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                     DingZhangApp.bumpDataVersion()
                 },
                 onGrant = { openSystem(ctx, android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS) }
+            )
+            Spacer(Modifier.height(6.dp))
+            ChannelRow(
+                title = "银行短信",
+                desc = "工资到账、线下刷卡这类不经过微信支付宝的钱，从银行动账短信里读。只收实时广播，不读历史短信箱，余额和完整卡号不入库",
+                systemGranted = smsGranted,
+                appEnabled = settings?.smsChannel ?: false,
+                onToggle = { v ->
+                    if (v && !smsGranted) {
+                        smsPermission.launch(Manifest.permission.RECEIVE_SMS)
+                    } else {
+                        settings?.smsChannel = v
+                        DingZhangApp.bumpDataVersion()
+                    }
+                },
+                onGrant = { smsPermission.launch(Manifest.permission.RECEIVE_SMS) }
             )
         }
 
@@ -862,7 +904,7 @@ private fun feedbackBody(ctx: Context, text: String): String {
         appendLine("设备：${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL} · Android ${android.os.Build.VERSION.SDK_INT}")
         appendLine(
             "通道：无障碍 ${on(s?.accessibilityChannel)} / 通知 ${on(s?.notificationChannel)}" +
-                " / 银行推送 ${on(s?.bankPushChannel)}"
+                " / 银行推送 ${on(s?.bankPushChannel)} / 短信 ${on(s?.smsChannel)}"
         )
     }
 }

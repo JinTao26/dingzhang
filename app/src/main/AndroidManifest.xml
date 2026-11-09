@@ -3,6 +3,9 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- 通道 D：银行短信。工资到账、线下刷卡不经过微信支付宝，只能从短信拿。
+         只接实时广播，不申请 READ_SMS，不读历史短信箱 -->
+    <uses-permission android:name="android.permission.RECEIVE_SMS" />
     <!-- 检查 GitHub Releases 用；只读公开接口，不上传任何账目 -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -61,6 +64,16 @@
                 android:name="android.accessibilityservice"
                 android:resource="@xml/accessibility_service_config" />
         </service>
+
+        <!-- 通道 D：银行短信，靠系统广播实时收，不读短信箱 -->
+        <receiver
+            android:name=".ingest.BankSmsReceiver"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_SMS">
+            <intent-filter android:priority="900">
+                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+        </receiver>
 
     </application>
 
