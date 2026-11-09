@@ -200,7 +200,14 @@ git push origin v0.4.0
 `.github/workflows/release.yml` 跑 `assembleRelease`，把 `dingzhang-<tag>.apk` 挂到 Release。
 App 内「检查更新」读的就是这个 Release 的 `latest`。
 
-> Release 包用 SDK 自带的 debug keystore 签名，方便侧载。要上架请换成自己的 keystore。
+> **签名是固定的**：`keystore/dingzhang.jks`（alias `dingzhang`，PKCS12，密码 `dingzhang2026`），
+> 证书 SHA-256 `BB:54:75:C9:5A:B0:6D:FF:DC:3E:49:08:39:7B:20:8D:61:6D:79:2C:AC:CB:C8:14:3B:6B:B6:BD:5E:15:22:69`。
+> 所有版本必须用这一个签名，否则手机上覆盖安装会失败（只能卸载重装、数据全丢）。
+> 之前用 AGP 自动生成的 debug keystore 就是踩了这个坑：CI 每次都在新机器上跑，
+> 每个包的签名都不一样。
+>
+> 密钥材料是公开的 —— 这个包名没有上架任何商店，自用侧载没关系；如果有人拿它做
+> "更新包"发给你，装之前认准证书指纹前几位 `BB:54:75`。
 > 仓库没提交 gradlew，CI 用 `gradle/actions/setup-gradle` 指定 8.9。
 
 ---

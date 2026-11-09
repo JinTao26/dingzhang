@@ -12,8 +12,8 @@ android {
         applicationId = "com.dingzhang.app"
         minSdk = 26          // Android 8.0，覆盖绝大多数在用机型
         targetSdk = 35
-        versionCode = 4
-        versionName = "0.5.1"
+        versionCode = 5
+        versionName = "0.5.2"
     }
 
     buildFeatures {
@@ -31,12 +31,25 @@ android {
         freeCompilerArgs += listOf("-opt-in=kotlin.RequiresOptIn")
     }
 
+    signingConfigs {
+        create("release") {
+            // 固定签名，必须一直用这一个。
+            // 之前用 SDK 自带的 debug keystore 是个坑：CI 每次都在新机器上跑，AGP 会
+            // 自动生成一个全新的 debug keystore，于是每个包的签名都不一样 ——
+            // 手机上覆盖安装必然失败，用户只能卸载重装、账本数据全丢。
+            // 自用/给朋友用的侧载场景，签名密钥直接放进仓库最省事。
+            // 介意的话可以改成从环境变量或 GitHub Secrets 读。
+            storeFile = rootProject.file("keystore/dingzhang.jks")
+            storePassword = "dingzhang2026"
+            keyAlias = "dingzhang"
+            keyPassword = "dingzhang2026"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
-            // 开源侧载分发：用 SDK 自带的 debug keystore 签名，别人能直接装。
-            // 真要上架应用商店，请换成自己的 keystore 并妥善保管。
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
