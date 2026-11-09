@@ -62,6 +62,15 @@ class TxnDao(private val helper: DbHelper) {
         helper.writableDatabase.update("txn", cv, "id = ?", arrayOf(id.toString()))
     }
 
+    /** 只改商户名。银行短信只有「尾号1234消费45元」，事后能从账单/详情页补上真名。 */
+    fun updatePayee(id: Long, payee: String, account: String? = null) {
+        val cv = ContentValues().apply {
+            put("payee", payee)
+            if (!account.isNullOrBlank()) put("account", account)
+        }
+        helper.writableDatabase.update("txn", cv, "id = ?", arrayOf(id.toString()))
+    }
+
     fun updateCategory(id: Long, categoryId: String, locked: Boolean) {
         val cv = ContentValues().apply {
             put("category_id", categoryId)

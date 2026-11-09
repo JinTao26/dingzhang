@@ -30,6 +30,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.Icon
@@ -315,6 +316,12 @@ fun BillsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                     Toast.LENGTH_SHORT
                 ).show()
             },
+            onRenamePayee = { newName ->
+                IngestPipeline.dao?.updatePayee(txn.id, newName)
+                DingZhangApp.bumpDataVersion()
+                // 弹窗里立刻显示新名字，不用退出去再进
+                selected = txn.copy(payee = newName)
+            },
             onDelete = {
                 IngestPipeline.dao?.delete(txn.id)
                 DingZhangApp.bumpDataVersion()
@@ -416,25 +423,43 @@ private fun TxnDetailDialog(
     txn: Txn,
     onDismiss: () -> Unit,
     onPickCategory: (String) -> Unit,
+    onRenamePayee: (String) -> Unit,
     onDelete: () -> Unit
 ) {
+    var renameOpen by remember { mutableStateOf(false) }
+    var nameInput by remember(txn.id, txn.payee) { mutableStateOf(txn.payee) }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Column(
             modifier = Modifier
                 .fillMaxWidth(0.93f)
+                .heightIn(max = 600.dp)
                 .clip(RoundedCornerShape(28.dp))
                 .background(Dz.Card)
+                .verticalScroll(rememberScrollState())
                 .padding(20.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 MascotFace(40.dp)
                 Column(Modifier.weight(1f).padding(start = 10.dp)) {
-                    Text(
-                        txn.payee.ifBlank { "未知商户" },
-                        style = MaterialTheme.typography.titleLarge,
-                        color = Dz.Ink,
-                        maxLines = 1
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            txn.payee.ifBlank { "未知商户" },
+                            style = MaterialTheme.typography.titleLarge,
+                            color = Dz.Ink,
+                            maxLines = 1,
+                            modifier = Modifier
+                                .weight(1f, fill = false)
+                                .clickable { renameOpen = !renameOpen }
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Icon(
+                            Icons.Rounded.Edit, "改商户名",
+                            tint = Dz.InkFaint,
+                            modifier = Modifier
+                                .size(13.dp)
+                                .clickable { renameOpen = !renameOpen }
+                        )
+                    }
                     Text(
                         "${Dates.relativeLabel(txn.occurredAt)} ${Dates.timeOf(txn.occurredAt)} · ${txn.wallet.label}",
                         style = MaterialTheme.typography.bodySmall,
@@ -447,6 +472,43 @@ private fun TxnDetailDialog(
                     fontSize = 20.sp,
                     color = if (txn.kind == TxnKind.INCOME || txn.kind == TxnKind.REFUND) Dz.Income else Dz.Ink
                 )
+            }
+
+            if (renameOpen) {
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = nameInput,
+                    onValueChange = { nameInput = it },
+                    singleLine = true,
+                    label = { Text("商户名", color = Dz.InkFaint, fontSize = 12.sp) },
+                    textStyle = TextStyle(fontSize = 14.sp),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(onClick = { renameOpen = false }) {
+                        Text("取消", color = Dz.InkSoft)
+                    }
+                    Button(
+                        onClick = {
+                            val v = nameInput.trim()
+                            if (v.isNotEmpty()) {
+                                onRenamePayee(v)
+                                renameOpen = false
+                            }
+                        },
+                        enabled = nameInput.isNotBlank(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Dz.Sakura,
+                            contentColor = Color.White
+                        )
+                    ) { Text("保存") }
+                }
             }
 
             Spacer(Modifier.height(14.dp))

@@ -47,6 +47,13 @@ object IngestPipeline {
         }
     }
 
+    /** 这些名字等于「不知道是谁」。后到的通道若带真商户名，应该覆盖掉它们。 */
+    private val genericPayees = setOf(
+        "", "未知", "未知商户", "微信支付", "支付宝", "云闪付", "银行", "银行卡", "储蓄卡"
+    )
+
+    private fun isGenericPayee(s: String): Boolean = s.trim() in genericPayees
+
     // ------------------------------------------------------------------ 公共入口
 
     /**
@@ -85,6 +92,17 @@ object IngestPipeline {
                     return Outcome(false, "已有更权威的账单记录", dup)
                 }
                 gap <= DUP_STRICT_MS -> {
+                    // 同一笔钱被两条通道各记了一次。先记的那条常常只有泛称
+                    // （银行短信里压根没有商户名），这次来了真名就顺手补上，
+                    // 不必等用户去导账单
+                    if (isGenericPayee(dup.payee) && !isGenericPayee(payee)) {
+                        dao.updatePayee(dup.id, payee, c.account)
+                        Log.d(TAG, "补商户名 #${dup.id} ${dup.payee} -> $payee")
+                        return Outcome(
+                            false, "已补上商户名：$payee",
+                            dao.get(dup.id) ?: dup, merged = true
+                        )
+                    }
                     Log.d(TAG, "疑似重复，跳过 ${c.payee} ${c.amountCents / 100.0}")
                     return Outcome(false, "疑似重复，已跳过", dup)
                 }
