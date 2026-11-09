@@ -6,6 +6,7 @@ import android.content.Intent
 import android.provider.Telephony
 import android.util.Log
 import com.dingzhang.app.DingZhangApp
+import com.dingzhang.app.core.model.Source
 import com.dingzhang.app.data.Settings
 
 /**
@@ -35,7 +36,7 @@ class BankSmsReceiver : BroadcastReceiver() {
         for (p in parts) body.append(p?.messageBody ?: "")
         if (body.isBlank()) return
 
-        val captured = BankSmsParser.parse(body.toString(), System.currentTimeMillis())
+        val captured = BankAlertParser.parse(body.toString(), System.currentTimeMillis(), Source.SMS)
         if (captured == null) {
             Log.d(TAG, "不是可识别的动账短信，跳过")
             return

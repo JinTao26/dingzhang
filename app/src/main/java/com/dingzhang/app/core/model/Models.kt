@@ -2,7 +2,14 @@ package com.dingzhang.app.core.model
 
 /** 交易方向。TRANSFER 是转账/内部划转，不计入收支统计。 */
 enum class TxnKind(val db: String) {
-    EXPENSE("expense"), INCOME("income"), TRANSFER("transfer");
+    EXPENSE("expense"),
+    INCOME("income"),
+    TRANSFER("transfer"),
+    /**
+     * 退款：钱是回来了，但它不是「赚到的」，而是「这笔没花成」。
+     * 统计时从对应分类的支出里扣掉，不进收入；找不到原支出就挂「其他」。
+     */
+    REFUND("refund");
 
     companion object {
         fun from(v: String?): TxnKind = values().firstOrNull { it.db == v } ?: EXPENSE

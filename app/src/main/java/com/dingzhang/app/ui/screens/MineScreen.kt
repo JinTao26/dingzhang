@@ -36,9 +36,11 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -220,6 +222,18 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                 appEnabled = settings?.notificationChannel ?: true,
                 onToggle = { v ->
                     settings?.notificationChannel = v
+                    DingZhangApp.bumpDataVersion()
+                },
+                onGrant = { openSystem(ctx, android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS) }
+            )
+            Spacer(Modifier.height(6.dp))
+            ChannelRow(
+                title = "银行推送 / 公众号",
+                desc = "手机银行 App 的动账推送、银行公众号的微信提醒。短信开始收费以后，走这条更省",
+                systemGranted = nlsOn,
+                appEnabled = settings?.bankPushChannel ?: true,
+                onToggle = { v ->
+                    settings?.bankPushChannel = v
                     DingZhangApp.bumpDataVersion()
                 },
                 onGrant = { openSystem(ctx, android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS) }
@@ -488,6 +502,48 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
             Spacer(Modifier.height(6.dp))
             ActionRow("从备份恢复", "已存在的记录自动跳过，不会记重") {
                 restorePicker.launch(arrayOf("application/json", "*/*"))
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        // ---------- 反馈 ----------
+        DzCard {
+            var feedback by remember { mutableStateOf("") }
+            Text("意见反馈", style = MaterialTheme.typography.titleLarge, color = Dz.Ink)
+            Text(
+                "哪个分类认错了、哪笔没记上、哪句文案别扭，都能从这儿直接发到仓库 Issues。" +
+                    "会自动附上机型和开关状态，省得你再描述环境",
+                style = MaterialTheme.typography.bodySmall,
+                color = Dz.InkFaint,
+                modifier = Modifier.padding(top = 4.dp, bottom = 10.dp)
+            )
+            OutlinedTextField(
+                value = feedback,
+                onValueChange = { feedback = it },
+                placeholder = { Text("说说哪里不对…", color = Dz.InkFaint, fontSize = 13.sp) },
+                textStyle = MaterialTheme.typography.bodyMedium,
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 96.dp)
+            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Button(
+                    onClick = { submitFeedback(ctx, feedback) },
+                    enabled = feedback.isNotBlank(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Dz.Sakura, contentColor = Color.White),
+                    modifier = Modifier.padding(top = 10.dp)
+                ) { Text("发到 GitHub") }
+                TextButton(
+                    onClick = { copyFeedback(ctx, feedbackBody(ctx, feedback)) },
+                    enabled = feedback.isNotBlank(),
+                    modifier = Modifier.padding(top = 10.dp)
+                ) { Text("复制", color = Dz.InkSoft) }
             }
         }
 
@@ -797,6 +853,46 @@ private fun ChannelRow(
             }
         }
     }
+}
+
+/** 反馈正文带上环境信息：用户描述「它不记账」时，八成是某条通道没开。 */
+private fun feedbackBody(ctx: Context, text: String): String {
+    val s = IngestPipeline.settings
+    fun on(v: Boolean?) = if (v == true) "开" else "关"
+    return buildString {
+        appendLine(text.trim())
+        appendLine()
+        appendLine("---")
+        appendLine("版本：${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
+        appendLine("设备：${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL} · Android ${android.os.Build.VERSION.SDK_INT}")
+        appendLine(
+            "通道：无障碍 ${on(s?.accessibilityChannel)} / 通知 ${on(s?.notificationChannel)}" +
+                " / 银行推送 ${on(s?.bankPushChannel)} / 短信 ${on(s?.smsChannel)}"
+        )
+    }
+}
+
+private fun submitFeedback(ctx: Context, text: String) {
+    if (text.isBlank()) return
+    val body = feedbackBody(ctx, text)
+    val url = "https://github.com/JinTao26/dingzhang/issues/new?title=" +
+        Uri.encode("反馈：" + text.trim().take(24)) +
+        "&body=" + Uri.encode(body)
+    try {
+        ctx.startActivity(
+            Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
+    } catch (e: Exception) {
+        copyFeedback(ctx, body)
+        Toast.makeText(ctx, "打不开 GitHub，内容已复制到剪贴板", Toast.LENGTH_LONG).show()
+    }
+}
+
+private fun copyFeedback(ctx: Context, text: String) {
+    if (text.isBlank()) return
+    val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+    cm.setPrimaryClip(android.content.ClipData.newPlainText("叮账反馈", text))
+    Toast.makeText(ctx, "已复制", Toast.LENGTH_SHORT).show()
 }
 
 @Composable

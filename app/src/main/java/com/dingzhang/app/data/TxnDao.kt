@@ -125,14 +125,17 @@ class TxnDao(private val helper: DbHelper) {
         ).use { return it.toList() }
     }
 
-    /** 按分类聚合支出，用于统计页环形图和排行榜。 */
+    /** 按分类聚合支出，用于统计页环形图和排行榜。退款从同一分类里扣掉，不另算收入。 */
     fun sumByCategory(start: Long, end: Long): List<CategoryTotal> {
         helper.readableDatabase.rawQuery(
             """
-            SELECT category_id, SUM(amount_cents) AS s, COUNT(*) AS c
+            SELECT category_id,
+                   SUM(CASE WHEN kind = 'expense' THEN amount_cents ELSE -amount_cents END) AS s,
+                   SUM(CASE WHEN kind = 'expense' THEN 1 ELSE 0 END) AS c
             FROM txn
-            WHERE occurred_at >= ? AND occurred_at < ? AND kind = 'expense'
+            WHERE occurred_at >= ? AND occurred_at < ? AND kind IN ('expense', 'refund')
             GROUP BY category_id
+            HAVING s > 0
             ORDER BY s DESC
             """.trimIndent(),
             arrayOf(start.toString(), end.toString())
@@ -159,27 +162,44 @@ class TxnDao(private val helper: DbHelper) {
             var inc = 0L
             while (it.moveToNext()) {
                 when (it.getString(0)) {
-                    "expense" -> exp = it.getLong(1)
-                    "income" -> inc = it.getLong(1)
+                    "expense" -> exp += it.getLong(1)
+                    "refund" -> exp -= it.getLong(1)
+                    "income" -> inc += it.getLong(1)
                 }
             }
             return exp to inc
         }
     }
 
-    /** 每日支出，返回「日 -> 分」。 */
+    /** 每日支出，返回「日 -> 分」。退款当天记成负数，曲线才对得上。 */
     fun dailyExpense(start: Long, end: Long): Map<Int, Long> {
         helper.readableDatabase.rawQuery(
-            "SELECT occurred_at, amount_cents FROM txn WHERE occurred_at >= ? AND occurred_at < ? AND kind = 'expense'",
+            "SELECT occurred_at, amount_cents, kind FROM txn WHERE occurred_at >= ? AND occurred_at < ? AND kind IN ('expense', 'refund')",
             arrayOf(start.toString(), end.toString())
         ).use {
             val map = HashMap<Int, Long>()
             while (it.moveToNext()) {
                 val d = Dates.dayIndex(it.getLong(0))
-                map[d] = (map[d] ?: 0L) + it.getLong(1)
+                val v = if (it.getString(2) == "refund") -it.getLong(1) else it.getLong(1)
+                map[d] = (map[d] ?: 0L) + v
             }
             return map
         }
+    }
+
+    /**
+     * 退款该算到哪个分类？找 90 天内同商户最近的一笔支出，沿用它的分类。
+     * 找不到返回 null，调用方会挂到「其他」。
+     */
+    fun findRefundTarget(payee: String, at: Long): Txn? {
+        if (payee.isBlank()) return null
+        val from = at - 90L * 24 * 60 * 60 * 1000
+        helper.readableDatabase.rawQuery(
+            "SELECT * FROM txn WHERE kind = 'expense' AND occurred_at BETWEEN ? AND ? AND payee LIKE ? " +
+                "ORDER BY occurred_at DESC LIMIT 1",
+            arrayOf(from.toString(), at.toString(), "%$payee%")
+        ).use { if (it.moveToFirst()) return it.toTxn() }
+        return null
     }
 
     fun countBySource(start: Long, end: Long): Map<Source, Int> {

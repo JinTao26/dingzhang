@@ -30,6 +30,7 @@ object PaymentNotifierParser {
         "支付成功", "付款成功", "已支付", "已付款", "扣款", "消费", "付款", "支付"
     )
     private val transferCues = listOf("还款成功", "已还款", "提现成功", "转账成功", "余额转入")
+    private val refundCues = listOf("退款", "已退回", "退回")
 
     /** 这些通知肯定不是一笔消费，先挡掉，省得后面误判。 */
     private val noise = listOf(
@@ -84,6 +85,8 @@ object PaymentNotifierParser {
 
         val kind = when {
             isTransfer -> TxnKind.TRANSFER
+            // 「退款到账」也会命中 incomeCues，得先在退款上判一次
+            refundCues.any { corpus.contains(it) } -> TxnKind.REFUND
             isIncome && !isExpense -> TxnKind.INCOME
             else -> TxnKind.EXPENSE
         }

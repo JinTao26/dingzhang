@@ -47,6 +47,8 @@ object Money {
         TxnKind.EXPENSE -> "-" + yuan(cents)
         TxnKind.INCOME -> "+" + yuan(cents)
         TxnKind.TRANSFER -> yuan(cents)
+        // 退款用负号：它减的是支出，不是加的收入
+        TxnKind.REFUND -> "-" + yuan(cents)
     }
 }
 

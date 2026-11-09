@@ -107,6 +107,9 @@ object BillParsers {
 
             val kindHint = when {
                 dirRaw.contains("不计收支") || dirRaw.contains("中性") -> TxnKind.TRANSFER
+                // 退款在账单里方向是「收入」，但它不是赚到的钱，要冲抵原来那笔支出
+                !dirRaw.contains("支出") &&
+                    listOf("退款", "已退回", "退货", "退回").any { joined.contains(it) } -> TxnKind.REFUND
                 dirRaw.contains("收入") || dirRaw.contains("入账") -> TxnKind.INCOME
                 dirRaw.contains("支出") || dirRaw.contains("出账") -> TxnKind.EXPENSE
                 else -> null

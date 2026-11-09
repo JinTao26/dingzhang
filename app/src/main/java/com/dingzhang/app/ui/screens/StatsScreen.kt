@@ -13,9 +13,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -29,6 +31,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dingzhang.app.core.model.Categories
@@ -92,8 +95,9 @@ fun StatsScreen(data: AppData) {
                         val sweep = c.cents.toFloat() / sum * 360f
                         drawArc(
                             color = Categories.of(c.categoryId).ui,
-                            startAngle = start + 1.5f,
-                            sweepAngle = (sweep - 3f).coerceAtLeast(1f),
+                            // 每段之间留一条缝，颜色再接近也不会连成一片
+                            startAngle = start + 2f,
+                            sweepAngle = (sweep - 4f).coerceAtLeast(1.5f),
                             useCenter = false,
                             topLeft = Offset(inset, inset),
                             size = Size(side, side),
@@ -117,24 +121,38 @@ fun StatsScreen(data: AppData) {
                     )
                 }
             }
-            Spacer(Modifier.height(12.dp))
-            // 图例：前四类
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                cats.take(4).forEach { c ->
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                        Box(
-                            Modifier
-                                .size(8.dp)
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(Categories.of(c.categoryId).ui)
-                        )
-                        Text(
-                            Categories.of(c.categoryId).name,
-                            fontSize = 10.sp,
-                            color = Dz.InkSoft,
-                            maxLines = 1,
-                            modifier = Modifier.padding(start = 4.dp)
-                        )
+            Spacer(Modifier.height(14.dp))
+            // 图例：全部分类，两列铺开 —— 只列前四名会让「剩下那 30% 是谁」永远找不到
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                cats.chunked(2).forEach { pair ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                        pair.forEach { c ->
+                            val cat = Categories.of(c.categoryId)
+                            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    Modifier
+                                        .size(9.dp)
+                                        .clip(RoundedCornerShape(2.dp))
+                                        .background(cat.ui)
+                                )
+                                Column(Modifier.weight(1f).padding(start = 6.dp)) {
+                                    Text(
+                                        cat.name,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = Dz.Ink,
+                                        maxLines = 1
+                                    )
+                                    Text(
+                                        "¥${Money.yuan(c.cents)} · ${(c.cents.toFloat() / total * 100).toInt()}%",
+                                        fontSize = 10.sp,
+                                        color = Dz.InkFaint,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+                        }
+                        if (pair.size == 1) Spacer(Modifier.weight(1f))
                     }
                 }
             }
@@ -146,7 +164,16 @@ fun StatsScreen(data: AppData) {
         DzCard {
             Text("花在哪儿了", style = MaterialTheme.typography.titleLarge, color = Dz.Ink)
             Spacer(Modifier.height(10.dp))
-            cats.forEach { c -> CategoryBar(c, total) }
+            cats.forEachIndexed { i, c ->
+                if (i > 0) {
+                    HorizontalDivider(
+                        color = Dz.Line,
+                        thickness = 0.6.dp,
+                        modifier = Modifier.padding(vertical = 2.dp)
+                    )
+                }
+                CategoryBar(c, total)
+            }
         }
 
         Spacer(Modifier.height(12.dp))
@@ -232,12 +259,16 @@ private fun CategoryBar(c: CategoryTotal, total: Long) {
                 Text(
                     "¥${Money.yuan(c.cents)}",
                     style = MaterialTheme.typography.labelLarge,
-                    color = Dz.Ink
+                    color = Dz.Ink,
+                    textAlign = TextAlign.End,
+                    modifier = Modifier.width(76.dp)
                 )
                 Text(
-                    "  ${(pct * 100).toInt()}%",
+                    "${(pct * 100).toInt()}%",
                     style = MaterialTheme.typography.labelSmall,
-                    color = Dz.InkFaint
+                    color = Dz.InkFaint,
+                    textAlign = TextAlign.End,
+                    modifier = Modifier.width(36.dp)
                 )
             }
             Spacer(Modifier.height(5.dp))

@@ -123,8 +123,11 @@ private fun loadAppData(month: String): AppData {
         monthExpense = expense,
         monthIncome = income,
         monthCount = byCat.sumOf { it.count },
+        // 今天花的钱要把今天的退款扣掉，否则「退款 30、又花 30」会被算成花了 30
         todayExpense = todayList.filter { it.kind == com.dingzhang.app.core.model.TxnKind.EXPENSE }
-            .sumOf { it.amountCents },
+            .sumOf { it.amountCents } -
+            todayList.filter { it.kind == com.dingzhang.app.core.model.TxnKind.REFUND }
+                .sumOf { it.amountCents },
         todayCount = todayList.size,
         pendingCount = dao.countAuto(),
         byCategory = byCat,

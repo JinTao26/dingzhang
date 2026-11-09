@@ -51,6 +51,14 @@ class Settings(context: Context) {
         get() = sp.getBoolean("channel_sms", false)
         set(v) = sp.edit().putBoolean("channel_sms", v).apply()
 
+    /**
+     * 银行提醒（App 推送 + 公众号）走通知监听，不需要额外权限，默认开。
+     * 短信收费以后，这条比短信更划算。
+     */
+    var bankPushChannel: Boolean
+        get() = sp.getBoolean("channel_bank_push", true)
+        set(v) = sp.edit().putBoolean("channel_bank_push", v).apply()
+
     fun addIgnoredPayee(payee: String) {
         val cur = sp.getStringSet("ignored_payees", emptySet()) ?: emptySet()
         sp.edit().putStringSet("ignored_payees", cur + payee).apply()

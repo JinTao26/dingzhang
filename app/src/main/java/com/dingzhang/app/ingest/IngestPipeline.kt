@@ -95,7 +95,12 @@ object IngestPipeline {
         val rules = cachedRules ?: dao.rules()
         val cls = CategoryEngine.classify(payee, c.note, c.raw, rules)
         val kind = c.kindHint ?: cls.kind
-        val categoryId = if (kind == TxnKind.TRANSFER) "other" else cls.categoryId
+        val categoryId = when (kind) {
+            TxnKind.TRANSFER -> "other"
+            // 退款挂回原来那笔支出的分类：统计时才从「餐饮」里扣，而不是跑到收入里去
+            TxnKind.REFUND -> dao.findRefundTarget(payee, c.occurredAt)?.categoryId ?: "other"
+            else -> cls.categoryId
+        }
 
         val status = when {
             c.source == Source.BILL_IMPORT -> TxnStatus.CONFIRMED

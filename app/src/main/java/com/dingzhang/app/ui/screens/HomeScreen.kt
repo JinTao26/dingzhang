@@ -406,6 +406,7 @@ fun TxnRow(txn: Txn, modifier: Modifier = Modifier, onClick: (() -> Unit)? = nul
                 TxnKind.EXPENSE -> Dz.Ink
                 TxnKind.INCOME -> Dz.Income
                 TxnKind.TRANSFER -> Dz.InkFaint
+                TxnKind.REFUND -> Dz.Income
             }
         )
     }

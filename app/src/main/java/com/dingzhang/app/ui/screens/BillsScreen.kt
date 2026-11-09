@@ -68,7 +68,7 @@ fun BillsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
 
     val filtered = remember(data, filter) {
         when (filter) {
-            1 -> data.monthTxns.filter { it.kind == TxnKind.EXPENSE }
+            1 -> data.monthTxns.filter { it.kind == TxnKind.EXPENSE || it.kind == TxnKind.REFUND }
             2 -> data.monthTxns.filter { it.kind == TxnKind.INCOME }
             3 -> data.monthTxns.filter { it.status == TxnStatus.AUTO }
             else -> data.monthTxns
@@ -175,7 +175,8 @@ private fun FilterChip(label: String, active: Boolean, onClick: () -> Unit) {
 
 @Composable
 private fun DayHeader(day: String, list: List<Txn>) {
-    val spent = list.filter { it.kind == TxnKind.EXPENSE }.sumOf { it.amountCents }
+    val spent = list.filter { it.kind == TxnKind.EXPENSE }.sumOf { it.amountCents } -
+        list.filter { it.kind == TxnKind.REFUND }.sumOf { it.amountCents }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -221,6 +222,8 @@ private fun TxnLine(txn: Txn, onClick: () -> Unit) {
                 Text(
                     buildString {
                         append(Categories.of(txn.categoryId).name)
+                        // 退款和普通支出长得像，不给个标记会以为记重了
+                        if (txn.kind == TxnKind.REFUND) append(" · 退款")
                         if (txn.account.isNotBlank()) append(" · ${txn.account}")
                         append(" · ${txn.source.label}")
                     },
@@ -238,6 +241,7 @@ private fun TxnLine(txn: Txn, onClick: () -> Unit) {
                         TxnKind.EXPENSE -> Dz.Ink
                         TxnKind.INCOME -> Dz.Income
                         TxnKind.TRANSFER -> Dz.InkFaint
+                        TxnKind.REFUND -> Dz.Income
                     }
                 )
                 Text(Dates.timeOf(txn.occurredAt), style = MaterialTheme.typography.labelSmall, color = Dz.InkFaint)
@@ -289,7 +293,7 @@ private fun TxnDetailDialog(
                     Money.signed(txn.amountCents, txn.kind),
                     fontWeight = FontWeight.Bold,
                     fontSize = 20.sp,
-                    color = if (txn.kind == TxnKind.INCOME) Dz.Income else Dz.Ink
+                    color = if (txn.kind == TxnKind.INCOME || txn.kind == TxnKind.REFUND) Dz.Income else Dz.Ink
                 )
             }
 
