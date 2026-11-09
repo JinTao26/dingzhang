@@ -43,13 +43,8 @@ class Settings(context: Context) {
         get() = sp.getString("theme_id", "sakura") ?: "sakura"
         set(v) = sp.edit().putString("theme_id", v).apply()
 
-    /**
-     * 银行短信通道。默认关：它要一条短信权限，而且只对「钱不经过微信支付宝」的场景有用
-     * （工资到账、线下刷卡、银行间转账）。
-     */
-    var smsChannel: Boolean
-        get() = sp.getBoolean("channel_sms", false)
-        set(v) = sp.edit().putBoolean("channel_sms", v).apply()
+    // 短信通道已下线：RECEIVE_SMS 在很多机型上根本授不下来，全中国短信也越来越少发。
+    // 银行那一路统一走「App 推送 / 公众号」= bankPushChannel，用的是通知监听，不额外要权限。
 
     /**
      * 银行提醒（App 推送 + 公众号）走通知监听，不需要额外权限，默认开。

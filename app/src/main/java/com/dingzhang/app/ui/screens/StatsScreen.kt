@@ -13,10 +13,12 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
@@ -40,15 +42,21 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.dingzhang.app.core.model.Categories
 import com.dingzhang.app.core.model.CategoryTotal
+import com.dingzhang.app.core.model.Dates
 import com.dingzhang.app.core.model.Money
 import com.dingzhang.app.core.model.Source
+import com.dingzhang.app.core.model.Txn
+import com.dingzhang.app.core.model.TxnKind
 import com.dingzhang.app.ui.AppData
 import com.dingzhang.app.ui.components.CategoryBadge
 import com.dingzhang.app.ui.components.DzCard
 import com.dingzhang.app.ui.components.EmptyHint
+import com.dingzhang.app.ui.components.MonthPickerDialog
 import com.dingzhang.app.ui.components.ui
+import com.dingzhang.app.ui.shiftMonth
 import com.dingzhang.app.ui.theme.Dz
 import kotlin.math.abs
 
@@ -57,10 +65,13 @@ import kotlin.math.abs
  *
  * 月看的是「这个月花在哪」，年看的是「这一年怎么过来的」——
  * 所以趋势图也跟着换：月看每天，年看每个月。
+ * 顶部标题可以点，直接跳到任意年月；点某个分类能看到那个分类的明细。
  */
 @Composable
-fun StatsScreen(data: AppData) {
+fun StatsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
     var yearScope by remember { mutableStateOf(false) }
+    var showPicker by remember { mutableStateOf(false) }
+    var detailCategory by remember { mutableStateOf<String?>(null) }
 
     val cats = if (yearScope) data.yearByCategory else data.byCategory
     // 环图与百分比的分母用分类合计，保证环内自洽；
@@ -69,8 +80,26 @@ fun StatsScreen(data: AppData) {
     val expense = if (yearScope) data.yearExpense else data.monthExpense
     val income = if (yearScope) data.yearIncome else data.monthIncome
     val count = if (yearScope) data.yearCount else data.monthCount
-    val label = if (yearScope) "${data.yearLabel} 年" else data.monthLabel
+    val title = if (yearScope) "${data.yearLabel} 年" else data.monthLabel
     val sources = if (yearScope) data.yearSourceCounts else data.sourceCounts
+    val txns = if (yearScope) data.yearTxns else data.monthTxns
+
+    if (showPicker) {
+        MonthPickerDialog(
+            month = month,
+            onDismiss = { showPicker = false },
+            onPick = { onMonthChange(it) }
+        )
+    }
+
+    detailCategory?.let { cid ->
+        CategoryDetailDialog(
+            categoryId = cid,
+            txns = txns.filter { it.categoryId == cid },
+            isYear = yearScope,
+            onDismiss = { detailCategory = null }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -79,14 +108,37 @@ fun StatsScreen(data: AppData) {
             .padding(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 96.dp)
     ) {
         Text("统计", style = MaterialTheme.typography.headlineLarge, color = Dz.Ink)
-        Text(
-            "$label · 共 $count 笔",
-            style = MaterialTheme.typography.bodySmall,
-            color = Dz.InkFaint,
-            modifier = Modifier.padding(top = 2.dp)
-        )
 
-        Spacer(Modifier.height(12.dp))
+        // 周期导航：年视图下箭头翻整年，月视图下翻单月；点中间直接选年月
+        Spacer(Modifier.height(8.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            NavArrow("‹") {
+                onMonthChange(shiftMonth(month, if (yearScope) -12 else -1))
+            }
+            Column(
+                Modifier
+                    .weight(1f)
+                    .clickable { showPicker = true }
+                    .padding(vertical = 6.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Dz.Ink
+                )
+                Text(
+                    "共 $count 笔",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Dz.InkFaint
+                )
+            }
+            NavArrow("›") {
+                onMonthChange(shiftMonth(month, if (yearScope) 12 else 1))
+            }
+        }
+
+        Spacer(Modifier.height(10.dp))
         ScopeTabs(yearScope) { yearScope = it }
 
         Spacer(Modifier.height(12.dp))
@@ -102,11 +154,17 @@ fun StatsScreen(data: AppData) {
             }
         } else {
             Spacer(Modifier.height(12.dp))
-            RingCard(cats, ringTotal, yearScope)
+            RingCard(cats, ringTotal, yearScope) { detailCategory = it }
 
             Spacer(Modifier.height(12.dp))
             DzCard {
                 Text("花在哪儿了", style = MaterialTheme.typography.titleLarge, color = Dz.Ink)
+                Text(
+                    "点一行看明细",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Dz.InkFaint,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
                 Spacer(Modifier.height(10.dp))
                 cats.forEachIndexed { i, c ->
                     if (i > 0) {
@@ -116,7 +174,7 @@ fun StatsScreen(data: AppData) {
                             modifier = Modifier.padding(vertical = 2.dp)
                         )
                     }
-                    CategoryBar(c, ringTotal)
+                    CategoryBar(c, ringTotal) { detailCategory = c.categoryId }
                 }
             }
 
@@ -138,6 +196,20 @@ fun StatsScreen(data: AppData) {
 
         Spacer(Modifier.height(12.dp))
         AutoCard(sources)
+    }
+}
+
+@Composable
+private fun NavArrow(symbol: String, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .size(32.dp)
+            .clip(CircleShape)
+            .background(Dz.Card)
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        Text(symbol, fontSize = 17.sp, color = Dz.InkSoft)
     }
 }
 
@@ -228,7 +300,8 @@ private fun SummaryCard(expense: Long, income: Long, isYear: Boolean) {
 private fun RingCard(
     cats: List<CategoryTotal>,
     ringTotal: Long,
-    isYear: Boolean
+    isYear: Boolean,
+    onCategoryClick: (String) -> Unit
 ) {
     DzCard(padding = 20.dp) {
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -280,7 +353,13 @@ private fun RingCard(
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                     pair.forEach { c ->
                         val cat = Categories.of(c.categoryId)
-                        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            Modifier
+                                .weight(1f)
+                                .clickable { onCategoryClick(c.categoryId) }
+                                .padding(vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             Box(
                                 Modifier
                                     .size(9.dp)
@@ -353,12 +432,13 @@ private fun AutoCard(sources: Map<Source, Int>) {
 }
 
 @Composable
-private fun CategoryBar(c: CategoryTotal, total: Long) {
+private fun CategoryBar(c: CategoryTotal, total: Long, onClick: () -> Unit) {
     val cat = Categories.of(c.categoryId)
     val pct = if (total > 0) c.cents.toFloat() / total.toFloat() else 0f
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable(onClick = onClick)
             .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -405,6 +485,118 @@ private fun CategoryBar(c: CategoryTotal, total: Long) {
             }
         }
     }
+}
+
+/** 点分类弹出来的明细。列表最多摆 200 条，再多也没人在手机上翻。 */
+@Composable
+private fun CategoryDetailDialog(
+    categoryId: String,
+    txns: List<Txn>,
+    isYear: Boolean,
+    onDismiss: () -> Unit
+) {
+    val cat = Categories.of(categoryId)
+    val net = txns.fold(0L) { acc, t ->
+        acc + if (t.kind == TxnKind.REFUND) -t.amountCents else t.amountCents
+    }
+    val sorted = txns.sortedByDescending { it.occurredAt }
+    val shown = sorted.take(200)
+
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .heightIn(max = 560.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(Dz.Card)
+                .padding(16.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CategoryBadge(categoryId, 32.dp)
+                Column(Modifier.weight(1f).padding(start = 10.dp)) {
+                    Text(cat.name, style = MaterialTheme.typography.titleMedium, color = Dz.Ink)
+                    Text(
+                        "${txns.size} 笔 · 合计 ¥${Money.yuan(net)}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Dz.InkFaint
+                    )
+                }
+                Box(
+                    Modifier
+                        .size(30.dp)
+                        .clip(CircleShape)
+                        .background(Dz.Cream)
+                        .clickable { onDismiss() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("×", fontSize = 16.sp, color = Dz.InkSoft)
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            HorizontalDivider(color = Dz.Line, thickness = 0.6.dp)
+
+            if (sorted.isEmpty()) {
+                EmptyHint(
+                    if (isYear) "这一年没有${cat.name}的记录" else "这个月没有${cat.name}的记录",
+                    "换个周期再看"
+                )
+            } else {
+                Column(
+                    Modifier
+                        .verticalScroll(rememberScrollState())
+                        .padding(top = 4.dp)
+                ) {
+                    shown.forEach { t ->
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 9.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    t.payee.ifBlank { t.note.ifBlank { "未命名" } },
+                                    fontSize = 13.sp,
+                                    color = Dz.Ink,
+                                    maxLines = 1
+                                )
+                                Text(
+                                    "${Dates.dayOf(t.occurredAt).takeLast(5)} ${Dates.timeOf(t.occurredAt)}",
+                                    fontSize = 10.sp,
+                                    color = Dz.InkFaint
+                                )
+                            }
+                            Text(
+                                signedText(t),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = when (t.kind) {
+                                    TxnKind.REFUND, TxnKind.INCOME -> Dz.Mint
+                                    else -> Dz.Ink
+                                }
+                            )
+                        }
+                        HorizontalDivider(color = Dz.Line, thickness = 0.5.dp)
+                    }
+                    if (sorted.size > shown.size) {
+                        Text(
+                            "只显示最近 200 条，其余 ${sorted.size - shown.size} 条没展开",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Dz.InkFaint,
+                            modifier = Modifier.padding(vertical = 10.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun signedText(t: Txn): String = when (t.kind) {
+    TxnKind.REFUND -> "+¥${Money.yuan(t.amountCents)}"
+    TxnKind.INCOME -> "+¥${Money.yuan(t.amountCents)}"
+    TxnKind.TRANSFER -> "¥${Money.yuan(t.amountCents)}"
+    TxnKind.EXPENSE -> "-¥${Money.yuan(t.amountCents)}"
 }
 
 /** 月视图：这个月每天花了多少。 */

@@ -93,6 +93,8 @@ data class AppData(
     val yearByCategory: List<CategoryTotal> = emptyList(),
     val monthly: Map<String, Long> = emptyMap(),
     val yearSourceCounts: Map<Source, Int> = emptyMap(),
+    /** 全年流水，点分类看明细时用 */
+    val yearTxns: List<Txn> = emptyList(),
     val rules: List<LearnedRule> = emptyList(),
     val ignoredPayees: Set<String> = emptySet(),
     val lastImportAt: Long = 0,
@@ -174,6 +176,7 @@ private fun loadAppData(month: String): AppData {
         yearByCategory = yByCat,
         monthly = dao.monthlyExpense(yStart, yEnd),
         yearSourceCounts = dao.countBySource(yStart, yEnd),
+        yearTxns = dao.listBetween(yStart, yEnd),
         rules = dao.rules(),
         ignoredPayees = settings?.ignoredPayees() ?: emptySet(),
         lastImportAt = settings?.lastBillImportAt ?: 0,
@@ -245,7 +248,7 @@ fun AppRoot() {
             when (tab) {
                 0 -> HomeScreen(data, month, onMonthChange = { month = it }, onGoTab = { tab = it })
                 1 -> BillsScreen(data, month, onMonthChange = { month = it })
-                2 -> StatsScreen(data)
+                2 -> StatsScreen(data, month, onMonthChange = { month = it })
                 else -> MineScreen(data, month, onMonthChange = { month = it })
             }
         }

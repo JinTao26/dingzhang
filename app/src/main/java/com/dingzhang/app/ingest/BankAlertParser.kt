@@ -46,9 +46,9 @@ object BankAlertParser {
     private val bankHints = listOf("银行", "储蓄卡", "储蓄账户", "信用卡", "借记卡", "账户")
 
     /**
-     * @param source 短信传 [Source.SMS]，App 推送 / 公众号提醒传 [Source.NOTIFICATION]。
+     * @param source App 推送 / 公众号提醒都传 [Source.NOTIFICATION]。
      */
-    fun parse(body: String, at: Long, source: Source = Source.SMS): Captured? {
+    fun parse(body: String, at: Long, source: Source = Source.NOTIFICATION): Captured? {
         val flat = body.replace('\n', ' ').replace('\r', ' ').trim()
         if (flat.isBlank()) return null
         if (!bankHints.any { flat.contains(it) }) return null

@@ -1,9 +1,7 @@
 package com.dingzhang.app.ui.screens
 
-import android.Manifest
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -52,13 +50,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.app.NotificationManagerCompat
-import androidx.core.content.ContextCompat
 import com.dingzhang.app.DingZhangApp
 import com.dingzhang.app.BuildConfig
 import com.dingzhang.app.core.model.Categories
@@ -88,29 +87,59 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
     var importing by remember { mutableStateOf(false) }
     var result by remember { mutableStateOf<ImportResult?>(null) }
     var confirmClear by remember { mutableStateOf(false) }
+    var budgetEdit by remember { mutableStateOf(false) }
+    var budgetInput by remember { mutableStateOf("") }
+
+    // 预算自己填：常用档给四个快选，想填多少填多少
+    if (budgetEdit) {
+        Dialog(onDismissRequest = { budgetEdit = false }) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Dz.Card)
+                    .padding(18.dp)
+            ) {
+                Text("每月预算", style = MaterialTheme.typography.titleLarge, color = Dz.Ink)
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = budgetInput,
+                    onValueChange = { v ->
+                        budgetInput = v.filter { it.isDigit() || it == '.' }.take(9)
+                    },
+                    label = { Text("金额（元）") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "填 0 表示不设预算，首页那条「预算还剩」就不显示了",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Dz.InkFaint
+                )
+                Spacer(Modifier.height(12.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = { budgetEdit = false }) {
+                        Text("取消", color = Dz.InkSoft)
+                    }
+                    TextButton(onClick = {
+                        val y = budgetInput.toDoubleOrNull() ?: 0.0
+                        settings?.monthlyBudgetCents = (y * 100).toLong()
+                        budgetEdit = false
+                        DingZhangApp.bumpDataVersion()
+                    }) {
+                        Text("保存", color = Dz.SakuraDeep, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
 
     // 每次进入本页实时读系统权限状态，用户从设置页回来就能看到变化
     val a11yOn = isA11yEnabled(ctx)
     val nlsOn = isNlsEnabled(ctx)
-
-    // 银行短信要一条运行时权限，授权状态每进一次页面重新读
-    var smsGranted by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECEIVE_SMS) ==
-                PackageManager.PERMISSION_GRANTED
-        )
-    }
-    val smsPermission = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        smsGranted = granted
-        if (granted) {
-            settings?.smsChannel = true
-            DingZhangApp.bumpDataVersion()
-        } else {
-            Toast.makeText(ctx, "没给短信权限，银行到账就看不到", Toast.LENGTH_SHORT).show()
-        }
-    }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
@@ -240,22 +269,6 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                 },
                 onGrant = { openSystem(ctx, android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS) }
             )
-            Spacer(Modifier.height(6.dp))
-            ChannelRow(
-                title = "银行短信",
-                desc = "工资到账、线下刷卡这类不经过微信支付宝的钱，从银行动账短信里读。只认动账，余额和完整卡号不入库",
-                systemGranted = smsGranted,
-                appEnabled = settings?.smsChannel ?: false,
-                onToggle = { v ->
-                    if (v && !smsGranted) {
-                        smsPermission.launch(Manifest.permission.RECEIVE_SMS)
-                    } else {
-                        settings?.smsChannel = v
-                        DingZhangApp.bumpDataVersion()
-                    }
-                },
-                onGrant = { smsPermission.launch(Manifest.permission.RECEIVE_SMS) }
-            )
         }
 
         Spacer(Modifier.height(12.dp))
@@ -347,7 +360,28 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
             }
 
             Spacer(Modifier.height(14.dp))
-            Text("每月预算", style = MaterialTheme.typography.bodyMedium, color = Dz.InkSoft)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("每月预算", style = MaterialTheme.typography.bodyMedium, color = Dz.InkSoft)
+                Spacer(Modifier.weight(1f))
+                Text(
+                    "¥${Money.yuan(settings?.monthlyBudgetCents ?: 300_000L)}",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Dz.Ink
+                )
+                Spacer(Modifier.width(8.dp))
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Dz.SakuraSoft)
+                        .clickable {
+                            budgetInput = ((settings?.monthlyBudgetCents ?: 300_000L) / 100).toString()
+                            budgetEdit = true
+                        }
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                ) {
+                    Text("自定义", style = MaterialTheme.typography.labelSmall, color = Dz.SakuraDeep)
+                }
+            }
             Spacer(Modifier.height(6.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(100_000L to "1000", 300_000L to "3000", 500_000L to "5000", 1_000_000L to "1万")
@@ -828,7 +862,7 @@ private fun feedbackBody(ctx: Context, text: String): String {
         appendLine("设备：${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL} · Android ${android.os.Build.VERSION.SDK_INT}")
         appendLine(
             "通道：无障碍 ${on(s?.accessibilityChannel)} / 通知 ${on(s?.notificationChannel)}" +
-                " / 银行推送 ${on(s?.bankPushChannel)} / 短信 ${on(s?.smsChannel)}"
+                " / 银行推送 ${on(s?.bankPushChannel)}"
         )
     }
 }
