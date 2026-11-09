@@ -38,6 +38,19 @@ class Settings(context: Context) {
         get() = sp.getLong("last_import", 0L)
         set(v) = sp.edit().putLong("last_import", v).apply()
 
+    /** 当前主题包 id，见 ui/theme/ThemePacks.ALL */
+    var themeId: String
+        get() = sp.getString("theme_id", "sakura") ?: "sakura"
+        set(v) = sp.edit().putString("theme_id", v).apply()
+
+    /**
+     * 银行短信通道。默认关：它要一条短信权限，而且只对「钱不经过微信支付宝」的场景有用
+     * （工资到账、线下刷卡、银行间转账）。
+     */
+    var smsChannel: Boolean
+        get() = sp.getBoolean("channel_sms", false)
+        set(v) = sp.edit().putBoolean("channel_sms", v).apply()
+
     fun addIgnoredPayee(payee: String) {
         val cur = sp.getStringSet("ignored_payees", emptySet()) ?: emptySet()
         sp.edit().putStringSet("ignored_payees", cur + payee).apply()

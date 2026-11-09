@@ -1,60 +1,93 @@
 package com.dingzhang.app.ui.theme
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
+import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowCompat
 
 /**
- * 配色：奶油粉底 + 樱粉主色 + 丁香紫副色 + 薄荷点缀。
- * 二次元感主要来自「低对比 + 高饱和点缀 + 大圆角 + 贴纸描边」，
- * 而不是往界面里堆插画，这就是设计上的取舍。
+ * 界面里所有颜色的入口。
+ *
+ * 这些属性都是「读当前主题包」的 getter，不是一个写死的常量表 ——
+ * 好处是整个 App 用 Dz.Sakura 用了两百多处，换主题时它们全部跟着变，
+ * 不用把每个界面改一遍（也不会漏）。
  */
 object Dz {
-    val Sakura = Color(0xFFFF8FB1)
-    val SakuraDeep = Color(0xFFF0638F)
-    val SakuraSoft = Color(0xFFFFE4ED)
-    val Lilac = Color(0xFFA78BFA)
-    val LilacSoft = Color(0xFFEFE8FF)
-    val Mint = Color(0xFF6FD9BC)
-    val MintSoft = Color(0xFFE2FAF3)
-    val Cream = Color(0xFFFFF7FA)
-    val Card = Color(0xFFFFFFFF)
-    val Ink = Color(0xFF3B2E45)
-    val InkSoft = Color(0xFF8A7D96)
-    val InkFaint = Color(0xFFBDB4C6)
-    val Line = Color(0xFFF2E7ED)
-    val Warn = Color(0xFFFFA63D)
-    val WarnSoft = Color(0xFFFFF1DE)
-    val Expense = Color(0xFFF2587A)
-    val Income = Color(0xFF16BF95)
+    private val p: ThemePack get() = ThemeController.current
+
+    val Sakura: Color get() = p.primary
+    val SakuraDeep: Color get() = p.primaryDeep
+    val SakuraSoft: Color get() = p.primarySoft
+    val Lilac: Color get() = p.secondary
+    val LilacSoft: Color get() = p.secondarySoft
+    val Mint: Color get() = p.accent
+    val MintSoft: Color get() = p.accentSoft
+    val Cream: Color get() = p.bg
+    val Card: Color get() = p.card
+    val Ink: Color get() = p.ink
+    val InkSoft: Color get() = p.inkSoft
+    val InkFaint: Color get() = p.inkFaint
+    val Line: Color get() = p.line
+    val Warn: Color get() = p.warn
+    val WarnSoft: Color get() = p.warnSoft
+    val Expense: Color get() = p.expense
+    val Income: Color get() = p.income
 }
 
-private val colors = lightColorScheme(
-    primary = Dz.Sakura,
-    onPrimary = Color.White,
-    primaryContainer = Dz.SakuraSoft,
-    onPrimaryContainer = Dz.SakuraDeep,
-    secondary = Dz.Lilac,
-    onSecondary = Color.White,
-    secondaryContainer = Dz.LilacSoft,
-    tertiary = Dz.Mint,
-    background = Dz.Cream,
-    onBackground = Dz.Ink,
-    surface = Dz.Card,
-    onSurface = Dz.Ink,
-    surfaceVariant = Dz.SakuraSoft,
-    onSurfaceVariant = Dz.InkSoft,
-    outline = Dz.Line,
-    error = Dz.Expense
-)
+private fun schemeOf(p: ThemePack) = if (p.dark) {
+    darkColorScheme(
+        primary = p.primary,
+        onPrimary = p.bg,
+        primaryContainer = p.primarySoft,
+        onPrimaryContainer = p.primaryDeep,
+        secondary = p.secondary,
+        onSecondary = p.bg,
+        secondaryContainer = p.secondarySoft,
+        tertiary = p.accent,
+        background = p.bg,
+        onBackground = p.ink,
+        surface = p.card,
+        onSurface = p.ink,
+        surfaceVariant = p.primarySoft,
+        onSurfaceVariant = p.inkSoft,
+        outline = p.line,
+        error = p.expense
+    )
+} else {
+    lightColorScheme(
+        primary = p.primary,
+        onPrimary = Color.White,
+        primaryContainer = p.primarySoft,
+        onPrimaryContainer = p.primaryDeep,
+        secondary = p.secondary,
+        onSecondary = Color.White,
+        secondaryContainer = p.secondarySoft,
+        tertiary = p.accent,
+        background = p.bg,
+        onBackground = p.ink,
+        surface = p.card,
+        onSurface = p.ink,
+        surfaceVariant = p.primarySoft,
+        onSurfaceVariant = p.inkSoft,
+        outline = p.line,
+        error = p.expense
+    )
+}
 
 /** 金额用等宽数字，避免列表里金额左右跳动 */
 private val tabular = "tnum"
@@ -76,18 +109,42 @@ private val typography = Typography(
     labelSmall = TextStyle(fontSize = 11.sp, letterSpacing = 0.6.sp)
 )
 
-private val shapes = Shapes(
-    small = RoundedCornerShape(14.dp),
-    medium = RoundedCornerShape(22.dp),
-    large = RoundedCornerShape(30.dp)
-)
-
 @Composable
 fun DingZhangTheme(content: @Composable () -> Unit) {
+    val pack = ThemeController.current
+    val scheme = remember(pack.id) { schemeOf(pack) }
+    val shapes = remember(pack.id) {
+        Shapes(
+            small = RoundedCornerShape(pack.rSmall.dp),
+            medium = RoundedCornerShape(pack.rMedium.dp),
+            large = RoundedCornerShape(pack.rLarge.dp)
+        )
+    }
+
+    // 深色主题下状态栏/导航栏图标得翻成白色，否则黑图标压在暗底上看不见
+    val view = LocalView.current
+    if (!view.isInEditMode) {
+        SideEffect {
+            val window = view.context.findActivity()?.window ?: return@SideEffect
+            val bar = WindowCompat.getInsetsController(window, view)
+            bar.isAppearanceLightStatusBars = !pack.dark
+            bar.isAppearanceLightNavigationBars = !pack.dark
+        }
+    }
+
     MaterialTheme(
-        colorScheme = colors,
+        colorScheme = scheme,
         typography = typography,
         shapes = shapes,
         content = content
     )
+}
+
+private fun Context.findActivity(): Activity? {
+    var ctx: Context = this
+    while (ctx is ContextWrapper) {
+        if (ctx is Activity) return ctx
+        ctx = ctx.baseContext
+    }
+    return null
 }

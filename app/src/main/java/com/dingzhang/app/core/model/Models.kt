@@ -13,7 +13,8 @@ enum class TxnKind(val db: String) {
 enum class Source(val db: String) {
     ACCESSIBILITY("a11y"),   // 无障碍读支付结果页 / 账单详情页
     NOTIFICATION("notify"),  // 通知监听
-    BILL_IMPORT("bill"),     // 官方账单 CSV 导入（最权威）
+    BILL_IMPORT("bill"),     // 官方账单 CSV/Excel 导入（最权威）
+    SMS("sms"),              // 银行短信：工资到账、刷卡消费这类不经过微信支付宝的钱
     MANUAL("manual");        // 手记
 
     companion object {
@@ -25,6 +26,7 @@ enum class Source(val db: String) {
             ACCESSIBILITY -> "自动识别"
             NOTIFICATION -> "支付通知"
             BILL_IMPORT -> "账单导入"
+            SMS -> "银行短信"
             MANUAL -> "手动"
         }
 }

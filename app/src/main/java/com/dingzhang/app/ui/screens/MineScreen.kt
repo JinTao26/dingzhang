@@ -1,12 +1,15 @@
 package com.dingzhang.app.ui.screens
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -53,6 +56,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import com.dingzhang.app.DingZhangApp
 import com.dingzhang.app.BuildConfig
 import com.dingzhang.app.core.model.Categories
@@ -66,6 +70,9 @@ import com.dingzhang.app.ui.AppData
 import com.dingzhang.app.ui.components.DzCard
 import com.dingzhang.app.ui.components.MascotFace
 import com.dingzhang.app.ui.theme.Dz
+import com.dingzhang.app.ui.theme.ThemeController
+import com.dingzhang.app.ui.theme.ThemePack
+import com.dingzhang.app.ui.theme.ThemePacks
 import com.dingzhang.app.update.UpdateChecker
 import kotlinx.coroutines.launch
 
@@ -82,6 +89,25 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
     // 每次进入本页实时读系统权限状态，用户从设置页回来就能看到变化
     val a11yOn = isA11yEnabled(ctx)
     val nlsOn = isNlsEnabled(ctx)
+
+    // 银行短信要一条运行时权限，授权状态每进一次页面重新读
+    var smsGranted by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECEIVE_SMS) ==
+                PackageManager.PERMISSION_GRANTED
+        )
+    }
+    val smsPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        smsGranted = granted
+        if (granted) {
+            settings?.smsChannel = true
+            DingZhangApp.bumpDataVersion()
+        } else {
+            Toast.makeText(ctx, "没给短信权限，银行到账就看不到", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
@@ -197,6 +223,22 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                     DingZhangApp.bumpDataVersion()
                 },
                 onGrant = { openSystem(ctx, android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS) }
+            )
+            Spacer(Modifier.height(6.dp))
+            ChannelRow(
+                title = "银行短信",
+                desc = "工资到账、线下刷卡这类不经过微信支付宝的钱，从银行动账短信里读。只认动账，余额和完整卡号不入库",
+                systemGranted = smsGranted,
+                appEnabled = settings?.smsChannel ?: false,
+                onToggle = { v ->
+                    if (v && !smsGranted) {
+                        smsPermission.launch(Manifest.permission.RECEIVE_SMS)
+                    } else {
+                        settings?.smsChannel = v
+                        DingZhangApp.bumpDataVersion()
+                    }
+                },
+                onGrant = { smsPermission.launch(Manifest.permission.RECEIVE_SMS) }
             )
         }
 
@@ -385,6 +427,44 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                     }
                 }
             }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        // ---------- 外观 ----------
+        DzCard {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("外观", style = MaterialTheme.typography.titleLarge, color = Dz.Ink)
+                Spacer(Modifier.weight(1f))
+                Text(
+                    ThemeController.current.name,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Dz.SakuraDeep
+                )
+            }
+            Text(
+                "换的是整套设计语言：底色、主色、圆角、明暗一起换，不是只改一个主色",
+                style = MaterialTheme.typography.bodySmall,
+                color = Dz.InkFaint,
+                modifier = Modifier.padding(top = 4.dp, bottom = 10.dp)
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ThemePacks.ALL.forEach { pack ->
+                    ThemeSwatch(
+                        pack = pack,
+                        active = pack.id == ThemeController.current.id,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        ThemeController.select(ctx, pack.id)
+                    }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                ThemeController.current.tagline,
+                style = MaterialTheme.typography.labelSmall,
+                color = Dz.InkFaint
+            )
         }
 
         Spacer(Modifier.height(12.dp))
@@ -716,6 +796,41 @@ private fun ChannelRow(
                 Text("去开启", style = MaterialTheme.typography.labelMedium, color = Dz.Warn)
             }
         }
+    }
+}
+
+@Composable
+private fun ThemeSwatch(
+    pack: ThemePack,
+    active: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val shape = RoundedCornerShape(14.dp)
+    val base = modifier
+        .clip(shape)
+        .background(pack.bg)
+    val box = if (active) base.border(1.5.dp, pack.primary, shape) else base
+
+    Column(box.clickable { onClick() }.padding(horizontal = 8.dp, vertical = 9.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            listOf(pack.primary, pack.secondary, pack.accent).forEach { c ->
+                Box(
+                    Modifier
+                        .size(9.dp)
+                        .clip(CircleShape)
+                        .background(c)
+                )
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            pack.name,
+            fontSize = 11.sp,
+            fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
+            color = pack.ink,
+            maxLines = 1
+        )
     }
 }
 
