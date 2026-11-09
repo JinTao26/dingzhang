@@ -203,6 +203,7 @@ object Exporter {
         TxnKind.EXPENSE -> "支出"
         TxnKind.INCOME -> "收入"
         TxnKind.TRANSFER -> "不计收支"
+        TxnKind.REFUND -> "退款"
     }
 
     private fun statusLabel(s: TxnStatus): String = when (s) {
