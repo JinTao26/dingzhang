@@ -24,16 +24,17 @@ App 只负责记和算，钱从哪儿来、花到哪儿去，还是得你自己�
 `alipay.data.dataservice.bill.downloadurl.query` 全是**商户对账单**接口，个人账号拿不到。
 所以任何声称"全自动同步微信支付宝"的 App，实际走的是下面几条路。
 
-叮账走四条通道，收口到一条管线：
+叮账走五条通道，收口到一条管线：
 
 | 通道 | 原理 | 覆盖 | 稳定性 |
 |---|---|---|---|
 | **A 通知监听** | 读微信/支付宝的支付结果通知 | 支付宝基本都带金额；部分机型微信只推"支付凭证"无金额 | 中 |
 | **B 无障碍服务** | 读支付结果页、账单详情页的控件文本 | **主力通道**，能拿金额+商户+支付方式 | 高（需授权） |
-| **C 账单导入** | 导入官方导出的 CSV/ZIP | 最权威，可补历史、可对账 | 高（手动触发） |
-| **D 手记** | 手动补一笔 | 兜底 | — |
+| **C 账单导入** | 导入官方导出的 Excel(xlsx) / CSV / ZIP | 最权威，可补历史、可对账 | 高（手动触发） |
+| **D 银行短信** | 读银行动账短信（需一条短信权限） | 工资到账、线下刷卡、银行间转账——**这些钱不经过微信支付宝** | 中（只认动账，账单/额度提醒会被拦掉） |
+| **E 手记** | 手动补一笔 | 兜底 | — |
 
-四条通道的输入统一变成 `Captured`，交给 `IngestPipeline.submit()` 做过滤 → 去重 → 分类 → 落库。
+五条通道的输入统一变成 `Captured`，交给 `IngestPipeline.submit()` 做过滤 → 去重 → 分类 → 落库。
 不管从哪条路进来，去重和分类的规则是同一套。
 
 ### 明确不做的事
@@ -125,6 +126,25 @@ Veri Fin / Fin（数据自主、导出备份、无追踪）的共性，补了三
 
 ---
 
+## 主题与外观
+
+「我的」页能整套换外观。换的是底色 + 主色 + 副色 + 点缀 + 圆角 + 明暗，
+不是只把主色改一下 —— 那种改法会让"原神风"变成粉底上贴一块金黄，一眼就不对。
+
+| 主题 | 性格 |
+|---|---|
+| 樱粉 | 奶油粉底 + 大圆角，默认 |
+| 提瓦特 | 深蓝夜空 + 鎏金描边 + 元素色点缀，圆角收窄。只取「星图 / 金线 / 元素」这套视觉语法，**不含任何官方角色、立绘或 Logo** |
+| 薄荷 | 白底薄荷绿，白天最省眼 |
+| 夜桜 | 暗紫底 + 樱粉，夜里记账不刺眼 |
+
+实现上只有一个真相源：`ThemeController` 用 Compose snapshot state 存当前主题包，
+界面里 `Dz.Sakura` 等 17 个颜色全是「读当前包」的 getter。
+所以换主题当场全局生效，两百多处引用一行都不用改；加一套新主题 =
+在 `ThemePacks` 里多加一个 `ThemePack`。
+
+---
+
 ## 构建
 
 需要 **JDK 17** 和 Android SDK（`compileSdk 35`）。
@@ -191,10 +211,11 @@ app/src/main/java/com/dingzhang/app/
 ├── core/model/        Models / Categories / Money（金额用 Long 分，BigDecimal 解析）
 ├── data/              DbHelper / TxnDao / Settings / Exporter / RecurringDetector
 ├── classify/          MerchantDict（300+ 词表）/ CategoryEngine（含 RuleLearning）
-├── ingest/            Captured → IngestPipeline ← 四条采集通道
+├── ingest/            Captured → IngestPipeline ← 五条采集通道
 │   ├── PaymentNotificationService   (A 通道)
 │   ├── PaymentAccessibilityService  (B 通道)
-│   ├── BillImporter / BillCsv / BillParsers  (C 通道)
+│   ├── BillImporter / BillCsv / BillParsers / XlsxReader  (C 通道)
+│   ├── BankSmsReceiver / BankSmsParser  (D 通道)
 ├── update/            UpdateChecker（GitHub Releases）
 └── ui/                theme / components / screens（5 个业务界面）
 ```
@@ -210,7 +231,7 @@ app/src/main/java/com/dingzhang/app/
 - [ ] 规则页手动新增说法
 - [ ] 流水页搜索 / 下拉刷新
 - [ ] 用真实微信个人账单校准列候选（当前按商户对账单推的）
-- [ ] 深色主题
+- [ ] 用真实银行短信校准 `BankSmsParser` 的动词表（各家措辞差别不小）
 
 ---
 

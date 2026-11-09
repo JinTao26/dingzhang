@@ -4,6 +4,8 @@ import com.dingzhang.app.core.model.Money
 import com.dingzhang.app.core.model.Source
 import com.dingzhang.app.core.model.TxnKind
 import com.dingzhang.app.core.model.Wallet
+import java.time.LocalDateTime
+import java.time.ZoneId
 
 /**
  * 银行短信 → 一笔账。
@@ -22,6 +24,17 @@ object BankSmsParser {
     private val merchantRe = Regex("""(?:商户|商户名称|交易场所|收款方)[：:]\s*([^，,。；;、\s]+)""")
     private val balanceCut = Regex("""(?:余额|可用余额|账户余额)""")
     private val longDigits = Regex("""\d{9,}""")
+    private val dateTimeRe = Regex("""(\d{1,2})月(\d{1,2})日\s*(\d{1,2})[:：](\d{2})""")
+    private val dateOnlyRe = Regex("""(\d{1,2})月(\d{1,2})日""")
+
+    /**
+     * 这些短信不是「钱真的动了」：账单提醒、额度提醒、验证码。
+     * 不排掉的话，「您9月账单应还2000元」会被记成一笔 2000 的消费。
+     */
+    private val notTxn = listOf(
+        "应还", "待还", "还款日", "账单日", "账单已出", "额度", "验证码", "请于", "即将",
+        "剩余可用", "可用额度不足", "累计积分", "活动", "优惠券"
+    )
 
     private val incomeWords = listOf("工资", "入账", "收入", "存入", "转入", "到账", "汇入", "退款", "返现", "奖励")
     private val expenseWords = listOf("消费", "支出", "扣款", "转出", "取现", "付款", "还款", "代扣", "缴费", "转给")
@@ -31,6 +44,7 @@ object BankSmsParser {
         val flat = body.replace('\n', ' ').replace('\r', ' ').trim()
         if (flat.isBlank()) return null
         if (!bankHints.any { flat.contains(it) }) return null
+        if (notTxn.any { flat.contains(it) }) return null
 
         // 「余额 12345.67 元」在后面，不切掉会把余额当成交易金额
         val cutAt = balanceCut.find(flat)?.range?.first ?: flat.length
@@ -73,12 +87,47 @@ object BankSmsParser {
             wallet = Wallet.BANK,
             payee = payee,
             source = Source.SMS,
-            occurredAt = at,
+            occurredAt = timeOf(flat, at),
             note = bank.ifEmpty { "银行短信" },
             raw = sanitize(flat),
             account = account,
             kindHint = kind
         )
+    }
+
+    /**
+     * 短信里写的交易时间比「收到短信的时间」准得多 —— 补发的、延迟的短信尤其明显。
+     * 只给月和日，年份按「不晚于现在」倒推（12月的短信在次年1月补发也能对上）。
+     */
+    private fun timeOf(flat: String, fallback: Long): Long {
+        val withTime = dateTimeRe.find(flat)
+        val withDate = dateOnlyRe.find(flat)
+        val month: Int
+        val day: Int
+        val hour: Int
+        val minute: Int
+        if (withTime != null) {
+            month = withTime.groupValues[1].toIntOrNull() ?: return fallback
+            day = withTime.groupValues[2].toIntOrNull() ?: return fallback
+            hour = withTime.groupValues[3].toIntOrNull() ?: return fallback
+            minute = withTime.groupValues[4].toIntOrNull() ?: return fallback
+        } else if (withDate != null) {
+            month = withDate.groupValues[1].toIntOrNull() ?: return fallback
+            day = withDate.groupValues[2].toIntOrNull() ?: return fallback
+            hour = 12
+            minute = 0
+        } else {
+            return fallback
+        }
+
+        return try {
+            val now = LocalDateTime.now()
+            var dt = LocalDateTime.of(now.year, month, day, hour, minute)
+            if (dt.isAfter(now.plusDays(1))) dt = LocalDateTime.of(now.year - 1, month, day, hour, minute)
+            dt.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        } catch (e: Exception) {
+            fallback
+        }
     }
 
     /** 完整卡号、账号一律打码，原始短信只留前 80 字。 */
