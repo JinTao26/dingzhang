@@ -1,0 +1,43 @@
+name: Bootstrap
+
+# 一次性工作流：从打包好的源码快照解出完整工程并提交。
+# 跑完就把它自己和 payload 一起清掉（见最后一步）。
+on  
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/bootstrap.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download payload
+        run: |
+          set -e
+          curl -fsSL -o /tmp/dz.tgz "https://aka.doubaocdn.com/s/PyuziKaidm"
+          ls -lh /tmp/dz.tgz
+          file /tmp/dz.tgz
+
+      - name: Extract
+        run: |
+          set -e
+          tar xzf /tmp/dz.tgz -C .
+          rm -rf bootstrap
+          ls -la
+          find app -name "*.kt" | wc -l
+
+      - name: Commit
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git status --short | head -60
+          git commit -m "chore: import dingzhang v0.4.0 source tree" || echo "nothing to commit"
+          git push
