@@ -14,10 +14,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,10 +30,14 @@ import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -39,7 +47,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -80,6 +90,10 @@ fun BillsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
     var query by remember { mutableStateOf("") }
     var rangeTxns by remember { mutableStateOf<List<Txn>>(emptyList()) }
     var hits by remember { mutableStateOf<List<Txn>>(emptyList()) }
+    var showFilter by remember { mutableStateOf(false) }
+    var minYuan by remember { mutableStateOf("") }   // 金额下限，单位元，空 = 不限
+    var maxYuan by remember { mutableStateOf("") }   // 金额上限
+    var catFilter by remember { mutableStateOf<Set<String>>(emptySet()) }
     val ctx = LocalContext.current
 
     // 快捷区间：直接按时间从库里取，跟当前浏览的月份无关
@@ -121,12 +135,19 @@ fun BillsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
         else -> rangeTxns
     }
 
-    val filtered = remember(base, filter) {
-        when (filter) {
-            1 -> base.filter { it.kind == TxnKind.EXPENSE || it.kind == TxnKind.REFUND }
-            2 -> base.filter { it.kind == TxnKind.INCOME }
-            3 -> base.filter { it.status == TxnStatus.AUTO }
-            else -> base
+    val minCents = parseMinYuan(minYuan)
+    val maxCents = parseMaxYuan(maxYuan)
+    val filtered = remember(base, filter, minCents, maxCents, catFilter) {
+        base.filter { t ->
+            val kindOk = when (filter) {
+                1 -> t.kind == TxnKind.EXPENSE || t.kind == TxnKind.REFUND
+                2 -> t.kind == TxnKind.INCOME
+                3 -> t.status == TxnStatus.AUTO
+                else -> true
+            }
+            val amountOk = t.amountCents >= minCents && t.amountCents <= maxCents
+            val catOk = catFilter.isEmpty() || t.categoryId in catFilter
+            kindOk && amountOk && catOk
         }
     }
     val grouped = remember(filtered) { filtered.groupBy { Dates.dayOf(it.occurredAt) } }
@@ -214,11 +235,18 @@ fun BillsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
 
             Spacer(Modifier.height(8.dp))
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 FilterChip("全部", filter == 0) { filter = 0 }
                 FilterChip("支出", filter == 1) { filter = 1 }
                 FilterChip("收入", filter == 2) { filter = 2 }
                 FilterChip("待确认", filter == 3) { filter = 3 }
+                Spacer(Modifier.weight(1f))
+                FilterEntry(
+                    active = minYuan.isNotBlank() || maxYuan.isNotBlank() || catFilter.isNotEmpty()
+                ) { showFilter = true }
             }
         }
 
@@ -245,6 +273,24 @@ fun BillsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                 }
             }
         }
+    }
+
+    if (showFilter) {
+        FilterDialog(
+            minYuan = minYuan,
+            maxYuan = maxYuan,
+            cats = catFilter,
+            onMin = { v -> minYuan = v.filter { it.isDigit() || it == '.' } },
+            onMax = { v -> maxYuan = v.filter { it.isDigit() || it == '.' } },
+            onToggleCat = { id -> catFilter = if (id in catFilter) catFilter - id else catFilter + id },
+            onReset = {
+                minYuan = ""
+                maxYuan = ""
+                catFilter = emptySet()
+            },
+            onApply = { showFilter = false },
+            onDismiss = { showFilter = false }
+        )
     }
 
     selected?.let { txn ->
@@ -595,6 +641,229 @@ private fun QuickChip(text: String, active: Boolean, onClick: () -> Unit) {
             style = MaterialTheme.typography.labelSmall,
             color = if (active) Dz.Ink else Dz.InkSoft,
             fontWeight = if (active) FontWeight.Bold else FontWeight.Normal
+        )
+    }
+}
+
+/** 金额下限：空或乱填都当 0。 */
+private fun parseMinYuan(s: String): Long =
+    s.trim().toDoubleOrNull()?.let { maxOf(0L, (it * 100).toLong()) } ?: 0L
+
+/** 金额上限：空当无穷大。 */
+private fun parseMaxYuan(s: String): Long =
+    s.trim().toDoubleOrNull()?.let { maxOf(0L, (it * 100).toLong()) } ?: Long.MAX_VALUE
+
+/** 「筛选」小按钮，有生效条件时高亮。 */
+@Composable
+private fun FilterEntry(active: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .clip(CircleShape)
+            .background(if (active) Dz.SakuraSoft else Dz.Card)
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            Icons.Rounded.Tune, null,
+            tint = if (active) Dz.SakuraDeep else Dz.InkFaint,
+            modifier = Modifier.size(15.dp)
+        )
+        Spacer(Modifier.width(4.dp))
+        Text(
+            "筛选",
+            fontSize = 12.sp,
+            fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
+            color = if (active) Dz.SakuraDeep else Dz.InkFaint
+        )
+    }
+}
+
+/** 金额区间 + 分类多选的筛选面板。全屏，跟次级页一个路数。 */
+@Composable
+private fun FilterDialog(
+    minYuan: String,
+    maxYuan: String,
+    cats: Set<String>,
+    onMin: (String) -> Unit,
+    onMax: (String) -> Unit,
+    onToggleCat: (String) -> Unit,
+    onReset: () -> Unit,
+    onApply: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .background(Dz.Cream)
+                .systemBarsPadding()
+                .imePadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 18.dp, vertical = 10.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .background(Dz.Card)
+                        .clickable { onDismiss() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Rounded.Close, "关闭",
+                        tint = Dz.InkSoft,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                Text("筛选", style = MaterialTheme.typography.titleLarge, color = Dz.Ink)
+            }
+
+            Spacer(Modifier.height(14.dp))
+
+            // ---------- 金额区间 ----------
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(Dz.Card)
+                    .padding(14.dp)
+            ) {
+                Text("金额区间", style = MaterialTheme.typography.titleMedium, color = Dz.Ink)
+                Text(
+                    "单位元，两位小数也认。只填一边也行，留空就是不限",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Dz.InkFaint,
+                    modifier = Modifier.padding(top = 2.dp, bottom = 10.dp)
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    AmountField(minYuan, "最低", onMin, Modifier.weight(1f))
+                    Text("~", color = Dz.InkFaint, fontSize = 14.sp)
+                    AmountField(maxYuan, "最高", onMax, Modifier.weight(1f))
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            // ---------- 分类 ----------
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(Dz.Card)
+                    .padding(14.dp)
+            ) {
+                Text("分类", style = MaterialTheme.typography.titleMedium, color = Dz.Ink)
+                Text(
+                    "不选就是全部。可以多选，比如「餐饮 + 购物」一起看",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Dz.InkFaint,
+                    modifier = Modifier.padding(top = 2.dp, bottom = 10.dp)
+                )
+                Text(
+                    "支出",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Dz.InkFaint
+                )
+                Spacer(Modifier.height(6.dp))
+                Categories.expenseAll.chunked(4).forEach { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        row.forEach { c ->
+                            CatChip(c.name, c.id in cats) { onToggleCat(c.id) }
+                        }
+                        repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    "收入",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Dz.InkFaint
+                )
+                Spacer(Modifier.height(6.dp))
+                Categories.incomeAll.chunked(4).forEach { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        row.forEach { c ->
+                            CatChip(c.name, c.id in cats) { onToggleCat(c.id) }
+                        }
+                        repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+            }
+
+            Spacer(Modifier.height(18.dp))
+
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextButton(onClick = onReset) {
+                    Text("重置", color = Dz.InkSoft)
+                }
+                Button(
+                    onClick = onApply,
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Dz.Sakura,
+                        contentColor = Color.White
+                    ),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("应用筛选")
+                }
+            }
+            Spacer(Modifier.height(30.dp))
+        }
+    }
+}
+
+@Composable
+private fun AmountField(
+    value: String,
+    hint: String,
+    onChange: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onChange,
+        singleLine = true,
+        placeholder = { Text(hint, fontSize = 12.sp, color = Dz.InkFaint) },
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+        textStyle = TextStyle(fontSize = 14.sp),
+        shape = RoundedCornerShape(12.dp),
+        modifier = modifier
+    )
+}
+
+@Composable
+private fun RowScope.CatChip(name: String, active: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .weight(1f)
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (active) Dz.SakuraSoft else Dz.Cream)
+            .clickable { onClick() }
+            .padding(vertical = 9.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            name,
+            fontSize = 12.sp,
+            maxLines = 1,
+            fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
+            color = if (active) Dz.SakuraDeep else Dz.InkSoft
         )
     }
 }
