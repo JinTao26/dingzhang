@@ -326,8 +326,6 @@ fun BillsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
 }
 
 @Composable
-
-@Composable
 private fun DayHeader(day: String, list: List<Txn>) {
     val spent = list.filter { it.kind == TxnKind.EXPENSE }.sumOf { it.amountCents } -
         list.filter { it.kind == TxnKind.REFUND }.sumOf { it.amountCents }
