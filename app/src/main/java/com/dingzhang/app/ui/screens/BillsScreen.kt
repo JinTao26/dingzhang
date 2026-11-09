@@ -153,34 +153,50 @@ fun BillsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
     }
     val grouped = remember(filtered) { filtered.groupBy { Dates.dayOf(it.occurredAt) } }
 
+    // 「支出 · ¥50~200 · 餐饮+购物」这种一行摘要，时间由标题显示，不重复
+    val typeNames = listOf("全部", "支出", "收入", "待确认")
+    val filterSummary = buildList {
+        if (filter != 0) add(typeNames[filter])
+        if (minYuan.isNotBlank() || maxYuan.isNotBlank()) {
+            add("¥" + minYuan.ifBlank { "0" } + " ~ " + maxYuan.ifBlank { "不限" })
+        }
+        if (catFilter.isNotEmpty()) add(catFilter.joinToString("+") { Categories.of(it).name })
+    }.joinToString(" · ")
+
     Column(Modifier.fillMaxSize()) {
-        // 标题 + 搜索 + 时间 / 类型筛选
+        // 标题 + 搜索 + 筛选入口（时间、类型都收进筛选面板了，这一屏不再堆两排 chip）
         Column(Modifier.padding(horizontal = 18.dp, vertical = 10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("明细", style = MaterialTheme.typography.headlineLarge, color = Dz.Ink)
                 Spacer(Modifier.weight(1f))
-                if (!searching && quick == 0) {
-                    Icon(
-                        Icons.Rounded.ChevronLeft, "上个月", tint = Dz.InkSoft,
-                        modifier = Modifier
-                            .size(26.dp)
-                            .clickable { onMonthChange(shiftMonth(month, -1)) }
-                    )
-                    Text(
-                        data.monthLabel,
+                when {
+                    searching -> Text(
+                        "${hits.size} 条结果",
                         style = MaterialTheme.typography.titleMedium,
-                        color = Dz.Ink,
-                        modifier = Modifier.padding(horizontal = 8.dp)
+                        color = Dz.InkSoft
                     )
-                    Icon(
-                        Icons.Rounded.ChevronRight, "下个月", tint = Dz.InkSoft,
-                        modifier = Modifier
-                            .size(26.dp)
-                            .clickable { onMonthChange(shiftMonth(month, 1)) }
-                    )
-                } else {
-                    Text(
-                        if (searching) "${hits.size} 条结果" else quickLabel(quick),
+                    quick == 0 -> {
+                        Icon(
+                            Icons.Rounded.ChevronLeft, "上个月", tint = Dz.InkSoft,
+                            modifier = Modifier
+                                .size(26.dp)
+                                .clickable { onMonthChange(shiftMonth(month, -1)) }
+                        )
+                        Text(
+                            data.monthLabel,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Dz.Ink,
+                            modifier = Modifier.padding(horizontal = 8.dp)
+                        )
+                        Icon(
+                            Icons.Rounded.ChevronRight, "下个月", tint = Dz.InkSoft,
+                            modifier = Modifier
+                                .size(26.dp)
+                                .clickable { onMonthChange(shiftMonth(month, 1)) }
+                        )
+                    }
+                    else -> Text(
+                        quickLabel(quick),
                         style = MaterialTheme.typography.titleMedium,
                         color = Dz.InkSoft
                     )
@@ -189,65 +205,52 @@ fun BillsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
 
             Spacer(Modifier.height(8.dp))
 
-            // 搜索框
-            OutlinedTextField(
-                value = query,
-                onValueChange = { query = it },
-                singleLine = true,
-                textStyle = TextStyle(fontSize = 13.sp),
-                placeholder = {
-                    Text("搜商户、备注、分类，跨全部时间", color = Dz.InkFaint, fontSize = 13.sp)
-                },
-                leadingIcon = {
-                    Icon(Icons.Rounded.Search, null, tint = Dz.InkFaint, modifier = Modifier.size(18.dp))
-                },
-                trailingIcon = {
-                    if (query.isNotEmpty()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    singleLine = true,
+                    textStyle = TextStyle(fontSize = 13.sp),
+                    placeholder = {
+                        Text("搜商户、备注、分类", color = Dz.InkFaint, fontSize = 13.sp)
+                    },
+                    leadingIcon = {
                         Icon(
-                            Icons.Rounded.Close, "清空",
+                            Icons.Rounded.Search, null,
                             tint = Dz.InkFaint,
-                            modifier = Modifier
-                                .size(18.dp)
-                                .clickable { query = "" }
+                            modifier = Modifier.size(18.dp)
                         )
-                    }
-                },
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 48.dp)
-            )
-
-            Spacer(Modifier.height(8.dp))
-
-            // 快捷时间
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(7.dp)
-            ) {
-                QuickChip("按月份", quick == 0) { quick = 0 }
-                QuickChip("今天", quick == 1) { quick = 1 }
-                QuickChip("本周", quick == 2) { quick = 2 }
-                QuickChip("本月", quick == 3) { quick = 3 }
-                QuickChip("上月", quick == 4) { quick = 4 }
+                    },
+                    trailingIcon = {
+                        if (query.isNotEmpty()) {
+                            Icon(
+                                Icons.Rounded.Close, "清空",
+                                tint = Dz.InkFaint,
+                                modifier = Modifier
+                                    .size(18.dp)
+                                    .clickable { query = "" }
+                            )
+                        }
+                    },
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 48.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                FilterEntry(
+                    active = filter != 0 || quick != 0 ||
+                        minYuan.isNotBlank() || maxYuan.isNotBlank() || catFilter.isNotEmpty()
+                ) { showFilter = true }
             }
 
-            Spacer(Modifier.height(8.dp))
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                FilterChip("全部", filter == 0) { filter = 0 }
-                FilterChip("支出", filter == 1) { filter = 1 }
-                FilterChip("收入", filter == 2) { filter = 2 }
-                FilterChip("待确认", filter == 3) { filter = 3 }
-                Spacer(Modifier.weight(1f))
-                FilterEntry(
-                    active = minYuan.isNotBlank() || maxYuan.isNotBlank() || catFilter.isNotEmpty()
-                ) { showFilter = true }
+            if (filterSummary.isNotEmpty()) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    filterSummary,
+                    fontSize = 11.sp,
+                    color = Dz.InkFaint
+                )
             }
         }
 
@@ -278,9 +281,13 @@ fun BillsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
 
     if (showFilter) {
         FilterDialog(
+            time = quick,
+            type = filter,
             minYuan = minYuan,
             maxYuan = maxYuan,
             cats = catFilter,
+            onTime = { quick = it },
+            onType = { filter = it },
             onMin = { v -> minYuan = v.filter { it.isDigit() || it == '.' } },
             onMax = { v -> maxYuan = v.filter { it.isDigit() || it == '.' } },
             onToggleCat = { id -> catFilter = if (id in catFilter) catFilter - id else catFilter + id },
@@ -319,22 +326,6 @@ fun BillsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
 }
 
 @Composable
-private fun FilterChip(label: String, active: Boolean, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .clip(CircleShape)
-            .background(if (active) Dz.SakuraSoft else Dz.Card)
-            .clickable { onClick() }
-            .padding(horizontal = 14.dp, vertical = 7.dp)
-    ) {
-        Text(
-            label,
-            fontSize = 12.sp,
-            fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
-            color = if (active) Dz.SakuraDeep else Dz.InkFaint
-        )
-    }
-}
 
 @Composable
 private fun DayHeader(day: String, list: List<Txn>) {
@@ -628,23 +619,6 @@ private fun quickRange(quick: Int): Pair<Long, Long> {
 }
 
 @Composable
-private fun QuickChip(text: String, active: Boolean, onClick: () -> Unit) {
-    Box(
-        Modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(if (active) Dz.LilacSoft else Dz.Card)
-            .clickable { onClick() }
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text,
-            style = MaterialTheme.typography.labelSmall,
-            color = if (active) Dz.Ink else Dz.InkSoft,
-            fontWeight = if (active) FontWeight.Bold else FontWeight.Normal
-        )
-    }
-}
 
 /** 金额下限：空或乱填都当 0。 */
 private fun parseMinYuan(s: String): Long =
@@ -683,9 +657,13 @@ private fun FilterEntry(active: Boolean, onClick: () -> Unit) {
 /** 金额区间 + 分类多选的筛选面板。全屏，跟次级页一个路数。 */
 @Composable
 private fun FilterDialog(
+    time: Int,
+    type: Int,
     minYuan: String,
     maxYuan: String,
     cats: Set<String>,
+    onTime: (Int) -> Unit,
+    onType: (Int) -> Unit,
     onMin: (String) -> Unit,
     onMax: (String) -> Unit,
     onToggleCat: (String) -> Unit,
@@ -726,6 +704,55 @@ private fun FilterDialog(
             }
 
             Spacer(Modifier.height(14.dp))
+
+            // ---------- 时间 ----------
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(Dz.Card)
+                    .padding(14.dp)
+            ) {
+                Text("时间", style = MaterialTheme.typography.titleMedium, color = Dz.Ink)
+                Text(
+                    "选「按月份」就用标题上那对左右箭头翻月",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Dz.InkFaint,
+                    modifier = Modifier.padding(top = 2.dp, bottom = 10.dp)
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    CatChip("按月份", time == 0) { onTime(0) }
+                    CatChip("本周", time == 2) { onTime(2) }
+                    CatChip("本月", time == 3) { onTime(3) }
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            // ---------- 类型 ----------
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(Dz.Card)
+                    .padding(14.dp)
+            ) {
+                Text("类型", style = MaterialTheme.typography.titleMedium, color = Dz.Ink)
+                Text(
+                    "待确认 = 系统自动记下、但还没核对过的",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Dz.InkFaint,
+                    modifier = Modifier.padding(top = 2.dp, bottom = 10.dp)
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    CatChip("全部", type == 0) { onType(0) }
+                    CatChip("支出", type == 1) { onType(1) }
+                    CatChip("收入", type == 2) { onType(2) }
+                    CatChip("待确认", type == 3) { onType(3) }
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
 
             // ---------- 金额区间 ----------
             Column(
