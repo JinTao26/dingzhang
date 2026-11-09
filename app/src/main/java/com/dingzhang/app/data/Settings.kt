@@ -38,6 +38,11 @@ class Settings(context: Context) {
         get() = sp.getLong("last_import", 0L)
         set(v) = sp.edit().putLong("last_import", v).apply()
 
+    /** 已应用到库里的分类词典版本。词典扩了以后靠它触发一次「重新分类」。 */
+    var dictVersion: Int
+        get() = sp.getInt("dict_version", 1)
+        set(v) = sp.edit().putInt("dict_version", v).apply()
+
     /** 当前主题包 id，见 ui/theme/ThemePacks.ALL */
     var themeId: String
         get() = sp.getString("theme_id", "sakura") ?: "sakura"

@@ -139,6 +139,15 @@ class TxnDao(private val helper: DbHelper) {
      * 关键词搜索，跨全部时间。明细页那个搜索框用这个。
      * 商户、备注、原文都匹配；分类的中文名在 UI 层补（category_id 存的是英文 id）。
      */
+    /** 按分类取记录，用来重算还挂在「其他」的旧账。 */
+    fun listByCategory(categoryId: String, limit: Int = 2000): List<Txn> {
+        val cursor = helper.readableDatabase.rawQuery(
+            "SELECT * FROM txn WHERE category_id = ? ORDER BY occurred_at DESC LIMIT ?",
+            arrayOf(categoryId, limit.toString())
+        )
+        cursor.use { return it.toList() }
+    }
+
     /** 同一商户的历史记录，用来「改一次、全跟着改」。商户名做包含匹配，退款那笔也能带上。 */
     fun listByPayee(payee: String, excludeId: Long, limit: Int = 200): List<Txn> {
         val key = payee.trim()

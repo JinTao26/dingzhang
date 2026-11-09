@@ -14,6 +14,11 @@ class DingZhangApp : Application() {
         IngestPipeline.init(this)
         // 主题也要在前台界面起来之前就定好，否则首帧会是默认配色再跳一次
         ThemeController.init(this)
+        // 词典扩了以后，把历史里还挂在「其他」的账在后台重算一遍（只碰没锁定的）
+        Thread {
+            val changed = IngestPipeline.reclassifyOthersIfNeeded()
+            if (changed > 0) bumpDataVersion()
+        }.start()
     }
 
     companion object {

@@ -224,6 +224,34 @@ object IngestPipeline {
         return CorrectResult(learned, updated)
     }
 
+    /** 词典版本号。每次扩充/调整词典就 +1，老库里挂在「其他」的记录会重算一遍。 */
+    private const val DICT_VERSION = 2
+
+    /**
+     * 把还挂在「其他」的旧记录按新词典重算一次。
+     *
+     * 只碰没锁定的、且重算后类型不变的记录 —— 用户手动定过的分类永远不会被改。
+     * 词典升级后跑一次即可，靠 Settings.dictVersion 记着跑过没有。
+     */
+    fun reclassifyOthersIfNeeded(): Int {
+        val dao = daoRef ?: return 0
+        val settings = settingsRef ?: return 0
+        if (settings.dictVersion >= DICT_VERSION) return 0
+        val rules = dao.rules()
+        var changed = 0
+        dao.listByCategory("other").forEach { t ->
+            if (t.categoryLocked) return@forEach
+            val guess = CategoryEngine.classify(t.payee, t.note, t.rawText, rules)
+            if (guess.categoryId != "other" && guess.kind == t.kind) {
+                dao.updateCategory(t.id, guess.categoryId, locked = false)
+                changed++
+            }
+        }
+        settings.dictVersion = DICT_VERSION
+        Log.d(TAG, "词典升级，重算「其他」：$changed 笔换了分类")
+        return changed
+    }
+
     fun confirm(txnId: Long) {
         daoRef?.setStatus(txnId, TxnStatus.CONFIRMED)
     }
