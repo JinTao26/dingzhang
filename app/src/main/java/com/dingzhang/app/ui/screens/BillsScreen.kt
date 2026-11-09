@@ -3,6 +3,8 @@ package com.dingzhang.app.ui.screens
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -21,10 +24,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,6 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.dingzhang.app.DingZhangApp
@@ -54,6 +62,10 @@ import com.dingzhang.app.ui.components.MascotFace
 import com.dingzhang.app.ui.components.ui
 import com.dingzhang.app.ui.shiftMonth
 import com.dingzhang.app.ui.theme.Dz
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+import java.util.Calendar
 
 private val expenseIds = listOf(
     "food", "drink", "transport", "shopping", "home", "fun",
@@ -64,44 +76,144 @@ private val expenseIds = listOf(
 fun BillsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
     var filter by remember { mutableStateOf(0) }
     var selected by remember { mutableStateOf<Txn?>(null) }
+    var quick by remember { mutableStateOf(0) }      // 0 按月份 / 1 今天 / 2 本周 / 3 本月 / 4 上月
+    var query by remember { mutableStateOf("") }
+    var rangeTxns by remember { mutableStateOf<List<Txn>>(emptyList()) }
+    var hits by remember { mutableStateOf<List<Txn>>(emptyList()) }
     val ctx = LocalContext.current
 
-    val filtered = remember(data, filter) {
+    // 快捷区间：直接按时间从库里取，跟当前浏览的月份无关
+    LaunchedEffect(quick, data.monthLabel, data.monthTxns.size) {
+        if (quick == 0) {
+            rangeTxns = emptyList()
+            return@LaunchedEffect
+        }
+        val (from, to) = quickRange(quick)
+        rangeTxns = withContext(Dispatchers.IO) {
+            IngestPipeline.dao?.listBetween(from, to).orEmpty()
+        }
+    }
+
+    // 搜索：跨全部流水，不受月份限制。停 250ms 再查，别每敲一个字就扫一遍库
+    LaunchedEffect(query, data.monthLabel, data.monthTxns.size) {
+        val q = query.trim()
+        if (q.isEmpty()) {
+            hits = emptyList()
+            return@LaunchedEffect
+        }
+        delay(250)
+        hits = withContext(Dispatchers.IO) {
+            val dao = IngestPipeline.dao ?: return@withContext emptyList<Txn>()
+            val text = dao.search(q)
+            // 分类中文名也能搜：「餐饮」「工资」这类词不在 payee/note 里
+            val catIds = Categories.all.filter { it.name.contains(q) }.map { it.id }.toSet()
+            if (catIds.isEmpty()) text
+            else (text + dao.listAll().filter { it.categoryId in catIds })
+                .distinctBy { it.id }
+                .sortedByDescending { it.occurredAt }
+        }
+    }
+
+    val searching = query.isNotBlank()
+    val base = when {
+        searching -> hits
+        quick == 0 -> data.monthTxns
+        else -> rangeTxns
+    }
+
+    val filtered = remember(base, filter) {
         when (filter) {
-            1 -> data.monthTxns.filter { it.kind == TxnKind.EXPENSE || it.kind == TxnKind.REFUND }
-            2 -> data.monthTxns.filter { it.kind == TxnKind.INCOME }
-            3 -> data.monthTxns.filter { it.status == TxnStatus.AUTO }
-            else -> data.monthTxns
+            1 -> base.filter { it.kind == TxnKind.EXPENSE || it.kind == TxnKind.REFUND }
+            2 -> base.filter { it.kind == TxnKind.INCOME }
+            3 -> base.filter { it.status == TxnStatus.AUTO }
+            else -> base
         }
     }
     val grouped = remember(filtered) { filtered.groupBy { Dates.dayOf(it.occurredAt) } }
 
     Column(Modifier.fillMaxSize()) {
-        // 月份 + 筛选
+        // 标题 + 搜索 + 时间 / 类型筛选
         Column(Modifier.padding(horizontal = 18.dp, vertical = 10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("明细", style = MaterialTheme.typography.headlineLarge, color = Dz.Ink)
                 Spacer(Modifier.weight(1f))
-                Icon(
-                    Icons.Rounded.ChevronLeft, "上个月", tint = Dz.InkSoft,
-                    modifier = Modifier
-                        .size(26.dp)
-                        .clickable { onMonthChange(shiftMonth(month, -1)) }
-                )
-                Text(
-                    data.monthLabel,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = Dz.Ink,
-                    modifier = Modifier.padding(horizontal = 8.dp)
-                )
-                Icon(
-                    Icons.Rounded.ChevronRight, "下个月", tint = Dz.InkSoft,
-                    modifier = Modifier
-                        .size(26.dp)
-                        .clickable { onMonthChange(shiftMonth(month, 1)) }
-                )
+                if (!searching && quick == 0) {
+                    Icon(
+                        Icons.Rounded.ChevronLeft, "上个月", tint = Dz.InkSoft,
+                        modifier = Modifier
+                            .size(26.dp)
+                            .clickable { onMonthChange(shiftMonth(month, -1)) }
+                    )
+                    Text(
+                        data.monthLabel,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Dz.Ink,
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    )
+                    Icon(
+                        Icons.Rounded.ChevronRight, "下个月", tint = Dz.InkSoft,
+                        modifier = Modifier
+                            .size(26.dp)
+                            .clickable { onMonthChange(shiftMonth(month, 1)) }
+                    )
+                } else {
+                    Text(
+                        if (searching) "${hits.size} 条结果" else quickLabel(quick),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Dz.InkSoft
+                    )
+                }
             }
-            Spacer(Modifier.height(10.dp))
+
+            Spacer(Modifier.height(8.dp))
+
+            // 搜索框
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                singleLine = true,
+                textStyle = TextStyle(fontSize = 13.sp),
+                placeholder = {
+                    Text("搜商户、备注、分类，跨全部时间", color = Dz.InkFaint, fontSize = 13.sp)
+                },
+                leadingIcon = {
+                    Icon(Icons.Rounded.Search, null, tint = Dz.InkFaint, modifier = Modifier.size(18.dp))
+                },
+                trailingIcon = {
+                    if (query.isNotEmpty()) {
+                        Icon(
+                            Icons.Rounded.Close, "清空",
+                            tint = Dz.InkFaint,
+                            modifier = Modifier
+                                .size(18.dp)
+                                .clickable { query = "" }
+                        )
+                    }
+                },
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            // 快捷时间
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(7.dp)
+            ) {
+                QuickChip("按月份", quick == 0) { quick = 0 }
+                QuickChip("今天", quick == 1) { quick = 1 }
+                QuickChip("本周", quick == 2) { quick = 2 }
+                QuickChip("本月", quick == 3) { quick = 3 }
+                QuickChip("上月", quick == 4) { quick = 4 }
+            }
+
+            Spacer(Modifier.height(8.dp))
+
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip("全部", filter == 0) { filter = 0 }
                 FilterChip("支出", filter == 1) { filter = 1 }
@@ -111,7 +223,11 @@ fun BillsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
         }
 
         if (filtered.isEmpty()) {
-            EmptyHint("这个月这里是空的", "换个筛选条件看看，或者去「我的」里导入账单补全历史")
+            when {
+                searching -> EmptyHint("没搜到", "换个关键词试试。金额、卡号也可以搜")
+                quick != 0 -> EmptyHint("${quickLabel(quick)}没有记录", "换个时间段，或者去「我的」里导入账单补全历史")
+                else -> EmptyHint("这个月这里是空的", "换个筛选条件看看，或者去「我的」里导入账单补全历史")
+            }
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
@@ -417,4 +533,68 @@ private fun MiniTag(text: String) {
             .background(Dz.Cream)
             .padding(horizontal = 7.dp, vertical = 3.dp)
     )
+}
+
+/** 快捷区间的名字。 */
+private fun quickLabel(quick: Int): String = when (quick) {
+    1 -> "今天"
+    2 -> "本周"
+    3 -> "本月"
+    4 -> "上月"
+    else -> "按月份"
+}
+
+/**
+ * 快捷区间的起止时间（含头不含尾）。
+ * 周一算一周的开头，跟国内习惯一致。
+ */
+private fun quickRange(quick: Int): Pair<Long, Long> {
+    val cal = Calendar.getInstance()
+    cal.firstDayOfWeek = Calendar.MONDAY
+    cal.set(Calendar.MILLISECOND, 0)
+    cal.set(Calendar.SECOND, 0)
+    cal.set(Calendar.MINUTE, 0)
+    cal.set(Calendar.HOUR_OF_DAY, 0)
+    val end = { from: Calendar, days: Int ->
+        (from.clone() as Calendar).apply { add(Calendar.DAY_OF_MONTH, days) }.timeInMillis
+    }
+    val monthEnd = { from: Calendar ->
+        (from.clone() as Calendar).apply { add(Calendar.MONTH, 1) }.timeInMillis
+    }
+    return when (quick) {
+        1 -> cal.timeInMillis to end(cal, 1)
+        2 -> {
+            cal.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
+            cal.timeInMillis to end(cal, 7)
+        }
+        3 -> {
+            cal.set(Calendar.DAY_OF_MONTH, 1)
+            cal.timeInMillis to monthEnd(cal)
+        }
+        4 -> {
+            cal.set(Calendar.DAY_OF_MONTH, 1)
+            cal.add(Calendar.MONTH, -1)
+            cal.timeInMillis to monthEnd(cal)
+        }
+        else -> cal.timeInMillis to end(cal, 1)
+    }
+}
+
+@Composable
+private fun QuickChip(text: String, active: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(if (active) Dz.LilacSoft else Dz.Card)
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text,
+            style = MaterialTheme.typography.labelSmall,
+            color = if (active) Dz.Ink else Dz.InkSoft,
+            fontWeight = if (active) FontWeight.Bold else FontWeight.Normal
+        )
+    }
 }

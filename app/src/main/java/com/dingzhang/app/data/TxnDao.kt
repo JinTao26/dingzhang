@@ -126,6 +126,22 @@ class TxnDao(private val helper: DbHelper) {
         ).use { return it.toList() }
     }
 
+    /**
+     * 关键词搜索，跨全部时间。明细页那个搜索框用这个。
+     * 商户、备注、原文都匹配；分类的中文名在 UI 层补（category_id 存的是英文 id）。
+     */
+    fun search(q: String, limit: Int = 500): List<Txn> {
+        val needle = "%" + q.trim() + "%"
+        helper.readableDatabase.rawQuery(
+            """
+            SELECT * FROM txn
+            WHERE payee LIKE ? OR note LIKE ? OR raw_text LIKE ? OR external_id LIKE ?
+            ORDER BY occurred_at DESC LIMIT $limit
+            """.trimIndent(),
+            arrayOf(needle, needle, needle, needle)
+        ).use { return it.toList() }
+    }
+
     /** 按分类聚合支出，用于统计页环形图和排行榜。退款从同一分类里扣掉，不另算收入。 */
     fun sumByCategory(start: Long, end: Long): List<CategoryTotal> {
         helper.readableDatabase.rawQuery(
