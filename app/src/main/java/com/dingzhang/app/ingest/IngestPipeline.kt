@@ -225,7 +225,7 @@ object IngestPipeline {
     }
 
     /** 词典版本号。每次扩充/调整词典就 +1，老库里挂在「其他」的记录会重算一遍。 */
-    private const val DICT_VERSION = 2
+    private const val DICT_VERSION = 3
 
     /**
      * 把还挂在「其他」的旧记录按新词典重算一次。
