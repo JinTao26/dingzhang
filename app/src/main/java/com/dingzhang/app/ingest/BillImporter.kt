@@ -56,17 +56,11 @@ object BillImporter {
             return@withContext ImportResult(fileName, Wallet.UNKNOWN, 0, 0, 0, 0, message = "文件是空的")
         }
 
-        val rawCsv = if (BillCsv.isZip(bytes)) {
-            extractFirstCsv(bytes)
-        } else {
-            bytes
-        }
-        if (rawCsv == null) {
+        val text = toBillText(bytes)
+        if (text == null) {
             return@withContext ImportResult(fileName, Wallet.UNKNOWN, 0, 0, 0, 0,
-                message = "压缩包里没找到 csv 文件")
+                message = "压缩包里没找到账单文件（csv 或 xlsx）")
         }
-
-        val text = BillCsv.decode(rawCsv)
         val kind = BillParsers.detect(text)
         if (kind == BillKind.UNKNOWN) {
             return@withContext ImportResult(fileName, Wallet.UNKNOWN, 0, 0, 0, 0,
@@ -146,13 +140,34 @@ object BillImporter {
         else -> Wallet.UNKNOWN
     }
 
-    private fun extractFirstCsv(bytes: ByteArray): ByteArray? {
+    /**
+     * 把任意一种账单文件变成 CSV 文本。
+     * 微信「用于个人对账」给的是 Excel（xlsx），支付宝/微信的另一种导出是 zip 套 csv，两种都要认。
+     */
+    private fun toBillText(bytes: ByteArray): String? {
+        // 1) 本身就是 xlsx
+        XlsxReader.readRowsOrNull(bytes)?.let { return XlsxReader.toCsv(it) }
+
+        // 2) zip：里面可能是 csv/txt，也可能是 xlsx
+        if (BillCsv.isZip(bytes)) {
+            val inner = extractFirstBillEntry(bytes) ?: return null
+            XlsxReader.readRowsOrNull(inner)?.let { return XlsxReader.toCsv(it) }
+            return BillCsv.decode(inner)
+        }
+
+        // 3) 普通 csv / txt
+        return BillCsv.decode(bytes)
+    }
+
+    private fun extractFirstBillEntry(bytes: ByteArray): ByteArray? {
         try {
             ZipInputStream(ByteArrayInputStream(bytes)).use { zis ->
                 var entry = zis.nextEntry
                 while (entry != null) {
                     val name = entry.name.lowercase()
-                    if (!entry.isDirectory && (name.endsWith(".csv") || name.endsWith(".txt"))) {
+                    if (!entry.isDirectory &&
+                        (name.endsWith(".csv") || name.endsWith(".txt") || name.endsWith(".xlsx"))
+                    ) {
                         return zis.readBytes()
                     }
                     entry = zis.nextEntry

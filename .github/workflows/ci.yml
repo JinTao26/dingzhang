@@ -1,0 +1,36 @@
+name: CI
+
+# 只编译、不发版。push 到 main 时跑一遍，保证源码不是"写完了但编不过"。
+# 发版由 release.yml 在打 tag 时负责。
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Assemble debug
+        run: gradle :app:assembleDebug --no-daemon
+
+      - name: Upload debug apk
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-apk
+          path: app/build/outputs/apk/debug/*.apk
