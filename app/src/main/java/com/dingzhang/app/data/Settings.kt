@@ -59,6 +59,21 @@ class Settings(context: Context) {
         get() = sp.getBoolean("channel_bank_push", true)
         set(v) = sp.edit().putBoolean("channel_bank_push", v).apply()
 
+    /** 开 App 时顺带查一次更新。默认开，嫌烦可以在「我的」里关掉。 */
+    var autoCheckUpdate: Boolean
+        get() = sp.getBoolean("auto_check_update", true)
+        set(v) = sp.edit().putBoolean("auto_check_update", v).apply()
+
+    /** 点了「暂不更新」的版本号。同一版本不再自动弹，手动点「检查更新」照样能查。 */
+    var skipVersion: String
+        get() = sp.getString("skip_version", "") ?: ""
+        set(v) = sp.edit().putString("skip_version", v).apply()
+
+    /** 上次自动检查的时间。冷启动很频繁，6 小时才打一次 GitHub API，免得白耗流量。 */
+    var lastUpdateCheckAt: Long
+        get() = sp.getLong("last_update_check_at", 0L)
+        set(v) = sp.edit().putLong("last_update_check_at", v).apply()
+
     fun addIgnoredPayee(payee: String) {
         val cur = sp.getStringSet("ignored_payees", emptySet()) ?: emptySet()
         sp.edit().putStringSet("ignored_payees", cur + payee).apply()

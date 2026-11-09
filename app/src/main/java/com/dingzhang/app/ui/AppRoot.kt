@@ -1,5 +1,7 @@
 package com.dingzhang.app.ui
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -28,6 +30,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -39,10 +42,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dingzhang.app.DingZhangApp
+import com.dingzhang.app.BuildConfig
 import com.dingzhang.app.core.model.CategoryTotal
 import com.dingzhang.app.core.model.Dates
 import com.dingzhang.app.core.model.LearnedRule
@@ -56,8 +61,11 @@ import com.dingzhang.app.ui.screens.BillsScreen
 import com.dingzhang.app.ui.screens.HomeScreen
 import com.dingzhang.app.ui.screens.MineScreen
 import com.dingzhang.app.ui.screens.StatsScreen
+import com.dingzhang.app.ui.components.UpdateDialog
 import com.dingzhang.app.ui.theme.Dz
+import com.dingzhang.app.update.UpdateChecker
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.util.Calendar
 
@@ -154,6 +162,25 @@ fun AppRoot() {
     var showAdd by remember { mutableStateOf(false) }
     var month by remember { mutableStateOf(Dates.monthOf(System.currentTimeMillis())) }
     val data = rememberAppData(month)
+    val ctx = LocalContext.current
+    var autoUpdate by remember { mutableStateOf<UpdateChecker.Result?>(null) }
+
+    // 开 App 顺带查一次更新。延迟 1.2 秒，别跟首屏抢帧；查不到就安静算了，绝不弹错误。
+    // 6 小时内不重复查：冷启动很频繁，没必要每次都打一次 GitHub API。
+    LaunchedEffect(Unit) {
+        val s = IngestPipeline.settings ?: return@LaunchedEffect
+        if (!s.autoCheckUpdate) return@LaunchedEffect
+        if (System.currentTimeMillis() - s.lastUpdateCheckAt < 6L * 3600_000) return@LaunchedEffect
+        delay(1200)
+        val r = try {
+            UpdateChecker.check(BuildConfig.VERSION_NAME)
+        } catch (e: Exception) {
+            return@LaunchedEffect
+        }
+        s.lastUpdateCheckAt = System.currentTimeMillis()
+        // 点过「暂不更新」的版本不再弹，等下一版
+        if (r.hasUpdate && r.latestVersion != s.skipVersion) autoUpdate = r
+    }
 
     if (showAdd) {
         AddScreen(
@@ -193,6 +220,30 @@ fun AppRoot() {
                 else -> MineScreen(data, month, onMonthChange = { month = it })
             }
         }
+    }
+
+    // 开屏的更新提示。用户选「暂不更新」就记住这个版本，下次打开不再问
+    autoUpdate?.let { r ->
+        UpdateDialog(
+            result = r,
+            fromAuto = true,
+            onDismiss = { autoUpdate = null },
+            onSkipVersion = {
+                IngestPipeline.settings?.skipVersion = r.latestVersion.orEmpty()
+                autoUpdate = null
+            },
+            onDownload = {
+                try {
+                    ctx.startActivity(
+                        Intent(Intent.ACTION_VIEW, Uri.parse(r.apkUrl ?: r.pageUrl))
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    )
+                } catch (e: Exception) {
+                    // 没有浏览器就算了，别用 Toast 打断
+                }
+                autoUpdate = null
+            }
+        )
     }
 }
 

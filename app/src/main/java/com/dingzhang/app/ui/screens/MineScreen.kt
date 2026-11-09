@@ -71,6 +71,7 @@ import com.dingzhang.app.ingest.IngestPipeline
 import com.dingzhang.app.ui.AppData
 import com.dingzhang.app.ui.components.DzCard
 import com.dingzhang.app.ui.components.MascotFace
+import com.dingzhang.app.ui.components.UpdateDialog
 import com.dingzhang.app.ui.theme.Dz
 import com.dingzhang.app.ui.theme.ThemeController
 import com.dingzhang.app.ui.theme.ThemePack
@@ -124,6 +125,7 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
 
     var checking by remember { mutableStateOf(false) }
     var updateResult by remember { mutableStateOf<UpdateChecker.Result?>(null) }
+    var autoCheck by remember { mutableStateOf(settings?.autoCheckUpdate ?: true) }
 
     // 导出走系统的「新建文档」，用户自己选存哪儿，不申请存储权限
     val csvSaver = rememberLauncherForActivityResult(
@@ -616,6 +618,31 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                         .padding(horizontal = 10.dp, vertical = 5.dp)
                 )
             }
+            Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "打开时自动检查更新",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Dz.Ink
+                    )
+                    Text(
+                        settings?.skipVersion?.takeIf { it.isNotBlank() }?.let {
+                            "已跳过 $it，出下一版仍会提示"
+                        } ?: "有新版会开屏提示，可以选「暂不更新」",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Dz.InkFaint
+                    )
+                }
+                Switch(
+                    checked = autoCheck,
+                    onCheckedChange = { v ->
+                        autoCheck = v
+                        settings?.autoCheckUpdate = v
+                    },
+                    colors = SwitchDefaults.colors(checkedTrackColor = Dz.Sakura)
+                )
+            }
         }
     }
 
@@ -670,84 +697,18 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
     }
 
     // ---------- 版本更新 ----------
+    // 弹窗和开屏提示共用同一套，免得两处文案越改越不一样
     updateResult?.let { r ->
-        Dialog(
-            onDismissRequest = { updateResult = null },
-            properties = DialogProperties(usePlatformDefaultWidth = false)
-        ) {
-            Column(
-                Modifier
-                    .fillMaxWidth(0.9f)
-                    .clip(RoundedCornerShape(26.dp))
-                    .background(Dz.Card)
-                    .padding(20.dp)
-            ) {
-                Text(
-                    if (r.hasUpdate) "有新版本了" else "版本检查",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = Dz.Ink
-                )
-                Text(
-                    when {
-                        r.hasUpdate -> "当前 ${r.currentVersion} → 最新 ${r.latestVersion ?: ""}"
-                        r.latestVersion != null -> "已是最新版本 ${r.currentVersion}"
-                        else -> r.message
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Dz.InkFaint,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-                if (r.hasUpdate && r.notes.isNotBlank()) {
-                    Spacer(Modifier.height(10.dp))
-                    Text(
-                        r.notes,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Dz.InkSoft,
-                        modifier = Modifier
-                            .heightIn(max = 200.dp)
-                            .verticalScroll(rememberScrollState())
-                    )
-                }
-                if (r.hasUpdate && r.apkUrl == null) {
-                    Text(
-                        "这个版本没附 APK 包，去 Release 页看构建产物",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Dz.InkFaint,
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
-                }
-                Spacer(Modifier.height(16.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Box(
-                        Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(Dz.Cream)
-                            .clickable { updateResult = null }
-                            .padding(vertical = 11.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("知道了", style = MaterialTheme.typography.labelLarge, color = Dz.InkSoft)
-                    }
-                    if (r.hasUpdate) {
-                        Box(
-                            Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(Dz.Sakura)
-                                .clickable {
-                                    openUrl(ctx, r.pageUrl)
-                                    updateResult = null
-                                }
-                                .padding(vertical = 11.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("去下载", style = MaterialTheme.typography.labelLarge, color = Color.White)
-                        }
-                    }
-                }
+        UpdateDialog(
+            result = r,
+            fromAuto = false,
+            onDismiss = { updateResult = null },
+            onSkipVersion = { IngestPipeline.settings?.skipVersion = r.latestVersion.orEmpty() },
+            onDownload = {
+                openUrl(ctx, r.apkUrl ?: r.pageUrl)
+                updateResult = null
             }
-        }
+        )
     }
 }
 
