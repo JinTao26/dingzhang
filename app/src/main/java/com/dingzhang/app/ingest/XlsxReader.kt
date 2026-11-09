@@ -117,7 +117,7 @@ object XlsxReader {
         return out
     }
 
-    private fun parseSheet(xml: ByteArray, shared: List<String>): List<List<String>> {
+    private fun parseSheet(xml: ByteArray, shared: List<String>): MutableList<List<String>> {
         val rows = ArrayList<List<String>>(1024)
         try {
             val p = Xml.newPullParser()
