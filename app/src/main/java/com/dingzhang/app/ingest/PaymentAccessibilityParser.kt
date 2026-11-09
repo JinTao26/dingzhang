@@ -90,9 +90,12 @@ object PaymentAccessibilityParser {
         val amount = extractAmount(texts) ?: return null
         if (amount <= 0 || amount > 10_000_000_00L) return null
 
+        // 有「商户全称：」标签就用标签；微信的支付结果页没这个标签，
+        // 第一行往往就是店名，所以再逐行猜一次
         val payee = findValue(texts, payeeLabels)
             ?.let { IngestPipeline.cleanPayee(it) }
             ?.takeIf { it.length >= 2 }
+            ?: IngestPipeline.guessPayeeFromLines(texts)
             ?: defaultPayee(wallet)
 
         val account = findValue(texts, accountLabels)?.take(20).orEmpty()

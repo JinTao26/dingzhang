@@ -216,6 +216,35 @@ object IngestPipeline {
      * 把各通道拿到的商户名洗成可读、可复用的形式。
      * 「微信支付-小杨生煎」-> 「小杨生煎」；「小杨生煎（北仑店）」原样保留（门店信息有用）。
      */
+    /**
+     * 这一行看着像不像商户名。微信/支付宝的支付卡片常常第一行就直接写店名，
+     * 没有任何「向 XX 付款」的句式，正则会漏，只能逐行判断。
+     */
+    private val payeeNoise = listOf(
+        "微信支付", "支付宝", "支付成功", "付款成功", "已支付", "支付完成",
+        "交易提醒", "账单详情", "账单", "明细", "服务通知", "通知", "收款到账",
+        "使用零钱", "零钱", "余额", "银行卡", "储蓄卡", "信用卡", "付款方式",
+        "支付方式", "优惠", "立减", "折扣", "积分", "退款", "转账", "还款",
+        "返回", "完成", "取消", "关闭", "详情", "更多", "复制", "分享",
+        "帮助", "客服", "确认", "查看", "元", "¥", "￥"
+    )
+
+    /** 从一行行文本里猜商户名，猜不到返回 null（调用方自己决定兜底成什么）。 */
+    fun guessPayeeFromLines(lines: List<String>): String? {
+        for (raw in lines) {
+            val t = raw.trim()
+            if (t.length !in 2..30) continue
+            if (payeeNoise.any { t.contains(it) }) continue
+            if (t.endsWith("：") || t.endsWith(":")) continue
+            // 「11.50」这种金额、「11月9日 18:12」这种时间都排除：数字占一半以上
+            val digits = t.count { it.isDigit() }
+            if (digits > 0 && digits * 2 >= t.length) continue
+            val cleaned = cleanPayee(t)
+            if (cleaned.length >= 2) return cleaned
+        }
+        return null
+    }
+
     fun cleanPayee(raw: String): String {
         var s = raw.trim()
             .replace("\u00a0", " ")

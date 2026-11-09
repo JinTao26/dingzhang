@@ -77,11 +77,17 @@ object PaymentNotifierParser {
 
         val amount = extractAmount(corpus) ?: return null
 
-        val payee = extractPayee(corpus) ?: when (wallet) {
-            Wallet.WECHAT -> "微信支付"
-            Wallet.ALIPAY -> "支付宝"
-            else -> ""
-        }
+        // 微信的支付卡片第一行直接写店名（「加贝购物超市」），没有「向 XX 付款」的句式，
+        // 所以正则匹配不到时再逐行猜一遍，猜不到才退回泛称
+        val lines = listOfNotNull(title?.toString(), text?.toString(), bigText?.toString())
+            .flatMap { it.split("\n") }
+        val payee = extractPayee(corpus)
+            ?: IngestPipeline.guessPayeeFromLines(lines)
+            ?: when (wallet) {
+                Wallet.WECHAT -> "微信支付"
+                Wallet.ALIPAY -> "支付宝"
+                else -> ""
+            }
 
         val kind = when {
             isTransfer -> TxnKind.TRANSFER
