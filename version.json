@@ -1,0 +1,7 @@
+{
+  "version": "0.5.6",
+  "notes": "明细筛选面板（金额区间 / 分类多选 / 时间 / 类型）；明细顶部收成一行搜索框 + 筛选；第二套主题换成星空物语；商户名能从通知和账单详情里补全，也能手动改。",
+  "apk": "https://github.com/JinTao26/dingzhang/releases/download/v0.5.6/dingzhang-v0.5.6.apk",
+  "page": "https://github.com/JinTao26/dingzhang/releases/tag/v0.5.6",
+  "published_at": "2026-11-09T12:02:00Z"
+}

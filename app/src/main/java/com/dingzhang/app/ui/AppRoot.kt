@@ -201,21 +201,34 @@ fun AppRoot() {
     val ctx = LocalContext.current
     var autoUpdate by remember { mutableStateOf<UpdateChecker.Result?>(null) }
 
-    // 开 App 顺带查一次更新。延迟 1.2 秒，别跟首屏抢帧；查不到就安静算了，绝不弹错误。
-    // 6 小时内不重复查：冷启动很频繁，没必要每次都打一次 GitHub API。
+    // 检查更新。
+    //
+    // 以前只在冷启动查一次、失败还写掉时间戳，结果「装了两天一次都没看到提醒」：
+    // App 常驻后台时几天都不会冷启动，加上国内直连 GitHub API 经常超时，
+    // 两个原因叠在一起，界面上永远是空的。
+    //
+    // 现在改成常驻循环：进程活着就一直按 12 小时的节奏查；查成功才记时间，
+    // 失败（网络不通）下次进前台还能再试，不会因为一次超时消停半天。
     LaunchedEffect(Unit) {
         val s = IngestPipeline.settings ?: return@LaunchedEffect
-        if (!s.autoCheckUpdate) return@LaunchedEffect
-        if (System.currentTimeMillis() - s.lastUpdateCheckAt < 6L * 3600_000) return@LaunchedEffect
-        delay(1200)
-        val r = try {
-            UpdateChecker.check(BuildConfig.VERSION_NAME)
-        } catch (e: Exception) {
-            return@LaunchedEffect
+        while (true) {
+            val due = s.autoCheckUpdate &&
+                System.currentTimeMillis() - s.lastUpdateCheckAt >= 12L * 3600_000
+            if (due) {
+                delay(1200)   // 别跟首屏抢帧
+                val r = try {
+                    UpdateChecker.check(BuildConfig.VERSION_NAME)
+                } catch (e: Exception) {
+                    null
+                }
+                if (r != null && r.ok) {
+                    s.lastUpdateCheckAt = System.currentTimeMillis()
+                    // 点过「暂不更新」的版本不再弹，等下一版
+                    if (r.hasUpdate && r.latestVersion != s.skipVersion) autoUpdate = r
+                }
+            }
+            delay(30L * 60 * 1000)
         }
-        s.lastUpdateCheckAt = System.currentTimeMillis()
-        // 点过「暂不更新」的版本不再弹，等下一版
-        if (r.hasUpdate && r.latestVersion != s.skipVersion) autoUpdate = r
     }
 
     if (showAdd) {
