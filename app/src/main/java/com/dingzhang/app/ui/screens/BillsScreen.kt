@@ -693,23 +693,24 @@ private fun parseMaxYuan(s: String): Long =
 private fun FilterEntry(active: Boolean, onClick: () -> Unit) {
     Row(
         Modifier
-            .clip(CircleShape)
-            .background(if (active) Dz.SakuraSoft else Dz.Card)
+            .height(48.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(if (active) Dz.Sakura else Dz.Card)
             .clickable { onClick() }
-            .padding(horizontal = 12.dp, vertical = 7.dp),
+            .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
             Icons.Rounded.Tune, null,
-            tint = if (active) Dz.SakuraDeep else Dz.InkFaint,
-            modifier = Modifier.size(15.dp)
+            tint = if (active) Color.White else Dz.InkSoft,
+            modifier = Modifier.size(20.dp)
         )
-        Spacer(Modifier.width(4.dp))
+        Spacer(Modifier.width(6.dp))
         Text(
             "筛选",
-            fontSize = 12.sp,
-            fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
-            color = if (active) Dz.SakuraDeep else Dz.InkFaint
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+            color = if (active) Color.White else Dz.Ink
         )
     }
 }
@@ -741,7 +742,6 @@ private fun FilterDialog(
                 .background(Dz.Cream)
                 .systemBarsPadding()
                 .imePadding()
-                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 18.dp, vertical = 10.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -764,6 +764,13 @@ private fun FilterDialog(
             }
 
             Spacer(Modifier.height(14.dp))
+
+            // 卡片区自己滚，底部按钮固定在屏幕下方，小屏也点得到
+            Column(
+                Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+            ) {
 
             // ---------- 时间 ----------
             Column(
@@ -889,15 +896,19 @@ private fun FilterDialog(
                 }
             }
 
-            Spacer(Modifier.height(18.dp))
+            }  // 卡片区结束
+
+            Spacer(Modifier.height(10.dp))
 
             Row(
-                Modifier.fillMaxWidth(),
+                Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 TextButton(onClick = onReset) {
-                    Text("重置", color = Dz.InkSoft)
+                    Text("重置", color = Dz.InkSoft, fontSize = 15.sp)
                 }
                 Button(
                     onClick = onApply,

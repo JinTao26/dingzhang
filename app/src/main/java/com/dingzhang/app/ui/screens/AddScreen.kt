@@ -311,16 +311,17 @@ fun AddScreen(onClose: () -> Unit, onSaved: () -> Unit) {
 private fun RowScope.ModeChip(text: String, active: Boolean, onClick: () -> Unit) {
     Box(
         Modifier
-            .clip(RoundedCornerShape(10.dp))
+            .width(76.dp)
+            .height(42.dp)
+            .clip(RoundedCornerShape(12.dp))
             .background(if (active) Dz.Card else Color.Transparent)
-            .clickable { onClick() }
-            .padding(horizontal = 10.dp, vertical = 5.dp),
+            .clickable { onClick() },
         contentAlignment = Alignment.Center
     ) {
         Text(
             text,
-            style = MaterialTheme.typography.labelSmall,
-            color = if (active) Dz.SakuraDeep else Dz.InkFaint,
+            fontSize = 15.sp,
+            color = if (active) Dz.SakuraDeep else Dz.InkSoft,
             fontWeight = if (active) FontWeight.Bold else FontWeight.Normal
         )
     }

@@ -599,6 +599,8 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                 color = Dz.InkFaint,
                 modifier = Modifier.padding(top = 4.dp, bottom = 10.dp)
             )
+            ActionRow("帮助", "微信和支付宝怎么导账单、各项权限怎么开") { subPage = 3 }
+            Spacer(Modifier.height(6.dp))
             ActionRow("意见反馈", "发到作者邮箱，自动带上机型和各通道开关") { subPage = 1 }
             Spacer(Modifier.height(6.dp))
             ActionRow("自动记账原理与限制", "五条通道各管什么、哪些做不到") { subPage = 2 }
@@ -743,6 +745,14 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
             properties = DialogProperties(usePlatformDefaultWidth = false)
         ) {
             PrinciplePage { subPage = 0 }
+        }
+    }
+    if (subPage == 3) {
+        Dialog(
+            onDismissRequest = { subPage = 0 },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            HelpPage { subPage = 0 }
         }
     }
 
@@ -1126,5 +1136,84 @@ private fun PrinciplePage(onClose: () -> Unit) {
             )
         }
         Spacer(Modifier.height(24.dp))
+    }
+}
+
+/**
+ * 帮助页。文字版步骤，后续换成截图版：
+ * 每张图直接放 Image(painterResource(R.drawable.help_xxx))，替换 HelpStep 即可。
+ */
+@Composable
+private fun HelpPage(onClose: () -> Unit) {
+    Column(
+        Modifier
+            .fillMaxSize()
+            .background(Dz.Cream)
+            .systemBarsPadding()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 18.dp, vertical = 10.dp)
+    ) {
+        SubPageBar("帮助", onClose)
+        Spacer(Modifier.height(14.dp))
+
+        DzCard {
+            Text("微信账单怎么导出", style = MaterialTheme.typography.titleMedium, color = Dz.Ink)
+            Spacer(Modifier.height(4.dp))
+            HelpStep("1", "微信 → 我 → 服务 → 钱包")
+            HelpStep("2", "右上角「账单」，再点右上角「常见问题」")
+            HelpStep("3", "「下载账单」→ 用途选「用于个人对账」")
+            HelpStep("4", "选时间范围（最长一年），填邮箱")
+            HelpStep("5", "邮件里收到压缩包，解压得到 csv 或 xlsx")
+            HelpStep("6", "回「我的 → 导入账单」，选那个文件")
+        }
+        Spacer(Modifier.height(12.dp))
+
+        DzCard {
+            Text("支付宝账单怎么导出", style = MaterialTheme.typography.titleMedium, color = Dz.Ink)
+            Spacer(Modifier.height(4.dp))
+            HelpStep("1", "支付宝 → 我的 → 账单")
+            HelpStep("2", "右上角「…」→「开具交易流水证明」")
+            HelpStep("3", "用途选「用于个人对账」，选时间范围，填邮箱")
+            HelpStep("4", "邮件里收到压缩包（带解压密码，密码在短信或邮件正文里）")
+            HelpStep("5", "解压后回「我的 → 导入账单」")
+        }
+        Spacer(Modifier.height(12.dp))
+
+        DzCard {
+            Text("权限怎么开", style = MaterialTheme.typography.titleMedium, color = Dz.Ink)
+            Spacer(Modifier.height(4.dp))
+            HelpStep("1", "通知使用权：设置 → 应用 → 特殊应用权限 → 通知使用权 → 叮账 → 允许")
+            HelpStep("2", "无障碍：设置 → 无障碍（辅助功能）→ 已下载的服务 → 叮账 → 开启")
+            HelpStep("3", "短信：首次弹窗点「允许」；之前拒过就去 设置 → 应用 → 叮账 → 权限 → 短信")
+            HelpStep("4", "后台存活：设置 → 电池 → 应用耗电管理 → 叮账 → 允许后台活动")
+            HelpStep("5", "Android 13 以上侧载：设置 → 应用 → 叮账 → 右上角 ⋮ → 允许受限设置")
+        }
+        Spacer(Modifier.height(12.dp))
+
+        DzCard {
+            Text("还是没记上？", style = MaterialTheme.typography.titleMedium, color = Dz.Ink)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "先看「自动记账原理与限制」那一页。区分两种情况：通道没开（去上一张卡里开），" +
+                    "还是这类消息本来就拿不到（淘宝页面被屏蔽、微信红包要点开、通知里没写金额）。" +
+                    "后一种只能靠导入账单补。",
+                style = MaterialTheme.typography.bodySmall,
+                color = Dz.InkFaint
+            )
+        }
+        Spacer(Modifier.height(24.dp))
+    }
+}
+
+@Composable
+private fun HelpStep(no: String, text: String) {
+    Row(Modifier.padding(vertical = 3.dp)) {
+        Text(
+            "$no. ",
+            fontSize = 12.sp,
+            color = Dz.SakuraDeep,
+            fontWeight = FontWeight.Bold
+        )
+        Text(text, style = MaterialTheme.typography.bodySmall, color = Dz.InkSoft)
     }
 }
