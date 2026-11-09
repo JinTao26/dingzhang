@@ -85,6 +85,14 @@ data class AppData(
     val daysInMonth: Int = 30,
     val budgetCents: Long = 0,
     val sourceCounts: Map<Source, Int> = emptyMap(),
+    // ---- 年视图 ----
+    val yearLabel: String = "",
+    val yearExpense: Long = 0,
+    val yearIncome: Long = 0,
+    val yearCount: Int = 0,
+    val yearByCategory: List<CategoryTotal> = emptyList(),
+    val monthly: Map<String, Long> = emptyMap(),
+    val yearSourceCounts: Map<Source, Int> = emptyMap(),
     val rules: List<LearnedRule> = emptyList(),
     val ignoredPayees: Set<String> = emptySet(),
     val lastImportAt: Long = 0,
@@ -126,6 +134,20 @@ private fun loadAppData(month: String): AppData {
     val todayList = dao.listBetween(todayStart, todayStart + 86_400_000L)
     val monthList = dao.listBetween(start, end)
 
+    // 年汇总：统计页切「年」时用。同一次查询顺手做掉，本地库里几千行也不费时
+    val yCal = Calendar.getInstance().apply {
+        set(Calendar.YEAR, year)
+        set(Calendar.MONTH, 0)
+        set(Calendar.DAY_OF_MONTH, 1)
+        set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
+        set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+    }
+    val yStart = yCal.timeInMillis
+    yCal.add(Calendar.YEAR, 1)
+    val yEnd = yCal.timeInMillis
+    val (yExpense, yIncome) = dao.sumByKind(yStart, yEnd)
+    val yByCat = dao.sumByCategory(yStart, yEnd)
+
     return AppData(
         monthLabel = month.replace("-", "."),
         monthExpense = expense,
@@ -145,6 +167,13 @@ private fun loadAppData(month: String): AppData {
         daysInMonth = days,
         budgetCents = settings?.monthlyBudgetCents ?: 0,
         sourceCounts = dao.countBySource(start, end),
+        yearLabel = year.toString(),
+        yearExpense = yExpense,
+        yearIncome = yIncome,
+        yearCount = yByCat.sumOf { it.count },
+        yearByCategory = yByCat,
+        monthly = dao.monthlyExpense(yStart, yEnd),
+        yearSourceCounts = dao.countBySource(yStart, yEnd),
         rules = dao.rules(),
         ignoredPayees = settings?.ignoredPayees() ?: emptySet(),
         lastImportAt = settings?.lastBillImportAt ?: 0,

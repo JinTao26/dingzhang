@@ -12,8 +12,8 @@ android {
         applicationId = "com.dingzhang.app"
         minSdk = 26          // Android 8.0，覆盖绝大多数在用机型
         targetSdk = 35
-        versionCode = 5
-        versionName = "0.5.2"
+        versionCode = 6
+        versionName = "0.5.3"
     }
 
     buildFeatures {

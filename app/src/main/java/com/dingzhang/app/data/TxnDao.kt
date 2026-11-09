@@ -202,6 +202,26 @@ class TxnDao(private val helper: DbHelper) {
         return null
     }
 
+    /**
+     * 按月聚合支出（退款同样记负），key 形如 "2026-01"。
+     * 年视图那 12 根柱子用的就是它。
+     */
+    fun monthlyExpense(start: Long, end: Long): Map<String, Long> {
+        helper.readableDatabase.rawQuery(
+            "SELECT occurred_at, amount_cents, kind FROM txn " +
+                "WHERE occurred_at >= ? AND occurred_at < ? AND kind IN ('expense', 'refund')",
+            arrayOf(start.toString(), end.toString())
+        ).use {
+            val map = HashMap<String, Long>()
+            while (it.moveToNext()) {
+                val k = Dates.monthOf(it.getLong(0))
+                val v = if (it.getString(2) == "refund") -it.getLong(1) else it.getLong(1)
+                map[k] = (map[k] ?: 0L) + v
+            }
+            return map
+        }
+    }
+
     fun countBySource(start: Long, end: Long): Map<Source, Int> {
         helper.readableDatabase.rawQuery(
             "SELECT source, COUNT(*) FROM txn WHERE occurred_at >= ? AND occurred_at < ? GROUP BY source",
