@@ -194,6 +194,27 @@ class TxnDao(private val helper: DbHelper) {
         }
     }
 
+    /** 收入按分类汇总。收入来源可能很多（工资、报销、红包、利息），单独出一张表。 */
+    fun sumIncomeByCategory(start: Long, end: Long): List<CategoryTotal> {
+        helper.readableDatabase.rawQuery(
+            """
+            SELECT category_id, SUM(amount_cents) AS s, COUNT(*) AS c
+            FROM txn
+            WHERE occurred_at >= ? AND occurred_at < ? AND kind = 'income'
+            GROUP BY category_id
+            HAVING s > 0
+            ORDER BY s DESC
+            """.trimIndent(),
+            arrayOf(start.toString(), end.toString())
+        ).use {
+            val out = ArrayList<CategoryTotal>()
+            while (it.moveToNext()) {
+                out.add(CategoryTotal(it.getString(0), it.getLong(1), it.getInt(2)))
+            }
+            return out
+        }
+    }
+
     /** 返回 (支出合计, 收入合计)，单位分。 */
     fun sumByKind(start: Long, end: Long): Pair<Long, Long> {
         helper.readableDatabase.rawQuery(

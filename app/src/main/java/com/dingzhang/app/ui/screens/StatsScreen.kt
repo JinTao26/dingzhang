@@ -74,6 +74,9 @@ fun StatsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
     var detailCategory by remember { mutableStateOf<String?>(null) }
 
     val cats = if (yearScope) data.yearByCategory else data.byCategory
+    // 收入来源可能很多（工资、奖金、报销、红包、理财），单独一块列在下面
+    val incomeCats = if (yearScope) data.yearIncomeByCategory else data.incomeByCategory
+    val incomeTotal = incomeCats.sumOf { it.cents }
     // 环图与百分比的分母用分类合计，保证环内自洽；
     // 顶部那个「支出」用 SQL 的合计（它包含净额为负、被 HAVING 挡掉的分类）
     val ringTotal = cats.sumOf { it.cents }
@@ -191,6 +194,42 @@ fun StatsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                 }
                 Spacer(Modifier.height(12.dp))
                 if (yearScope) MonthlyBars(data) else DailyBars(data)
+            }
+        }
+
+        if (incomeCats.isNotEmpty()) {
+            Spacer(Modifier.height(12.dp))
+            DzCard {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "钱从哪儿来",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = Dz.Ink
+                    )
+                    Spacer(Modifier.weight(1f))
+                    Text(
+                        "共 ${incomeCats.sumOf { it.count }} 笔",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Dz.InkFaint
+                    )
+                }
+                Text(
+                    "点一行看明细",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Dz.InkFaint,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+                Spacer(Modifier.height(10.dp))
+                incomeCats.forEachIndexed { i, c ->
+                    if (i > 0) {
+                        HorizontalDivider(
+                            color = Dz.Line,
+                            thickness = 0.6.dp,
+                            modifier = Modifier.padding(vertical = 2.dp)
+                        )
+                    }
+                    CategoryBar(c, incomeTotal) { detailCategory = c.categoryId }
+                }
             }
         }
 

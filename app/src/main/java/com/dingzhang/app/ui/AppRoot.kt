@@ -81,6 +81,7 @@ data class AppData(
     val todayCount: Int = 0,
     val pendingCount: Int = 0,
     val byCategory: List<CategoryTotal> = emptyList(),
+    val incomeByCategory: List<CategoryTotal> = emptyList(),
     val daily: Map<Int, Long> = emptyMap(),
     val recent: List<Txn> = emptyList(),
     val monthTxns: List<Txn> = emptyList(),
@@ -93,6 +94,7 @@ data class AppData(
     val yearIncome: Long = 0,
     val yearCount: Int = 0,
     val yearByCategory: List<CategoryTotal> = emptyList(),
+    val yearIncomeByCategory: List<CategoryTotal> = emptyList(),
     val monthly: Map<String, Long> = emptyMap(),
     val yearSourceCounts: Map<Source, Int> = emptyMap(),
     /** 全年流水，点分类看明细时用 */
@@ -134,6 +136,7 @@ private fun loadAppData(month: String): AppData {
     val todayStart = Dates.startOfDay(now)
     val (expense, income) = dao.sumByKind(start, end)
     val byCat = dao.sumByCategory(start, end)
+    val incomeByCat = dao.sumIncomeByCategory(start, end)
     val daily = dao.dailyExpense(start, end)
     val todayList = dao.listBetween(todayStart, todayStart + 86_400_000L)
     val monthList = dao.listBetween(start, end)
@@ -151,6 +154,7 @@ private fun loadAppData(month: String): AppData {
     val yEnd = yCal.timeInMillis
     val (yExpense, yIncome) = dao.sumByKind(yStart, yEnd)
     val yByCat = dao.sumByCategory(yStart, yEnd)
+    val yIncomeByCat = dao.sumIncomeByCategory(yStart, yEnd)
 
     return AppData(
         monthLabel = month.replace("-", "."),
@@ -165,6 +169,7 @@ private fun loadAppData(month: String): AppData {
         todayCount = todayList.size,
         pendingCount = dao.countAuto(),
         byCategory = byCat,
+        incomeByCategory = incomeByCat,
         daily = daily,
         recent = dao.recent(30),
         monthTxns = monthList,
@@ -176,6 +181,7 @@ private fun loadAppData(month: String): AppData {
         yearIncome = yIncome,
         yearCount = yByCat.sumOf { it.count },
         yearByCategory = yByCat,
+        yearIncomeByCategory = yIncomeByCat,
         monthly = dao.monthlyExpense(yStart, yEnd),
         yearSourceCounts = dao.countBySource(yStart, yEnd),
         yearTxns = dao.listBetween(yStart, yEnd),

@@ -1,6 +1,6 @@
 {
   "version": "0.5.7",
-  "notes": "更新提示改成常驻轮询，不再只在冷启动查一次；更新源加 jsDelivr 兜底，连不上会明确提示；APK 下载走 ghproxy 镜像；我的页能看上次检查时间，跳过的版本可一键恢复；明细筛选按钮放大、筛选面板底部按钮固定；记一笔收支切换放大；首页最近可改分类，改一次同商户和退款一起改；新增帮助页。",
+  "notes": "打开 App 时，有新版本会弹提示，可以选「暂不更新」，也能先看更新说明。我的页面能看到上次检查更新的时间，跳过的版本可以一键恢复提示。明细筛选按钮更大更好点，筛选面板底部按钮固定。记一笔时收支切换放大。首页最近的账可以点开改分类，同商户和退款一起改。新增帮助页。",
   "apk": "https://github.com/JinTao26/dingzhang/releases/download/v0.5.7/dingzhang-v0.5.7.apk",
   "page": "https://github.com/JinTao26/dingzhang/releases/tag/v0.5.7",
   "published_at": "2026-11-09T13:32:00Z"

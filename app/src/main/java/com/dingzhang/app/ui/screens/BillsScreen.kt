@@ -311,10 +311,10 @@ fun BillsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                 DingZhangApp.bumpDataVersion()
                 selected = null
                 val name = Categories.of(catId).name
+                // 只报「改成了什么 + 连带改了几笔」，不再把商户名和学到的规则念一遍
                 val msg = buildString {
-                    if (r.learned != null) append("记住了：以后「${r.learned}」算 $name")
-                    else append("已改成 $name")
-                    if (r.updated > 0) append("，同类 ${r.updated} 笔也一起改了")
+                    append("已改成 $name")
+                    if (r.updated > 0) append("，同商户 $r.updated 笔一起改")
                 }
                 Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show()
             },
