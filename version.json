@@ -1,7 +1,7 @@
 {
-  "version": "0.5.12",
-  "notes": "统计能在支出和收入之间切换，收入也有环形图和排行；环形图点得动，图例更大更清楚；每笔可以自己指定算日常还是大额；新增分享给朋友；账单详情页的金额和店名认得更全了。",
-  "apk": "https://github.com/JinTao26/dingzhang/releases/download/v0.5.12/dingzhang-v0.5.12.apk",
-  "page": "https://github.com/JinTao26/dingzhang/releases/tag/v0.5.12",
-  "published_at": "2026-11-10T05:45:00Z"
+  "version": "0.5.13",
+  "notes": "明细页的月份能点开直接选；装好第一次打开会有一次说明，告诉你权限、帮助和检查更新在哪；分享出去的链接点开直接下载安装包。",
+  "apk": "https://github.com/JinTao26/dingzhang/releases/download/v0.5.13/dingzhang.apk",
+  "page": "https://github.com/JinTao26/dingzhang/releases/tag/v0.5.13",
+  "published_at": "2026-11-10T06:42:00Z"
 }
