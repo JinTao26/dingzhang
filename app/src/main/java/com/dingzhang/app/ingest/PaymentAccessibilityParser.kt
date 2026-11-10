@@ -38,7 +38,13 @@ object PaymentAccessibilityParser {
         ),
         PageRule(
             Wallet.ALIPAY, "支付宝-账单详情",
-            mustContain = listOf("交易金额", "支付时间", "商户全称", "交易单号")
+            // 新版支付宝账单详情把标签改成了「收款方全称 / 订单号」，
+            // 金额也不再带 ¥，所以这里把常见的几种标签都放进来，命中任意两个即可
+            mustContain = listOf(
+                "交易金额", "支付时间", "商户全称", "收款方全称",
+                "订单号", "交易单号", "收单机构", "支付方式", "当前状态"
+            ),
+            mustNotContain = listOf("收款码", "扫一扫")
         ),
         PageRule(
             Wallet.WECHAT, "微信-支付结果",
@@ -47,14 +53,20 @@ object PaymentAccessibilityParser {
         ),
         PageRule(
             Wallet.WECHAT, "微信-账单详情",
-            mustContain = listOf("交易单号", "商户全称", "支付时间")
+            mustContain = listOf("交易单号", "商户全称", "支付时间", "当前状态", "商品")
         )
     )
 
     private val amountWithSymbol = Regex("[¥￥]\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)")
     private val amountPlain = Regex("([0-9][0-9,]*(?:\\.[0-9]{1,2})?)\\s*元")
+    /** 账单详情页的大字金额：「-20.00」，负号、没有货币符号 */
+    private val amountSigned = Regex("^[−\\-－]\\s*[¥￥]?\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)")
+    /** 只有数字和小数点的一行；要求带小数，免得把订单号、卡号尾号当成金额 */
+    private val amountBareDecimal = Regex("^[¥￥]?\\s*([0-9][0-9,]*\\.[0-9]{1,2})$")
 
-    private val payeeLabels = listOf("收款方", "商户全称", "商户名称", "交易对方", "对方", "商家名称")
+    private val payeeLabels = listOf(
+        "收款方全称", "商户全称", "收款方名称", "商户名称", "商家名称", "交易对方", "收款方", "对方"
+    )
     private val accountLabels = listOf("付款方式", "支付方式", "收付款方式", "扣款方式")
     private val timeLabels = listOf("支付时间", "交易时间", "创建时间", "付款时间")
     private val tradeNoLabels = listOf("交易单号", "订单号", "商户单号", "交易号")
@@ -158,7 +170,20 @@ object PaymentAccessibilityParser {
             Money.parseToCents(it)?.let { c -> if (c > 0) return c }
         }
         for (t in texts) {
+            val m = amountSigned.find(t)
+            if (m != null) {
+                Money.parseToCents(m.groupValues[1])?.let { if (it > 0) return it }
+            }
+        }
+        for (t in texts) {
             val m = amountPlain.find(t)
+            if (m != null) {
+                Money.parseToCents(m.groupValues[1])?.let { if (it > 0) return it }
+            }
+        }
+        // 最后兜一层：页面上单独一行、只写了「20.00」的，基本就是这笔的金额
+        for (t in texts) {
+            val m = amountBareDecimal.find(t.trim())
             if (m != null) {
                 Money.parseToCents(m.groupValues[1])?.let { if (it > 0) return it }
             }

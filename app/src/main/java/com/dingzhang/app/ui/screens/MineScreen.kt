@@ -756,6 +756,8 @@ private fun ChannelRow(
     onToggle: (Boolean) -> Unit,
     onGrant: () -> Unit
 ) {
+    // 开关点下去得立刻动，不能等下次刷新数据才追上
+    var on by remember(appEnabled) { mutableStateOf(appEnabled) }
     Column(
         Modifier
             .fillMaxWidth()
@@ -770,7 +772,7 @@ private fun ChannelRow(
                     .clip(CircleShape)
                     .background(
                         when {
-                            !appEnabled -> Dz.InkFaint
+                            !on -> Dz.InkFaint
                             systemGranted -> Dz.Mint
                             else -> Dz.Warn
                         }
@@ -785,8 +787,11 @@ private fun ChannelRow(
                 )
             }
             Switch(
-                checked = appEnabled,
-                onCheckedChange = onToggle,
+                checked = on,
+                onCheckedChange = {
+                    on = it
+                    onToggle(it)
+                },
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = Color.White,
                     checkedTrackColor = Dz.Sakura

@@ -279,6 +279,8 @@ object IngestPipeline {
 
     private val prefixNoise = Regex("^(微信支付|支付宝|付款给|收款方|商户|交易对方)\\s*[\\-:：]?\\s*")
     private val suffixNoise = Regex("\\s*[\\-—]?\\s*(商户号|订单号|交易单号)[:：]?\\s*\\d+.*$")
+    /** 「宁波市北仑区霜语食品店（个体工商户）」——括号里是执照类型，不是店名 */
+    private val licenseSuffix = Regex("（(个体工商户|个体户|个人独资|小微企业|有限公司|分公司|经营部|商贸行|企业)）$")
 
     /**
      * 把各通道拿到的商户名洗成可读、可复用的形式。
@@ -320,6 +322,7 @@ object IngestPipeline {
             .trim()
         s = prefixNoise.replace(s, "")
         s = suffixNoise.replace(s, "")
+        s = licenseSuffix.replace(s, "")
         s = s.trim(' ', '-', '—', '|', '·', ':', '：', ',', '，')
         return s.take(40)
     }
