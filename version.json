@@ -1,7 +1,7 @@
 {
-  "version": "0.5.10",
-  "notes": "首页和统计都能看到年预算用了多少；设置里改成了每月/每年预算，可自定义；批量删除、批量改分类加了全选，返回键能退出批量；筛选更快；删除固定在弹窗底部；小额门槛去掉。",
-  "apk": "https://github.com/JinTao26/dingzhang/releases/download/v0.5.10/dingzhang-v0.5.10.apk",
-  "page": "https://github.com/JinTao26/dingzhang/releases/tag/v0.5.10",
-  "published_at": "2026-11-10T02:45:00Z"
+  "version": "0.5.11",
+  "notes": "统计分成全部/日常/大额三档，大额也看环形图，边界点一下就能改；点分类里的每笔都能改分类、标成退款；金额不再拖小数，上万写成万；删掉自动化程度卡片和几处说明小字。",
+  "apk": "https://github.com/JinTao26/dingzhang/releases/download/v0.5.11/dingzhang-v0.5.11.apk",
+  "page": "https://github.com/JinTao26/dingzhang/releases/tag/v0.5.11",
+  "published_at": "2026-11-10T04:00:00Z"
 }
