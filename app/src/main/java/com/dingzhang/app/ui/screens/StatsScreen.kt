@@ -20,10 +20,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -39,6 +42,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -75,14 +79,18 @@ fun StatsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
     var showPicker by remember { mutableStateOf(false) }
     var detailCategory by remember { mutableStateOf<String?>(null) }
     var detailTxn by remember { mutableStateOf<Txn?>(null) }
-    // 只在这次看的时候过滤，不动库里的数据：单笔 ≥ 200 元的不算「日常」
+    // 只在这次看的时候过滤，不动库里的数据：单笔 ≥ 这个数的算大额
     var skipBig by remember { mutableStateOf(false) }
-    val bigCut = 20_000L
+    var bigCut by remember { mutableStateOf(20_000L) }
+    var editCut by remember { mutableStateOf(false) }
+    var cutInput by remember { mutableStateOf("") }
+    var showBigList by remember { mutableStateOf(false) }
 
     val catsBase = if (yearScope) data.yearByCategory else data.byCategory
     val incomeCatsBase = if (yearScope) data.yearIncomeByCategory else data.incomeByCategory
     val txns = if (yearScope) data.yearTxns else data.monthTxns
     val viewTxns = if (skipBig) txns.filter { it.amountCents < bigCut } else txns
+    val bigTxns = txns.filter { it.amountCents >= bigCut && it.kind != TxnKind.TRANSFER }
 
     val cats = if (skipBig) aggCats(viewTxns, false) else catsBase
     // 收入来源可能很多（工资、奖金、报销、红包、理财），单独一块列在下面
@@ -116,6 +124,58 @@ fun StatsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
             month = month,
             onDismiss = { showPicker = false },
             onPick = { onMonthChange(it) }
+        )
+    }
+
+    if (editCut) {
+        Dialog(onDismissRequest = { editCut = false }) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Dz.Card)
+                    .padding(18.dp)
+            ) {
+                Text("多大算大额", style = MaterialTheme.typography.titleLarge, color = Dz.Ink)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "超过这个数的单笔，打开「只看日常」就不算进去",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Dz.InkFaint
+                )
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = cutInput,
+                    onValueChange = { v -> cutInput = v.filter { it.isDigit() }.take(7) },
+                    label = { Text("整元") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(12.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = { editCut = false }) {
+                        Text("取消", color = Dz.InkSoft)
+                    }
+                    TextButton(onClick = {
+                        val y = (cutInput.toLongOrNull() ?: 0L) * 100
+                        if (y > 0) bigCut = y
+                        editCut = false
+                    }) {
+                        Text("保存", color = Dz.SakuraDeep, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+
+    if (showBigList) {
+        BigListDialog(
+            txns = bigTxns,
+            cutCents = bigCut,
+            onDismiss = { showBigList = false },
+            onTxnClick = { detailTxn = it }
         )
     }
 
@@ -198,7 +258,18 @@ fun StatsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
         ScopeTabs(yearScope) { yearScope = it }
 
         Spacer(Modifier.height(10.dp))
-        DailyOnlyRow(skipBig, bigCut) { skipBig = it }
+        DailyOnlyRow(
+            on = skipBig,
+            cutCents = bigCut,
+            bigCount = bigTxns.size,
+            bigSum = netExpense(bigTxns),
+            onToggle = { skipBig = it },
+            onEditCut = {
+                cutInput = (bigCut / 100).toString()
+                editCut = true
+            },
+            onShowExcluded = { showBigList = true }
+        )
 
         Spacer(Modifier.height(12.dp))
         SummaryCard(expense, income, yearScope, data.yearBudgetCents)
@@ -372,34 +443,158 @@ private fun netExpense(txns: List<Txn>): Long = txns.fold(0L) { acc, t ->
 
 /** 「只看日常」开关。只在这次看的时候过滤，库里的数据一个字不动。 */
 @Composable
-private fun DailyOnlyRow(on: Boolean, cutCents: Long, onChange: (Boolean) -> Unit) {
-    Row(
+private fun DailyOnlyRow(
+    on: Boolean,
+    cutCents: Long,
+    bigCount: Int,
+    bigSum: Long,
+    onToggle: (Boolean) -> Unit,
+    onEditCut: () -> Unit,
+    onShowExcluded: () -> Unit
+) {
+    Column(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
             .background(if (on) Dz.SakuraSoft else Dz.Cream)
-            .clickable { onChange(!on) }
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = 14.dp, vertical = 10.dp)
     ) {
-        Column(Modifier.weight(1f)) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clickable { onToggle(!on) },
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Text(
                 if (on) "只看日常消费 · 已排除大额" else "只看日常消费",
                 style = MaterialTheme.typography.titleSmall,
-                color = if (on) Dz.SakuraDeep else Dz.InkSoft
+                color = if (on) Dz.SakuraDeep else Dz.InkSoft,
+                modifier = Modifier.weight(1f)
             )
             Text(
-                "单笔 ≥ ¥${Money.short(cutCents)} 的先不算，AA 和大件分开看",
-                style = MaterialTheme.typography.labelSmall,
-                color = Dz.InkFaint,
-                modifier = Modifier.padding(top = 1.dp)
+                if (on) "开 ＞" else "关",
+                style = MaterialTheme.typography.labelLarge,
+                color = if (on) Dz.SakuraDeep else Dz.InkFaint
             )
         }
-        Text(
-            if (on) "开" else "关",
-            style = MaterialTheme.typography.labelLarge,
-            color = if (on) Dz.SakuraDeep else Dz.InkFaint
-        )
+        Spacer(Modifier.height(4.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "单笔 ≥ ¥${Money.short(cutCents)} 算大额",
+                style = MaterialTheme.typography.labelSmall,
+                color = Dz.InkFaint
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                "改",
+                style = MaterialTheme.typography.labelSmall,
+                color = Dz.SakuraDeep,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Dz.Card)
+                    .clickable { onEditCut() }
+                    .padding(horizontal = 8.dp, vertical = 3.dp)
+            )
+            if (on) {
+                Spacer(Modifier.weight(1f))
+                Text(
+                    "大额 $bigCount 笔 · ¥${Money.short(bigSum)} 查看",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Dz.SakuraDeep,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Dz.Card)
+                        .clickable { onShowExcluded() }
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                )
+            }
+        }
+    }
+}
+
+/** 被「只看日常」排除掉的那批，单独列出来看。 */
+@Composable
+private fun BigListDialog(
+    txns: List<Txn>,
+    cutCents: Long,
+    onDismiss: () -> Unit,
+    onTxnClick: (Txn) -> Unit
+) {
+    val sorted = txns.sortedByDescending { it.occurredAt }
+    val total = netExpense(txns)
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .heightIn(max = 560.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(Dz.Card)
+                .padding(16.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("大额消费", style = MaterialTheme.typography.titleMedium, color = Dz.Ink)
+                    Text(
+                        "${txns.size} 笔 · 合计 ¥${Money.short(total)}（≥ ¥${Money.short(cutCents)}）",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Dz.InkFaint
+                    )
+                }
+                Box(
+                    Modifier
+                        .size(30.dp)
+                        .clip(CircleShape)
+                        .background(Dz.Cream)
+                        .clickable { onDismiss() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("×", fontSize = 16.sp, color = Dz.InkSoft)
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            HorizontalDivider(color = Dz.Line, thickness = 0.6.dp)
+            if (sorted.isEmpty()) {
+                EmptyHint("还没有够得着这条线的支出", "把边界调小一点再看")
+            } else {
+                Column(
+                    Modifier
+                        .verticalScroll(rememberScrollState())
+                        .padding(top = 4.dp)
+                ) {
+                    sorted.forEach { t ->
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable { onTxnClick(t) }
+                                .padding(vertical = 9.dp, horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    t.payee.ifBlank { t.note.ifBlank { "未命名" } },
+                                    fontSize = 13.sp,
+                                    color = Dz.Ink,
+                                    maxLines = 1
+                                )
+                                Text(
+                                    "${Dates.dayOf(t.occurredAt).takeLast(5)} ${Dates.timeOf(t.occurredAt)}",
+                                    fontSize = 10.sp,
+                                    color = Dz.InkFaint
+                                )
+                            }
+                            Text(
+                                signedText(t),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = if (t.kind == TxnKind.REFUND) Dz.Mint else Dz.Ink
+                            )
+                        }
+                        HorizontalDivider(color = Dz.Line, thickness = 0.5.dp)
+                    }
+                }
+            }
+        }
     }
 }
 
