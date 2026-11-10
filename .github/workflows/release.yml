@@ -34,6 +34,9 @@ jobs:
         run: |
           mkdir -p out
           cp app/build/outputs/apk/release/app-release.apk "out/dingzhang-${GITHUB_REF_NAME}.apk"
+          # 再放一份固定名字的：releases/latest/download/dingzhang.apk 这个地址
+          # 永远指向最新版，分享出去的链接不会过期
+          cp app/build/outputs/apk/release/app-release.apk "out/dingzhang.apk"
           ls -lh out
 
       - name: Upload artifact
