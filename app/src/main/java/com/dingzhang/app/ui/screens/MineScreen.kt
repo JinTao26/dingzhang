@@ -187,7 +187,6 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
     var lastCheck by remember { mutableStateOf(settings?.lastUpdateCheckAt ?: 0L) }
     var skippedVer by remember { mutableStateOf(settings?.skipVersion.orEmpty()) }
     var updateResult by remember { mutableStateOf<UpdateChecker.Result?>(null) }
-    var autoCheck by remember { mutableStateOf(settings?.autoCheckUpdate ?: true) }
 
     // 导出走系统的「新建文档」，用户自己选存哪儿，不申请存储权限
     val csvSaver = rememberLauncherForActivityResult(

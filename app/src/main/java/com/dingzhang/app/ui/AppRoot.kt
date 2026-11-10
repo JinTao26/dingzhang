@@ -205,6 +205,7 @@ fun AppRoot() {
     var month by remember { mutableStateOf(Dates.monthOf(System.currentTimeMillis())) }
     val data = rememberAppData(month)
     val ctx = LocalContext.current
+
     if (showAdd) {
         Box(Modifier.fillMaxSize().background(Dz.Cream)) {
             if (starry) StarfieldBackdrop(Modifier.fillMaxSize())
@@ -250,5 +251,66 @@ fun AppRoot() {
         }
     }
     }
+}
 
+private data class TabItem(val icon: ImageVector, val label: String)
+
+/** "2026-11" 前后翻月 */
+internal fun shiftMonth(month: String, delta: Int): String {
+    val y = month.substringBefore("-").toIntOrNull()
+    val m = month.substringAfter("-").toIntOrNull()
+    if (y == null || m == null) return Dates.monthOf(System.currentTimeMillis())
+    val cal = Calendar.getInstance().apply {
+        set(Calendar.YEAR, y)
+        set(Calendar.MONTH, m - 1)
+        set(Calendar.DAY_OF_MONTH, 1)
+        add(Calendar.MONTH, delta)
+    }
+    return Dates.monthOf(cal.timeInMillis)
+}
+
+private val tabs = listOf(
+    TabItem(Icons.Rounded.Home, "首页"),
+    TabItem(Icons.Rounded.ReceiptLong, "明细"),
+    TabItem(Icons.Rounded.PieChart, "统计"),
+    TabItem(Icons.Rounded.Person, "我的")
+)
+
+@Composable
+private fun DzBottomBar(current: Int, onSelect: (Int) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Dz.Cream)
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        tabs.forEachIndexed { index, item ->
+            val on = current == index
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(if (on) Dz.SakuraSoft else Color.Transparent)
+                    .clickable { onSelect(index) }
+                    .padding(vertical = 9.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    item.icon,
+                    contentDescription = item.label,
+                    tint = if (on) Dz.SakuraDeep else Dz.InkFaint,
+                    modifier = Modifier.size(22.dp)
+                )
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    item.label,
+                    fontSize = 11.sp,
+                    fontWeight = if (on) FontWeight.Bold else FontWeight.Normal,
+                    color = if (on) Dz.SakuraDeep else Dz.InkFaint
+                )
+            }
+        }
+    }
 }
