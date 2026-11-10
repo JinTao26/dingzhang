@@ -399,12 +399,7 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
         // ---------- 预算 ----------
         DzCard {
             Text("预算", style = MaterialTheme.typography.titleLarge, color = Dz.Ink)
-            Text(
-                "设了每月预算，首页会多一条「预算还剩」。0 就是不设，不影响记账",
-                style = MaterialTheme.typography.bodySmall,
-                color = Dz.InkFaint,
-                modifier = Modifier.padding(top = 2.dp, bottom = 12.dp)
-            )
+            Spacer(Modifier.height(10.dp))
 
             BudgetRow(
                 label = "每月预算",
@@ -476,12 +471,7 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                     color = Dz.SakuraDeep
                 )
             }
-            Text(
-                "换的是整套设计语言：底色、主色、圆角、明暗一起换，不是只改一个主色",
-                style = MaterialTheme.typography.bodySmall,
-                color = Dz.InkFaint,
-                modifier = Modifier.padding(top = 4.dp, bottom = 10.dp)
-            )
+            Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ThemePacks.ALL.forEach { pack ->
                     ThemeSwatch(
@@ -530,12 +520,7 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
         // ---------- 两个次级页面的入口 ----------
         DzCard {
             Text("更多", style = MaterialTheme.typography.titleLarge, color = Dz.Ink)
-            Text(
-                "细节挪进单独页面了，这一页不用再一路划到底",
-                style = MaterialTheme.typography.bodySmall,
-                color = Dz.InkFaint,
-                modifier = Modifier.padding(top = 4.dp, bottom = 10.dp)
-            )
+            Spacer(Modifier.height(10.dp))
             ActionRow("帮助", "微信和支付宝怎么导账单、各项权限怎么开") { subPage = 3 }
             Spacer(Modifier.height(6.dp))
             ActionRow("意见反馈", "发到作者邮箱，自动带上机型和各通道开关") { subPage = 1 }
@@ -864,7 +849,7 @@ private fun submitFeedback(ctx: Context, text: String) {
         copyFeedback(ctx, body)
         Toast.makeText(
             ctx,
-            "没找到邮件 App，内容已复制，可以手动发到 $FEEDBACK_MAIL",
+            "没找到邮件 App。内容已复制，装个邮件 App 再粘贴发出去就行",
             Toast.LENGTH_LONG
         ).show()
     }
@@ -1082,12 +1067,6 @@ private fun FeedbackPage(ctx: Context, onClose: () -> Unit) {
                     modifier = Modifier.padding(top = 10.dp)
                 ) { Text("复制", color = Dz.InkSoft) }
             }
-            Text(
-                FEEDBACK_MAIL,
-                style = MaterialTheme.typography.labelSmall,
-                color = Dz.InkFaint,
-                modifier = Modifier.padding(top = 8.dp)
-            )
         }
         Spacer(Modifier.height(24.dp))
     }

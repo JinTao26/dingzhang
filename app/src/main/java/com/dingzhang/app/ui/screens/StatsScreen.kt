@@ -80,44 +80,45 @@ fun StatsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
     var detailCategory by remember { mutableStateOf<String?>(null) }
     var detailTxn by remember { mutableStateOf<Txn?>(null) }
     // 只在这次看的时候过滤，不动库里的数据：单笔 ≥ 这个数的算大额
-    var skipBig by remember { mutableStateOf(false) }
+    var view by remember { mutableStateOf(0) }        // 0 全部 / 1 日常 / 2 大额
     var bigCut by remember { mutableStateOf(20_000L) }
     var editCut by remember { mutableStateOf(false) }
     var cutInput by remember { mutableStateOf("") }
-    var showBigList by remember { mutableStateOf(false) }
 
     val catsBase = if (yearScope) data.yearByCategory else data.byCategory
     val incomeCatsBase = if (yearScope) data.yearIncomeByCategory else data.incomeByCategory
     val txns = if (yearScope) data.yearTxns else data.monthTxns
-    val viewTxns = if (skipBig) txns.filter { it.amountCents < bigCut } else txns
-    val bigTxns = txns.filter { it.amountCents >= bigCut && it.kind != TxnKind.TRANSFER }
+    val viewTxns = when (view) {
+        1 -> txns.filter { it.amountCents < bigCut }
+        2 -> txns.filter { it.amountCents >= bigCut }
+        else -> txns
+    }
 
-    val cats = if (skipBig) aggCats(viewTxns, false) else catsBase
+    val cats = if (view != 0) aggCats(viewTxns, false) else catsBase
     // 收入来源可能很多（工资、奖金、报销、红包、理财），单独一块列在下面
-    val incomeCats = if (skipBig) aggCats(viewTxns, true) else incomeCatsBase
+    val incomeCats = if (view != 0) aggCats(viewTxns, true) else incomeCatsBase
     val incomeTotal = incomeCats.sumOf { it.cents }
     // 环图与百分比的分母用分类合计，保证环内自洽；
     // 顶部那个「支出」用 SQL 的合计（它包含净额为负、被 HAVING 挡掉的分类）
     val ringTotal = cats.sumOf { it.cents }
-    val expense = if (skipBig) netExpense(viewTxns)
+    val expense = if (view != 0) netExpense(viewTxns)
     else if (yearScope) data.yearExpense else data.monthExpense
-    val income = if (skipBig) viewTxns.filter { it.kind == TxnKind.INCOME }.sumOf { it.amountCents }
+    val income = if (view != 0) viewTxns.filter { it.kind == TxnKind.INCOME }.sumOf { it.amountCents }
     else if (yearScope) data.yearIncome else data.monthIncome
-    val count = if (skipBig) viewTxns.count { it.kind != TxnKind.TRANSFER }
+    val count = if (view != 0) viewTxns.count { it.kind != TxnKind.TRANSFER }
     else if (yearScope) data.yearCount else data.monthCount
     // 柱状图也按同一口径重算，避免上下数字对不上
-    val dailyMap = if (!skipBig) data.daily else viewTxns
+    val dailyMap = if (view == 0) data.daily else viewTxns
         .filter { it.kind == TxnKind.EXPENSE || it.kind == TxnKind.REFUND }
         .groupBy { Dates.dayOf(it.occurredAt).takeLast(2).toIntOrNull() ?: 0 }
         .filterKeys { it > 0 }
         .mapValues { e -> e.value.sumOf { if (it.kind == TxnKind.REFUND) -it.amountCents else it.amountCents } }
-    val monthlyMap = if (!skipBig) data.monthly else viewTxns
+    val monthlyMap = if (view == 0) data.monthly else viewTxns
         .filter { it.kind == TxnKind.EXPENSE || it.kind == TxnKind.REFUND }
         .groupBy { Dates.monthOf(it.occurredAt) }
         .mapValues { e -> e.value.sumOf { if (it.kind == TxnKind.REFUND) -it.amountCents else it.amountCents } }
 
     val title = if (yearScope) "${data.yearLabel} 年" else data.monthLabel
-    val sources = if (yearScope) data.yearSourceCounts else data.sourceCounts
 
     if (showPicker) {
         MonthPickerDialog(
@@ -168,15 +169,6 @@ fun StatsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                 }
             }
         }
-    }
-
-    if (showBigList) {
-        BigListDialog(
-            txns = bigTxns,
-            cutCents = bigCut,
-            onDismiss = { showBigList = false },
-            onTxnClick = { detailTxn = it }
-        )
     }
 
     detailCategory?.let { cid ->
@@ -258,17 +250,23 @@ fun StatsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
         ScopeTabs(yearScope) { yearScope = it }
 
         Spacer(Modifier.height(10.dp))
-        DailyOnlyRow(
-            on = skipBig,
-            cutCents = bigCut,
-            bigCount = bigTxns.size,
-            bigSum = netExpense(bigTxns),
-            onToggle = { skipBig = it },
-            onEditCut = {
-                cutInput = (bigCut / 100).toString()
-                editCut = true
-            },
-            onShowExcluded = { showBigList = true }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            CutChip("全部", view == 0) { view = 0 }
+            CutChip("日常", view == 1) { view = 1 }
+            CutChip("大额", view == 2) { view = 2 }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "单笔 ≥ ¥${Money.short(bigCut)} 算大额，点这里改",
+            style = MaterialTheme.typography.labelSmall,
+            color = Dz.InkFaint,
+            modifier = Modifier
+                .clip(RoundedCornerShape(10.dp))
+                .clickable {
+                    cutInput = (bigCut / 100).toString()
+                    editCut = true
+                }
+                .padding(horizontal = 6.dp, vertical = 3.dp)
         )
 
         Spacer(Modifier.height(12.dp))
@@ -360,8 +358,6 @@ fun StatsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
             }
         }
 
-        Spacer(Modifier.height(12.dp))
-        AutoCard(sources)
     }
 }
 
@@ -441,160 +437,24 @@ private fun netExpense(txns: List<Txn>): Long = txns.fold(0L) { acc, t ->
     }
 }
 
-/** 「只看日常」开关。只在这次看的时候过滤，库里的数据一个字不动。 */
+/** 口径切换：全部 / 日常 / 大额。只影响这次看，库里的数据一个字不动。 */
 @Composable
-private fun DailyOnlyRow(
-    on: Boolean,
-    cutCents: Long,
-    bigCount: Int,
-    bigSum: Long,
-    onToggle: (Boolean) -> Unit,
-    onEditCut: () -> Unit,
-    onShowExcluded: () -> Unit
-) {
-    Column(
+private fun RowScope.CutChip(text: String, active: Boolean, onClick: () -> Unit) {
+    Box(
         Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(if (on) Dz.SakuraSoft else Dz.Cream)
-            .padding(horizontal = 14.dp, vertical = 10.dp)
+            .weight(1f)
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (active) Dz.SakuraSoft else Dz.Cream)
+            .clickable { onClick() }
+            .padding(vertical = 9.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .clickable { onToggle(!on) },
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                if (on) "只看日常消费 · 已排除大额" else "只看日常消费",
-                style = MaterialTheme.typography.titleSmall,
-                color = if (on) Dz.SakuraDeep else Dz.InkSoft,
-                modifier = Modifier.weight(1f)
-            )
-            Text(
-                if (on) "开 ＞" else "关",
-                style = MaterialTheme.typography.labelLarge,
-                color = if (on) Dz.SakuraDeep else Dz.InkFaint
-            )
-        }
-        Spacer(Modifier.height(4.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                "单笔 ≥ ¥${Money.short(cutCents)} 算大额",
-                style = MaterialTheme.typography.labelSmall,
-                color = Dz.InkFaint
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                "改",
-                style = MaterialTheme.typography.labelSmall,
-                color = Dz.SakuraDeep,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Dz.Card)
-                    .clickable { onEditCut() }
-                    .padding(horizontal = 8.dp, vertical = 3.dp)
-            )
-            if (on) {
-                Spacer(Modifier.weight(1f))
-                Text(
-                    "大额 $bigCount 笔 · ¥${Money.short(bigSum)} 查看",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Dz.SakuraDeep,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Dz.Card)
-                        .clickable { onShowExcluded() }
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
-                )
-            }
-        }
-    }
-}
-
-/** 被「只看日常」排除掉的那批，单独列出来看。 */
-@Composable
-private fun BigListDialog(
-    txns: List<Txn>,
-    cutCents: Long,
-    onDismiss: () -> Unit,
-    onTxnClick: (Txn) -> Unit
-) {
-    val sorted = txns.sortedByDescending { it.occurredAt }
-    val total = netExpense(txns)
-    Dialog(onDismissRequest = onDismiss) {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .heightIn(max = 560.dp)
-                .clip(RoundedCornerShape(20.dp))
-                .background(Dz.Card)
-                .padding(16.dp)
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("大额消费", style = MaterialTheme.typography.titleMedium, color = Dz.Ink)
-                    Text(
-                        "${txns.size} 笔 · 合计 ¥${Money.short(total)}（≥ ¥${Money.short(cutCents)}）",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Dz.InkFaint
-                    )
-                }
-                Box(
-                    Modifier
-                        .size(30.dp)
-                        .clip(CircleShape)
-                        .background(Dz.Cream)
-                        .clickable { onDismiss() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("×", fontSize = 16.sp, color = Dz.InkSoft)
-                }
-            }
-            Spacer(Modifier.height(10.dp))
-            HorizontalDivider(color = Dz.Line, thickness = 0.6.dp)
-            if (sorted.isEmpty()) {
-                EmptyHint("还没有够得着这条线的支出", "把边界调小一点再看")
-            } else {
-                Column(
-                    Modifier
-                        .verticalScroll(rememberScrollState())
-                        .padding(top = 4.dp)
-                ) {
-                    sorted.forEach { t ->
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(10.dp))
-                                .clickable { onTxnClick(t) }
-                                .padding(vertical = 9.dp, horizontal = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(Modifier.weight(1f)) {
-                                Text(
-                                    t.payee.ifBlank { t.note.ifBlank { "未命名" } },
-                                    fontSize = 13.sp,
-                                    color = Dz.Ink,
-                                    maxLines = 1
-                                )
-                                Text(
-                                    "${Dates.dayOf(t.occurredAt).takeLast(5)} ${Dates.timeOf(t.occurredAt)}",
-                                    fontSize = 10.sp,
-                                    color = Dz.InkFaint
-                                )
-                            }
-                            Text(
-                                signedText(t),
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = if (t.kind == TxnKind.REFUND) Dz.Mint else Dz.Ink
-                            )
-                        }
-                        HorizontalDivider(color = Dz.Line, thickness = 0.5.dp)
-                    }
-                }
-            }
-        }
+        Text(
+            text,
+            style = MaterialTheme.typography.labelLarge,
+            color = if (active) Dz.SakuraDeep else Dz.InkFaint,
+            fontWeight = if (active) FontWeight.Bold else FontWeight.Normal
+        )
     }
 }
 
@@ -756,47 +616,6 @@ private fun RingCard(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun AutoCard(sources: Map<Source, Int>) {
-    DzCard {
-        Text("记账的自动化程度", style = MaterialTheme.typography.titleLarge, color = Dz.Ink)
-        Spacer(Modifier.height(10.dp))
-        val auto = (sources[Source.ACCESSIBILITY] ?: 0) +
-            (sources[Source.NOTIFICATION] ?: 0) +
-            (sources[Source.BILL_IMPORT] ?: 0)
-        val manual = sources[Source.MANUAL] ?: 0
-        val all = (auto + manual).coerceAtLeast(1)
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("$auto", fontSize = 30.sp, fontWeight = FontWeight.Bold, color = Dz.SakuraDeep)
-            Text(" 笔自动记账", style = MaterialTheme.typography.bodyMedium, color = Dz.InkSoft)
-            Spacer(Modifier.weight(1f))
-            Text("$manual 笔手记", style = MaterialTheme.typography.bodySmall, color = Dz.InkFaint)
-        }
-        Spacer(Modifier.height(8.dp))
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(9.dp)
-                .clip(RoundedCornerShape(5.dp))
-                .background(Dz.SakuraSoft)
-        ) {
-            Box(
-                Modifier
-                    .fillMaxWidth(auto.toFloat() / all.toFloat())
-                    .fillMaxHeight()
-                    .clip(RoundedCornerShape(5.dp))
-                    .background(Brush.horizontalGradient(listOf(Dz.Mint, Dz.Sakura)))
-            )
-        }
-        Spacer(Modifier.height(6.dp))
-        Text(
-            "自动 $auto · 手记 $manual",
-            style = MaterialTheme.typography.labelSmall,
-            color = Dz.InkFaint
-        )
     }
 }
 
