@@ -42,9 +42,12 @@ android {
             // 自用/给朋友用的侧载场景，签名密钥直接放进仓库最省事。
             // 介意的话可以改成从环境变量或 GitHub Secrets 读。
             storeFile = rootProject.file("keystore/dingzhang.jks")
-            storePassword = "dingzhang2026"
+            // 密码不写进代码，也不进仓库：本地构建用环境变量 DZ_KS_PASS，
+            // CI 从 GitHub Secrets 注入（同名）。仓库是公开的，明文密码等于把私钥送人。
+            val ksPass = System.getenv("DZ_KS_PASS") ?: ""
+            storePassword = ksPass
             keyAlias = "dingzhang"
-            keyPassword = "dingzhang2026"
+            keyPassword = ksPass
         }
     }
 

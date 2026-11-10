@@ -28,6 +28,8 @@ jobs:
           gradle-version: "8.9"
 
       - name: Assemble release
+        env:
+          DZ_KS_PASS: ${{ secrets.DZ_KS_PASS }}
         run: gradle :app:assembleRelease --no-daemon
 
       - name: Rename APK
