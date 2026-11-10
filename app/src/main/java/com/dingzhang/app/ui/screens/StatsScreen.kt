@@ -83,6 +83,8 @@ fun StatsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
     var yearScope by remember { mutableStateOf(false) }
     var showPicker by remember { mutableStateOf(false) }
     var detailCategory by remember { mutableStateOf<String?>(null) }
+    var detailDay by remember { mutableStateOf<Int?>(null) }        // 月视图：点了哪一天
+    var detailMonthOfYear by remember { mutableStateOf<Int?>(null) } // 年视图：点了哪个月
     var detailTxn by remember { mutableStateOf<Txn?>(null) }
     // 只在这次看的时候过滤，不动库里的数据：单笔 ≥ 这个数的算大额
     var view by remember { mutableStateOf(0) }        // 0 全部 / 1 日常 / 2 大额
@@ -181,6 +183,27 @@ fun StatsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                 }
             }
         }
+    }
+
+    // 点柱子：先看这一天的总额和笔数，点条目还是老样子进详情
+    detailDay?.let { d ->
+        val list = data.monthTxns.filter { dayNum(it.occurredAt) == d }
+        TxnSliceDialog(
+            title = "${month.substringAfter("-").toIntOrNull() ?: 0} 月 $d 日",
+            txns = list,
+            onDismiss = { detailDay = null },
+            onTxnClick = { detailTxn = it }
+        )
+    }
+
+    detailMonthOfYear?.let { m ->
+        val list = data.yearTxns.filter { monthNum(it.occurredAt) == m }
+        TxnSliceDialog(
+            title = "$m 月",
+            txns = list,
+            onDismiss = { detailMonthOfYear = null },
+            onTxnClick = { detailTxn = it }
+        )
     }
 
     detailCategory?.let { cid ->
@@ -344,8 +367,8 @@ fun StatsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                         Text("单位：元", style = MaterialTheme.typography.labelSmall, color = Dz.InkFaint)
                     }
                     Spacer(Modifier.height(12.dp))
-                    if (yearScope) MonthlyBars(monthlyMap, data.yearLabel)
-                    else DailyBars(dailyMap, data.daysInMonth)
+                    if (yearScope) MonthlyBars(monthlyMap, data.yearLabel) { detailMonthOfYear = it }
+                    else DailyBars(dailyMap, data.daysInMonth) { detailDay = it }
                 }
             }
         }
@@ -767,6 +790,128 @@ private fun CategoryBar(c: CategoryTotal, total: Long, onClick: () -> Unit) {
 
 /** 点分类弹出来的明细。列表最多摆 200 条，再多也没人在手机上翻。 */
 @Composable
+
+/** 左侧三档刻度：最高、一半、0。金额用短格式，别把轴撑爆 */
+@Composable
+private fun AxisLabels(max: Long, height: androidx.compose.ui.unit.Dp) {
+    Column(
+        Modifier
+            .height(height)
+            .padding(end = 6.dp),
+        verticalArrangement = Arrangement.SpaceBetween,
+        horizontalAlignment = Alignment.End
+    ) {
+        Text(Money.short(max), style = MaterialTheme.typography.labelSmall, color = Dz.InkFaint)
+        Text(Money.short(max / 2), style = MaterialTheme.typography.labelSmall, color = Dz.InkFaint)
+        Text("0", style = MaterialTheme.typography.labelSmall, color = Dz.InkFaint)
+    }
+}
+
+private fun dayNum(ts: Long): Int = Dates.dayOf(ts).takeLast(2).toIntOrNull() ?: 0
+
+private fun monthNum(ts: Long): Int = Dates.monthOf(ts).takeLast(2).toIntOrNull() ?: 0
+
+/** 点柱子后的小结：这一天的总额、笔数，点条目进详情（跟分类明细一样的操作） */
+@Composable
+private fun TxnSliceDialog(
+    title: String,
+    txns: List<Txn>,
+    onDismiss: () -> Unit,
+    onTxnClick: (Txn) -> Unit
+) {
+    val net = txns.fold(0L) { acc, t ->
+        acc + if (t.kind == TxnKind.REFUND) -t.amountCents else t.amountCents
+    }
+    val sorted = txns.sortedByDescending { it.occurredAt }
+    val shown = sorted.take(200)
+
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .heightIn(max = 560.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(Dz.Card)
+                .padding(16.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(title, style = MaterialTheme.typography.titleMedium, color = Dz.Ink)
+                    Text(
+                        "${txns.size} 笔 · 合计 ¥${Money.short(net)}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Dz.InkSoft,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
+                Box(
+                    Modifier
+                        .size(30.dp)
+                        .clip(CircleShape)
+                        .background(Dz.Cream)
+                        .clickable { onDismiss() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("×", fontSize = 16.sp, color = Dz.InkSoft)
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            HorizontalDivider(color = Dz.Line, thickness = 0.6.dp)
+
+            if (sorted.isEmpty()) {
+                EmptyHint("这${if (title.contains("日")) "一天" else "个月"}没有记录", "点别处看看")
+            } else {
+                Column(
+                    Modifier
+                        .verticalScroll(rememberScrollState())
+                        .padding(top = 4.dp)
+                ) {
+                    shown.forEach { t ->
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable { onTxnClick(t) }
+                                .padding(vertical = 9.dp, horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    t.payee.ifBlank { t.note.ifBlank { "未命名" } },
+                                    fontSize = 13.sp,
+                                    color = Dz.Ink,
+                                    maxLines = 1
+                                )
+                                Text(
+                                    "${Dates.dayOf(t.occurredAt).takeLast(5)} ${Dates.timeOf(t.occurredAt)}",
+                                    fontSize = 10.sp,
+                                    color = Dz.InkFaint
+                                )
+                            }
+                            Text(
+                                signedText(t),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = when (t.kind) {
+                                    TxnKind.REFUND, TxnKind.INCOME -> Dz.Mint
+                                    else -> Dz.Ink
+                                }
+                            )
+                        }
+                        HorizontalDivider(color = Dz.Line, thickness = 0.5.dp)
+                    }
+                    Text(
+                        "点任意一条能改分类、改商户名、改这笔记成什么",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Dz.InkFaint,
+                        modifier = Modifier.padding(top = 10.dp, bottom = 4.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
 private fun CategoryDetailDialog(
     categoryId: String,
     txns: List<Txn>,
@@ -882,18 +1027,24 @@ private fun signedText(t: Txn): String = when (t.kind) {
 
 /** 月视图：这个月每天花了多少。 */
 @Composable
-private fun DailyBars(daily: Map<Int, Long>, daysInMonth: Int) {
+private fun DailyBars(daily: Map<Int, Long>, daysInMonth: Int, onDayClick: (Int) -> Unit = {}) {
     val max = (daily.values.maxOrNull() ?: 0L).coerceAtLeast(1L)
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(88.dp),
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.Bottom
     ) {
-        for (day in 1..daysInMonth) {
-            val v = (daily[day] ?: 0L).coerceAtLeast(0L)
-            Bar(v, max)
+        AxisLabels(max, 88.dp)
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .height(88.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            verticalAlignment = Alignment.Bottom
+        ) {
+            for (day in 1..daysInMonth) {
+                val v = (daily[day] ?: 0L).coerceAtLeast(0L)
+                Bar(v, max) { onDayClick(day) }
+            }
         }
     }
     Spacer(Modifier.height(6.dp))
@@ -906,19 +1057,25 @@ private fun DailyBars(daily: Map<Int, Long>, daysInMonth: Int) {
 
 /** 年视图：这一年每个月花了多少。12 根柱子，比不了更粗的粒度有意义。 */
 @Composable
-private fun MonthlyBars(monthly: Map<String, Long>, year: String) {
+private fun MonthlyBars(monthly: Map<String, Long>, year: String, onMonthClick: (Int) -> Unit = {}) {
     val vals = (1..12).map { m ->
         (monthly["$year-${m.toString().padStart(2, '0')}"] ?: 0L).coerceAtLeast(0L)
     }
     val max = (vals.maxOrNull() ?: 0L).coerceAtLeast(1L)
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(96.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.Bottom
     ) {
-        vals.forEach { Bar(it, max) }
+        AxisLabels(max, 96.dp)
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .height(96.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.Bottom
+        ) {
+            vals.forEachIndexed { i, v -> Bar(v, max) { onMonthClick(i + 1) } }
+        }
     }
     Spacer(Modifier.height(6.dp))
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -930,12 +1087,13 @@ private fun MonthlyBars(monthly: Map<String, Long>, year: String) {
 
 /** 一根柱子。0 也要留一丝底座，否则那一天/那一月在横轴上会"消失"。 */
 @Composable
-private fun RowScope.Bar(v: Long, max: Long) {
+private fun RowScope.Bar(v: Long, max: Long, onClick: () -> Unit = {}) {
     val frac = if (max > 0) v.toFloat() / max.toFloat() else 0f
     Box(
         modifier = Modifier
             .weight(1f)
-            .fillMaxHeight(),
+            .fillMaxHeight()
+            .clickable(onClick = onClick),
         contentAlignment = Alignment.BottomCenter
     ) {
         Box(
