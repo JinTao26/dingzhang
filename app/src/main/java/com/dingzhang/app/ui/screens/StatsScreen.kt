@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
@@ -41,6 +42,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -65,6 +67,9 @@ import com.dingzhang.app.ui.shiftMonth
 import com.dingzhang.app.ingest.IngestPipeline
 import com.dingzhang.app.ui.theme.Dz
 import kotlin.math.abs
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.sin
 
 /**
  * 统计页：「月」和「年」两套口径，同一个界面。
@@ -84,6 +89,7 @@ fun StatsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
     var bigCut by remember { mutableStateOf(20_000L) }
     var editCut by remember { mutableStateOf(false) }
     var cutInput by remember { mutableStateOf("") }
+    var flow by remember { mutableStateOf(0) }        // 0 支出 / 1 收入
 
     val catsBase = if (yearScope) data.yearByCategory else data.byCategory
     val incomeCatsBase = if (yearScope) data.yearIncomeByCategory else data.incomeByCategory
@@ -272,88 +278,63 @@ fun StatsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
         Spacer(Modifier.height(12.dp))
         SummaryCard(expense, income, yearScope, data.yearBudgetCents)
 
-        if (cats.isEmpty()) {
+        // 支出分类一多，收入就被顶到很下面，所以这里直接切
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            CutChip("支出", flow == 0) { flow = 0 }
+            CutChip("收入", flow == 1) { flow = 1 }
+        }
+
+        val flowCats = if (flow == 0) cats else incomeCats
+        val flowTotal = if (flow == 0) ringTotal else incomeTotal
+        val flowIsExpense = flow == 0
+
+        if (flowCats.isEmpty()) {
             Spacer(Modifier.height(12.dp))
             DzCard {
                 EmptyHint(
-                    if (yearScope) "这一年还没有支出记录" else "这个月还没有支出记录",
-                    "付几笔之后这里会有环形图和排行"
+                    if (flowIsExpense) {
+                        if (yearScope) "这一年还没有支出记录" else "这个月还没有支出记录"
+                    } else {
+                        if (yearScope) "这一年还没有收入记录" else "这个月还没有收入记录"
+                    },
+                    if (flowIsExpense) "付几笔之后这里会有环形图和排行" else "工资、收款到账之后这里会有环形图和排行"
                 )
             }
         } else {
             Spacer(Modifier.height(12.dp))
-            RingCard(cats, ringTotal, yearScope) { detailCategory = it }
+            RingCard(
+                cats = flowCats,
+                ringTotal = flowTotal,
+                title = if (flowIsExpense) (if (yearScope) "全年支出" else "本月支出")
+                else (if (yearScope) "全年收入" else "本月收入"),
+                subLine = if (yearScope) "月均 ¥${Money.short(flowTotal / 12)}"
+                else "日均 ¥${Money.short(flowTotal / 30)}",
+                onCategoryClick = { detailCategory = it }
+            )
 
             Spacer(Modifier.height(12.dp))
-            DzCard {
-                Text("花在哪儿了", style = MaterialTheme.typography.titleLarge, color = Dz.Ink)
-                Text(
-                    "点一行看明细",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Dz.InkFaint,
-                    modifier = Modifier.padding(top = 2.dp)
-                )
-                Spacer(Modifier.height(10.dp))
-                cats.forEachIndexed { i, c ->
-                    if (i > 0) {
-                        HorizontalDivider(
-                            color = Dz.Line,
-                            thickness = 0.6.dp,
-                            modifier = Modifier.padding(vertical = 2.dp)
-                        )
-                    }
-                    CategoryBar(c, ringTotal) { detailCategory = c.categoryId }
-                }
-            }
+            RankCard(
+                title = if (flowIsExpense) "花在哪儿了" else "钱从哪儿来",
+                cats = flowCats,
+                total = flowTotal
+            ) { detailCategory = it }
 
-            Spacer(Modifier.height(12.dp))
-            DzCard {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        if (yearScope) "每月花了多少" else "每天花了多少",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = Dz.Ink
-                    )
-                    Spacer(Modifier.weight(1f))
-                    Text("单位：元", style = MaterialTheme.typography.labelSmall, color = Dz.InkFaint)
-                }
+            if (flowIsExpense) {
                 Spacer(Modifier.height(12.dp))
-                if (yearScope) MonthlyBars(monthlyMap, data.yearLabel) else DailyBars(dailyMap, data.daysInMonth)
-            }
-        }
-
-        if (incomeCats.isNotEmpty()) {
-            Spacer(Modifier.height(12.dp))
-            DzCard {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        "钱从哪儿来",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = Dz.Ink
-                    )
-                    Spacer(Modifier.weight(1f))
-                    Text(
-                        "共 ${incomeCats.sumOf { it.count }} 笔",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Dz.InkFaint
-                    )
-                }
-                Text(
-                    "点一行看明细",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Dz.InkFaint,
-                    modifier = Modifier.padding(top = 2.dp)
-                )
-                Spacer(Modifier.height(10.dp))
-                incomeCats.forEachIndexed { i, c ->
-                    if (i > 0) {
-                        HorizontalDivider(
-                            color = Dz.Line,
-                            thickness = 0.6.dp,
-                            modifier = Modifier.padding(vertical = 2.dp)
+                DzCard {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            if (yearScope) "每月花了多少" else "每天花了多少",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = Dz.Ink
                         )
+                        Spacer(Modifier.weight(1f))
+                        Text("单位：元", style = MaterialTheme.typography.labelSmall, color = Dz.InkFaint)
                     }
-                    CategoryBar(c, incomeTotal) { detailCategory = c.categoryId }
+                    Spacer(Modifier.height(12.dp))
+                    if (yearScope) MonthlyBars(monthlyMap, data.yearLabel)
+                    else DailyBars(dailyMap, data.daysInMonth)
                 }
             }
         }
@@ -529,35 +510,88 @@ private fun SummaryCard(expense: Long, income: Long, isYear: Boolean, yearBudget
 private fun RingCard(
     cats: List<CategoryTotal>,
     ringTotal: Long,
-    isYear: Boolean,
+    title: String,
+    subLine: String,
     onCategoryClick: (String) -> Unit
 ) {
+    val sum = cats.sumOf { it.cents }.toFloat().takeIf { it > 0f } ?: 1f
     DzCard(padding = 20.dp) {
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            Canvas(Modifier.size(216.dp)) {
+            Canvas(
+                Modifier
+                    .size(216.dp)
+                    .pointerInput(cats) {
+                        // 点环上的哪一段，就开那一段的明细
+                        detectTapGestures { off ->
+                            val center = Offset(size.width / 2f, size.height / 2f)
+                            val dist = (off - center).getDistance()
+                            val outer = size.width / 2f
+                            val inner = outer - 24.dp.toPx() - 4.dp.toPx()
+                            if (dist in inner..outer) {
+                                var deg = Math.toDegrees(
+                                    atan2(
+                                        (off.y - center.y).toDouble(),
+                                        (off.x - center.x).toDouble()
+                                    )
+                                ).toFloat()
+                                deg = (deg + 450f) % 360f   // 环从正上方开始
+                                var acc = 0f
+                                for (c in cats) {
+                                    val sweep = c.cents.toFloat() / sum * 360f
+                                    if (deg >= acc && deg < acc + sweep) {
+                                        onCategoryClick(c.categoryId)
+                                        break
+                                    }
+                                    acc += sweep
+                                }
+                            }
+                        }
+                    }
+            ) {
                 val stroke = 24.dp.toPx()
                 val inset = stroke / 2 + 3.dp.toPx()
                 val side = this.size.width - inset * 2
-                val sum = cats.sumOf { it.cents }.toFloat().takeIf { it > 0f } ?: 1f
+                val r = this.size.width / 2f
                 var start = -90f
                 cats.forEach { c ->
                     val sweep = c.cents.toFloat() / sum * 360f
                     drawArc(
                         color = Categories.of(c.categoryId).ui,
-                        // 每段之间留一条缝，颜色再接近也不会连成一片
-                        startAngle = start + 2f,
-                        sweepAngle = (sweep - 4f).coerceAtLeast(1.5f),
+                        startAngle = start,
+                        sweepAngle = sweep.coerceAtLeast(0.4f),
                         useCenter = false,
                         topLeft = Offset(inset, inset),
                         size = Size(side, side),
-                        style = Stroke(width = stroke, cap = StrokeCap.Round)
+                        style = Stroke(width = stroke, cap = StrokeCap.Butt)
                     )
                     start += sweep
+                }
+                // 段与段之间压一条和卡片底色同色的细线，边界一眼看清
+                if (cats.size > 1) {
+                    var edge = -90f
+                    cats.forEach { c ->
+                        val a = Math.toRadians(edge.toDouble())
+                        val from = Offset(
+                            r + cos(a).toFloat() * (r - stroke),
+                            r + sin(a).toFloat() * (r - stroke)
+                        )
+                        val to = Offset(
+                            r + cos(a).toFloat() * (r + 1.dp.toPx()),
+                            r + sin(a).toFloat() * (r + 1.dp.toPx())
+                        )
+                        drawLine(
+                            color = Dz.Card,
+                            start = from,
+                            end = to,
+                            strokeWidth = 1.5.dp.toPx()
+                        )
+                        edge += c.cents.toFloat() / sum * 360f
+                    }
                 }
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    if (isYear) "全年支出" else "本月支出",
+                    title,
                     style = MaterialTheme.typography.labelSmall,
                     color = Dz.InkFaint
                 )
@@ -568,16 +602,23 @@ private fun RingCard(
                     color = Dz.Ink
                 )
                 Text(
-                    if (isYear) "月均 ¥${Money.short(ringTotal / 12)}"
-                    else "日均 ¥${Money.short(ringTotal / 30)}",
+                    subLine,
                     style = MaterialTheme.typography.labelSmall,
                     color = Dz.InkFaint
                 )
             }
         }
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "点环上的色块或下面任意一行都能看明细",
+            style = MaterialTheme.typography.labelSmall,
+            color = Dz.InkFaint,
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.Center
+        )
+        Spacer(Modifier.height(12.dp))
         // 图例：全部分类，两列铺开 —— 只列前四名会让「剩下那 30% 是谁」永远找不到
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             cats.chunked(2).forEach { pair ->
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                     pair.forEach { c ->
@@ -585,28 +626,29 @@ private fun RingCard(
                         Row(
                             Modifier
                                 .weight(1f)
+                                .clip(RoundedCornerShape(10.dp))
                                 .clickable { onCategoryClick(c.categoryId) }
-                                .padding(vertical = 2.dp),
+                                .padding(vertical = 3.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Box(
                                 Modifier
-                                    .size(9.dp)
-                                    .clip(RoundedCornerShape(2.dp))
+                                    .size(11.dp)
+                                    .clip(RoundedCornerShape(3.dp))
                                     .background(cat.ui)
                             )
-                            Column(Modifier.weight(1f).padding(start = 6.dp)) {
+                            Column(Modifier.weight(1f).padding(start = 7.dp)) {
                                 Text(
                                     cat.name,
-                                    fontSize = 11.sp,
+                                    fontSize = 14.sp,
                                     fontWeight = FontWeight.Medium,
                                     color = Dz.Ink,
                                     maxLines = 1
                                 )
                                 Text(
                                     "¥${Money.short(c.cents)} · ${(c.cents.toFloat() / ringTotal * 100).toInt()}%",
-                                    fontSize = 10.sp,
-                                    color = Dz.InkFaint,
+                                    fontSize = 12.sp,
+                                    color = Dz.InkSoft,
                                     maxLines = 1
                                 )
                             }
@@ -615,6 +657,43 @@ private fun RingCard(
                     if (pair.size == 1) Spacer(Modifier.weight(1f))
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun RankCard(
+    title: String,
+    cats: List<CategoryTotal>,
+    total: Long,
+    onCategoryClick: (String) -> Unit
+) {
+    DzCard {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(title, style = MaterialTheme.typography.titleLarge, color = Dz.Ink)
+            Spacer(Modifier.weight(1f))
+            Text(
+                "共 ${cats.sumOf { it.count }} 笔",
+                style = MaterialTheme.typography.labelSmall,
+                color = Dz.InkFaint
+            )
+        }
+        Text(
+            "点一行看明细",
+            style = MaterialTheme.typography.labelSmall,
+            color = Dz.InkFaint,
+            modifier = Modifier.padding(top = 2.dp)
+        )
+        Spacer(Modifier.height(10.dp))
+        cats.forEachIndexed { i, c ->
+            if (i > 0) {
+                HorizontalDivider(
+                    color = Dz.Line,
+                    thickness = 0.6.dp,
+                    modifier = Modifier.padding(vertical = 2.dp)
+                )
+            }
+            CategoryBar(c, total) { onCategoryClick(c.categoryId) }
         }
     }
 }
