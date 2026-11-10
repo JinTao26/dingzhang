@@ -42,7 +42,7 @@ object PaymentAccessibilityParser {
             // 金额也不再带 ¥，所以这里把常见的几种标签都放进来，命中任意两个即可
             mustContain = listOf(
                 "交易金额", "支付时间", "商户全称", "收款方全称",
-                "订单号", "交易单号", "收单机构", "支付方式", "当前状态"
+                "订单号", "交易单号", "收单机构", "支付方式", "当前状态", "账单分类"
             ),
             mustNotContain = listOf("收款码", "扫一扫")
         ),
@@ -61,6 +61,13 @@ object PaymentAccessibilityParser {
     private val amountPlain = Regex("([0-9][0-9,]*(?:\\.[0-9]{1,2})?)\\s*元")
     /** 账单详情页的大字金额：「-20.00」，负号、没有货币符号 */
     private val amountSigned = Regex("^[−\\-－]\\s*[¥￥]?\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)")
+    /** 金额前面的正负号：账单详情页「-20.00」是支出，「+20.00」是进账 */
+    private val amountPosSign = Regex("^[+＋]\\s*[¥￥]?\\s*[0-9]")
+    /**
+     * 页面明确写着退款才算退款。只写「退款」两个字不行 ——
+     * 微信账单页底部有「可在支持的商户扫码退款」，那样会把每笔都判成退款。
+     */
+    private val refundCues = listOf("退款成功", "退款到账", "退款完成", "已全额退款", "已退款")
     /** 只有数字和小数点的一行；要求带小数，免得把订单号、卡号尾号当成金额 */
     private val amountBareDecimal = Regex("^[¥￥]?\\s*([0-9][0-9,]*\\.[0-9]{1,2})$")
 
@@ -119,11 +126,22 @@ object PaymentAccessibilityParser {
             ?.let { Dates.parseBillTime(it) }
             ?: now
 
+        // 支付宝自己标好的分类，比如「餐饮美食」。抓到就带上，比自己猜准
+        val platformCategory = findValue(texts, listOf("账单分类"))
+            ?.replace(">", "")
+            ?.trim()
+            ?.takeIf { it.length in 2..12 }
+
         val tradeNo = findValue(texts, tradeNoLabels)
             ?.filter { it.isDigit() }
             ?.takeIf { it.length >= 10 }
 
         val kind = when {
+            // 退款最优先：页面上写了退款成功，这笔就是退回来的钱
+            refundCues.any { flat.contains(it) } -> TxnKind.REFUND
+            // 金额带 + 号 = 钱进来了（收款、退款到零钱都在这条上）
+            texts.any { amountPosSign.containsMatchIn(it.trim()) } ->
+                if (wallet == Wallet.WECHAT && flat.contains("转账")) TxnKind.TRANSFER else TxnKind.INCOME
             transferCues.any { flat.contains(it) } && wallet == Wallet.WECHAT && flat.contains("转账") ->
                 TxnKind.TRANSFER
             incomeCues.any { flat.contains(it) } && !flat.contains("支付成功") ->
@@ -142,7 +160,8 @@ object PaymentAccessibilityParser {
             account = account,
             raw = flat.take(300),
             externalId = tradeNo,
-            kindHint = kind
+            kindHint = kind,
+            platformCategory = platformCategory
         )
     }
 

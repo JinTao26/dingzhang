@@ -124,10 +124,13 @@ object IngestPipeline {
         val rules = cachedRules ?: dao.rules()
         val cls = CategoryEngine.classify(payee, c.note, c.raw, rules)
         val kind = c.kindHint ?: cls.kind
+        // 支付平台（支付宝）自己标好的分类比我们的词典准，能用就用
+        val platformCat = c.platformCategory?.let { categoryFromPlatform(it) }
         val categoryId = when (kind) {
             TxnKind.TRANSFER -> "other"
             // 退款挂回原来那笔支出的分类：统计时才从「餐饮」里扣，而不是跑到收入里去
             TxnKind.REFUND -> dao.findRefundTarget(payee, c.occurredAt)?.categoryId ?: "other"
+            TxnKind.EXPENSE -> platformCat ?: cls.categoryId
             else -> cls.categoryId
         }
 
@@ -325,6 +328,35 @@ object IngestPipeline {
         s = licenseSuffix.replace(s, "")
         s = s.trim(' ', '-', '—', '|', '·', ':', '：', ',', '，')
         return s.take(40)
+    }
+
+    /**
+     * 支付宝「账单分类」原文 → 我们的分类。
+     * 商家在支付宝报备时就有类目，平台分的类比按商户名猜准得多。
+     */
+    fun categoryFromPlatform(hint: String): String? {
+        val h = hint.replace(">", "").trim()
+        if (h.isEmpty()) return null
+        // 按支付宝账单详情里真实出现的类目校准过：
+        // 餐饮美食 / 服饰装扮 / 日用百货 / 交通出行 / 酒店旅行 / 爱车养车 /
+        // 家居家装 / 住房物业 / 教育培训 / 运动户外 / 文化休闲 / 数码电器 / 转账红包
+        val pairs = listOf(
+            "餐饮" to "food", "食品" to "food", "外卖" to "food",
+            "咖啡" to "drink", "茶饮" to "drink", "奶茶" to "drink",
+            "交通" to "transport", "出行" to "transport", "打车" to "transport",
+            "酒店" to "transport", "旅行" to "transport", "爱车" to "transport", "养车" to "transport",
+            // 「日用百货」里日用在前，生活用品归家居家常，不算购物
+            "日用" to "home", "家居" to "home", "物业" to "home", "住房" to "home", "家装" to "home",
+            "服饰" to "shopping", "装扮" to "shopping", "百货" to "shopping", "超市" to "shopping", "购物" to "shopping",
+            "数码" to "digital", "电器" to "digital", "通讯" to "digital",
+            "医疗" to "health", "健康" to "health", "药店" to "health", "美容" to "health",
+            "文化" to "fun", "休闲" to "fun", "娱乐" to "fun", "运动" to "fun", "户外" to "fun", "旅游" to "fun",
+            "教育" to "study", "培训" to "study", "图书" to "study",
+            "宠物" to "pet",
+            // 「转账红包」是给人钱，归人际往来，别算成消费
+            "转账" to "social", "红包" to "social", "社交" to "social", "人脉" to "social", "公益" to "social"
+        )
+        return pairs.firstOrNull { h.contains(it.first) }?.second
     }
 
     fun fingerprintOf(wallet: Wallet, amountCents: Long, payee: String): String {

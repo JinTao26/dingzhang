@@ -22,7 +22,12 @@ data class Captured(
     /** 有些通道能直接判定方向（比如账单的「收/支」列），给了就优先用它 */
     val kindHint: TxnKind? = null,
     /** 账单里的交易单号，用于跨通道对账 */
-    val billNo: String? = null
+    val billNo: String? = null,
+    /**
+     * 支付平台自己标好的分类原文，比如支付宝账单详情的「账单分类：餐饮美食」。
+     * 平台分的类比我们自己的词典准（它知道商户的报备类目），有就直接用。
+     */
+    val platformCategory: String? = null
 )
 
 data class Outcome(
