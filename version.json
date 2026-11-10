@@ -1,7 +1,7 @@
 {
-  "version": "0.5.13",
-  "notes": "明细页的月份能点开直接选；装好第一次打开会有一次说明，告诉你权限、帮助和检查更新在哪；分享出去的链接点开直接下载安装包。",
-  "apk": "https://github.com/JinTao26/dingzhang/releases/download/v0.5.13/dingzhang.apk",
-  "page": "https://github.com/JinTao26/dingzhang/releases/tag/v0.5.13",
-  "published_at": "2026-11-10T06:42:00Z"
+  "version": "0.5.14",
+  "notes": "安装包从 10.5MB 瘦到 1.3MB，功能一条没少；「每天花了多少」「每月花了多少」左边补了金额刻度，点柱子能看当天的总额和明细。",
+  "apk": "https://github.com/JinTao26/dingzhang/releases/download/v0.5.14/dingzhang.apk",
+  "page": "https://github.com/JinTao26/dingzhang/releases/tag/v0.5.14",
+  "published_at": "2026-11-10T07:42:00Z"
 }
