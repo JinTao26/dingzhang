@@ -14,6 +14,8 @@ android {
         targetSdk = 35
         versionCode = 16
         versionName = "0.5.13"
+        // 只留中文资源，库自带的其他语言翻译全删掉（界面本来就只有中文）
+        resourceConfigurations += listOf("zh")
     }
 
     buildFeatures {
@@ -56,11 +58,6 @@ android {
             signingConfig = signingConfigs.getByName("release")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
-    }
-
-    androidResources {
-        // 只留中文。库自带的语言资源全删掉，界面本来就只有中文
-        localeFilters += listOf("zh")
     }
 
     packaging {
