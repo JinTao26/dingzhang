@@ -69,6 +69,7 @@ import com.dingzhang.app.core.model.TxnKind
 import com.dingzhang.app.core.model.TxnStatus
 import com.dingzhang.app.ingest.IngestPipeline
 import com.dingzhang.app.ui.AppData
+import com.dingzhang.app.ui.components.CategoryPickerDialog
 import com.dingzhang.app.ui.components.CategoryBadge
 import com.dingzhang.app.ui.components.EmptyHint
 import com.dingzhang.app.ui.components.MascotFace
@@ -98,6 +99,7 @@ fun BillsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
     var selectMode by remember { mutableStateOf(false) }
     var picked by remember { mutableStateOf(setOf<Long>()) }
     var confirmBatch by remember { mutableStateOf(false) }
+    var batchPickCat by remember { mutableStateOf(false) }
     var minYuan by remember { mutableStateOf("") }   // 金额下限，单位元，空 = 不限
     var maxYuan by remember { mutableStateOf("") }   // 金额上限
     var catFilter by remember { mutableStateOf<Set<String>>(emptySet()) }
@@ -326,6 +328,17 @@ fun BillsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                     modifier = Modifier.weight(1f)
                 )
                 Text(
+                    "改分类",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (picked.isEmpty()) Dz.InkFaint else Dz.SakuraDeep,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Dz.Cream)
+                        .clickable(enabled = picked.isNotEmpty()) { batchPickCat = true }
+                        .padding(horizontal = 14.dp, vertical = 9.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
                     "删除",
                     style = MaterialTheme.typography.labelLarge,
                     color = if (picked.isEmpty()) Dz.InkFaint else Color.White,
@@ -338,6 +351,28 @@ fun BillsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
             }
         }
         }
+    }
+
+    if (batchPickCat) {
+        CategoryPickerDialog(
+            payee = "已选 ${picked.size} 笔",
+            currentId = "",
+            onPick = { catId ->
+                val ids = picked
+                batchPickCat = false
+                selectMode = false
+                picked = emptySet()
+                // 只改选中的这些，顺手锁住，不让后面的自动重算再动它们
+                ids.forEach { IngestPipeline.dao?.updateCategory(it, catId, true) }
+                DingZhangApp.bumpDataVersion()
+                Toast.makeText(
+                    ctx,
+                    "${ids.size} 笔已改成 ${Categories.of(catId).name}",
+                    Toast.LENGTH_SHORT
+                ).show()
+            },
+            onDismiss = { batchPickCat = false }
+        )
     }
 
     if (confirmBatch) {

@@ -1,7 +1,7 @@
 {
-  "version": "0.5.8",
-  "notes": "统计页新增收入统计「钱从哪儿来」，工资、报销、红包各多少，点一行看明细；支出仍排在前面。美团、京东、淘宝这些平台认得准了：美团外卖、美团买菜、美团单车、美团买药分开归，京东到家、天猫超市、淘宝闪购、叮咚买菜、朴朴、多多买菜也能认。我的页去掉了「它学会的说法」清单。改分类的提示变短，只说改成什么、连带改了几笔。",
-  "apk": "https://github.com/JinTao26/dingzhang/releases/download/v0.5.8/dingzhang-v0.5.8.apk",
-  "page": "https://github.com/JinTao26/dingzhang/releases/tag/v0.5.8",
-  "published_at": "2026-11-09T15:40:00Z"
+  "version": "0.5.9",
+  "notes": "明细支持批量删除和批量改分类；首页「最近」点开和明细页一样，能改分类、改商户名、删除；再导一次账单，商户名以官方账单为准；帮助改成点标题展开；检查更新回到直连、更快。",
+  "apk": "https://github.com/JinTao26/dingzhang/releases/download/v0.5.9/dingzhang-v0.5.9.apk",
+  "page": "https://github.com/JinTao26/dingzhang/releases/tag/v0.5.9",
+  "published_at": "2026-11-10T02:00:00Z"
 }
