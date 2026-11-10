@@ -1,7 +1,7 @@
 {
-  "version": "0.5.14",
-  "notes": "安装包从 10.5MB 瘦到 1.3MB，功能一条没少；「每天花了多少」「每月花了多少」左边补了金额刻度，点柱子能看当天的总额和明细。",
-  "apk": "https://github.com/JinTao26/dingzhang/releases/download/v0.5.14/dingzhang.apk",
-  "page": "https://github.com/JinTao26/dingzhang/releases/tag/v0.5.14",
-  "published_at": "2026-11-10T07:42:00Z"
+  "version": "0.5.15",
+  "notes": "支付完之后更容易自动记上了；金额更准，同时有原价、优惠、实付时取实付；退款能认出来了，会挂回原来那笔支出；同一个店连着买两次同样的金额，两笔都会记上；商户名更准，补全之后分类会跟着重算；支付宝账单自带的分类直接拿来用。",
+  "apk": "https://github.com/JinTao26/dingzhang/releases/download/v0.5.15/dingzhang.apk",
+  "page": "https://github.com/JinTao26/dingzhang/releases/tag/v0.5.15",
+  "published_at": "2026-11-10T14:10:00Z"
 }
