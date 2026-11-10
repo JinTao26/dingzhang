@@ -7,6 +7,11 @@ class Settings(context: Context) {
 
     private val sp = context.applicationContext.getSharedPreferences("dingzhang_settings", Context.MODE_PRIVATE)
 
+    /** 装好第一次打开时那个说明弹窗，看过一次就不再弹。 */
+    var introSeen: Boolean
+        get() = sp.getBoolean("intro_seen", false)
+        set(v) = sp.edit().putBoolean("intro_seen", v).apply()
+
     var onboarded: Boolean
         get() = sp.getBoolean("onboarded", false)
         set(v) = sp.edit().putBoolean("onboarded", v).apply()

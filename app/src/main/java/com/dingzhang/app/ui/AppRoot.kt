@@ -26,6 +26,8 @@ import androidx.compose.material.icons.rounded.ReceiptLong
 import androidx.compose.material3.FabPosition
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -45,6 +47,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.unit.sp
 import com.dingzhang.app.DingZhangApp
 import com.dingzhang.app.BuildConfig
@@ -207,8 +210,17 @@ fun AppRoot() {
     var month by remember { mutableStateOf(Dates.monthOf(System.currentTimeMillis())) }
     // 明细进批量模式时，让「记一笔」的加号躲开，省得压住底部的批量条
     var billsSelect by remember { mutableStateOf(false) }
+    // 第一次进来给个说明，只弹一次
+    var showIntro by remember { mutableStateOf(!(IngestPipeline.settings?.introSeen ?: true)) }
     val data = rememberAppData(month)
     val ctx = LocalContext.current
+
+    if (showIntro) {
+        IntroDialog {
+            IngestPipeline.settings?.introSeen = true
+            showIntro = false
+        }
+    }
 
     if (showAdd) {
         Box(Modifier.fillMaxSize().background(Dz.Cream)) {
@@ -260,6 +272,67 @@ fun AppRoot() {
             }
         }
     }
+    }
+}
+
+
+/** 装好第一次打开：告诉他权限在哪开、帮助在哪、更新在哪，只弹这一次。 */
+@Composable
+private fun IntroDialog(onClose: () -> Unit) {
+    Dialog(onDismissRequest = onClose) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(22.dp))
+                .background(Dz.Card)
+                .padding(20.dp)
+        ) {
+            Text("叮账装好了", style = MaterialTheme.typography.headlineLarge, color = Dz.Ink)
+            Text(
+                "三件事，两分钟就能用起来",
+                style = MaterialTheme.typography.bodySmall,
+                color = Dz.InkFaint,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+            Spacer(Modifier.height(16.dp))
+            IntroLine("1", "开权限", "「我的」→「自动记账通道」，按提示打开无障碍和通知监听，之后付款就自动记账")
+            IntroLine("2", "看帮助", "微信、支付宝怎么导账单、权限怎么开，都写在「我的」→「更多」→「帮助」里")
+            IntroLine("3", "查更新", "新版本在「我的」最下面「检查更新」，每一版改了什么也写在里面")
+            Spacer(Modifier.height(16.dp))
+            Button(
+                onClick = onClose,
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Dz.Sakura,
+                    contentColor = Color.White
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("知道了") }
+        }
+    }
+}
+
+@Composable
+private fun IntroLine(no: String, title: String, body: String) {
+    Row(Modifier.padding(bottom = 12.dp)) {
+        Box(
+            Modifier
+                .size(22.dp)
+                .clip(CircleShape)
+                .background(Dz.SakuraSoft),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(no, style = MaterialTheme.typography.labelMedium, color = Dz.SakuraDeep)
+        }
+        Column(Modifier.padding(start = 10.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, color = Dz.Ink)
+            Text(
+                body,
+                style = MaterialTheme.typography.bodySmall,
+                color = Dz.InkSoft,
+                modifier = Modifier.padding(top = 2.dp)
+            )
+        }
     }
 }
 

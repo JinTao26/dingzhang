@@ -28,6 +28,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
@@ -74,6 +75,7 @@ import com.dingzhang.app.ui.components.CategoryPickerDialog
 import com.dingzhang.app.ui.components.CategoryBadge
 import com.dingzhang.app.ui.components.EmptyHint
 import com.dingzhang.app.ui.components.MascotFace
+import com.dingzhang.app.ui.components.MonthPickerDialog
 import com.dingzhang.app.ui.components.ui
 import com.dingzhang.app.ui.shiftMonth
 import com.dingzhang.app.ui.theme.Dz
@@ -101,6 +103,7 @@ fun BillsScreen(
     var rangeTxns by remember { mutableStateOf<List<Txn>>(emptyList()) }
     var hits by remember { mutableStateOf<List<Txn>>(emptyList()) }
     var showFilter by remember { mutableStateOf(false) }
+    var showMonthPicker by remember { mutableStateOf(false) }
     // 批量删账：进多选模式后点条目是勾选，不是打开详情
     var selectMode by remember { mutableStateOf(false) }
     LaunchedEffect(selectMode) { onSelectModeChange(selectMode) }
@@ -178,6 +181,17 @@ fun BillsScreen(
         if (catFilter.isNotEmpty()) add(catFilter.joinToString("+") { Categories.of(it).name })
     }.joinToString(" · ")
 
+    if (showMonthPicker) {
+        MonthPickerDialog(
+            month = month,
+            onDismiss = { showMonthPicker = false },
+            onPick = {
+                onMonthChange(it)
+                showMonthPicker = false
+            }
+        )
+    }
+
     Column(Modifier.fillMaxSize()) {
         // 标题 + 搜索 + 筛选入口（时间、类型都收进筛选面板了，这一屏不再堆两排 chip）
         Column(Modifier.padding(horizontal = 18.dp, vertical = 10.dp)) {
@@ -197,12 +211,23 @@ fun BillsScreen(
                                 .size(26.dp)
                                 .clickable { onMonthChange(shiftMonth(month, -1)) }
                         )
-                        Text(
-                            data.monthLabel,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = Dz.Ink,
-                            modifier = Modifier.padding(horizontal = 8.dp)
-                        )
+                        Row(
+                            Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable { showMonthPicker = true }
+                                .padding(horizontal = 8.dp, vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                data.monthLabel,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = Dz.Ink
+                            )
+                            Icon(
+                                Icons.Rounded.ArrowDropDown, "选月份", tint = Dz.InkSoft,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                         Icon(
                             Icons.Rounded.ChevronRight, "下个月", tint = Dz.InkSoft,
                             modifier = Modifier

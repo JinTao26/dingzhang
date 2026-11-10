@@ -267,12 +267,6 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
         // ---------- 通道 ----------
         DzCard {
             Text("自动记账通道", style = MaterialTheme.typography.titleLarge, color = Dz.Ink)
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "两个通道一起开最稳：无障碍读支付页面（准），通知监听兜底（快）",
-                style = MaterialTheme.typography.bodySmall,
-                color = Dz.InkFaint
-            )
             Spacer(Modifier.height(12.dp))
 
             ChannelRow(
@@ -344,8 +338,8 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                 }
             }
             Text(
-                "微信/支付宝导出的账单都认：zip（套着 csv 或 xlsx）、csv、txt、xlsx。导入后能补全历史，并把之前漏记的跟已有记录对上号",
-                style = MaterialTheme.typography.bodySmall,
+                "支持 zip · csv · txt · xlsx",
+                style = MaterialTheme.typography.labelMedium,
                 color = Dz.InkFaint,
                 modifier = Modifier.padding(top = 4.dp)
             )
@@ -497,12 +491,7 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
         // ---------- 数据与备份 ----------
         DzCard {
             Text("你的数据，你带走", style = MaterialTheme.typography.titleLarge, color = Dz.Ink)
-            Text(
-                "换手机、或者想迁到别的记账 App 都能导出去。备份文件连分类规则一起带走",
-                style = MaterialTheme.typography.bodySmall,
-                color = Dz.InkFaint,
-                modifier = Modifier.padding(top = 4.dp, bottom = 10.dp)
-            )
+            Spacer(Modifier.height(10.dp))
             ActionRow("导出明细 CSV", "给 Excel 或别的记账 App 用") {
                 csvSaver.launch(Exporter.defaultCsvName())
             }
