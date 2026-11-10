@@ -88,7 +88,12 @@ private val expenseIds = listOf(
 )
 
 @Composable
-fun BillsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
+fun BillsScreen(
+    data: AppData,
+    month: String,
+    onMonthChange: (String) -> Unit,
+    onSelectModeChange: (Boolean) -> Unit = {}
+) {
     var filter by remember { mutableStateOf(0) }
     var selected by remember { mutableStateOf<Txn?>(null) }
     var quick by remember { mutableStateOf(0) }      // 0 按月份 / 1 今天 / 2 本周 / 3 本月 / 4 上月
@@ -98,6 +103,7 @@ fun BillsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
     var showFilter by remember { mutableStateOf(false) }
     // 批量删账：进多选模式后点条目是勾选，不是打开详情
     var selectMode by remember { mutableStateOf(false) }
+    LaunchedEffect(selectMode) { onSelectModeChange(selectMode) }
     var picked by remember { mutableStateOf(setOf<Long>()) }
     var confirmBatch by remember { mutableStateOf(false) }
     var batchPickCat by remember { mutableStateOf(false) }
@@ -321,8 +327,8 @@ fun BillsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
             Row(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    // 底下那个是「记一笔」的悬浮按钮，批量条得让开，不然删除键点不着
-                    .padding(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 86.dp)
+                    // 批量模式下「记一笔」已经收起来了，这条可以贴着实底放
+                    .padding(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 18.dp)
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(20.dp))
                     .background(Dz.Card)
@@ -1020,6 +1026,17 @@ private fun FilterDialog(
                 }
                 Spacer(Modifier.width(12.dp))
                 Text("筛选", style = MaterialTheme.typography.titleLarge, color = Dz.Ink)
+                Spacer(Modifier.weight(1f))
+                Text(
+                    "重置全部",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Dz.SakuraDeep,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Dz.Card)
+                        .clickable { onReset() }
+                        .padding(horizontal = 16.dp, vertical = 9.dp)
+                )
             }
 
             Spacer(Modifier.height(14.dp))
@@ -1157,26 +1174,8 @@ private fun FilterDialog(
 
             }  // 卡片区结束
 
+            // 重置已经挪到顶栏，底部不再放按钮，省得被手势条压住
             Spacer(Modifier.height(10.dp))
-
-            // 选了就即时生效，不再要「应用」这一步；只剩重置
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center
-            ) {
-                Text(
-                    "重置全部",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = Dz.InkSoft,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(Dz.Card)
-                        .clickable { onReset() }
-                        .padding(horizontal = 26.dp, vertical = 12.dp)
-                )
-            }
-            // 底部黑边和手势条会吃掉一段，多留出位置
-            Spacer(Modifier.height(40.dp))
         }
     }
 }

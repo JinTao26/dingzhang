@@ -114,11 +114,11 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                 OutlinedTextField(
                     value = budgetInput,
                     onValueChange = { v ->
-                        budgetInput = v.filter { it.isDigit() || it == '.' }.take(9)
+                        budgetInput = v.filter { it.isDigit() }.take(7)
                     },
-                    label = { Text("金额（元）") },
+                    label = { Text("整元，不用填小数") },
                     singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -134,11 +134,11 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                         Text("取消", color = Dz.InkSoft)
                     }
                     TextButton(onClick = {
-                        val y = (budgetInput.toDoubleOrNull() ?: 0.0) * 100
+                        val y = (budgetInput.toLongOrNull() ?: 0L) * 100
                         if (budgetEdit == 1) {
-                            settings?.monthlyBudgetCents = y.toLong()
+                            settings?.monthlyBudgetCents = y
                         } else {
-                            settings?.yearBudgetCents = y.toLong()
+                            settings?.yearBudgetCents = y
                         }
                         budgetEdit = 0
                         DingZhangApp.bumpDataVersion()

@@ -205,6 +205,8 @@ fun AppRoot() {
     var tab by remember { mutableStateOf(0) }
     var showAdd by remember { mutableStateOf(false) }
     var month by remember { mutableStateOf(Dates.monthOf(System.currentTimeMillis())) }
+    // 明细进批量模式时，让「记一笔」的加号躲开，省得压住底部的批量条
+    var billsSelect by remember { mutableStateOf(false) }
     val data = rememberAppData(month)
     val ctx = LocalContext.current
 
@@ -225,16 +227,18 @@ fun AppRoot() {
         containerColor = if (starry) Color.Transparent else Dz.Cream,
         bottomBar = { DzBottomBar(tab) { tab = it } },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showAdd = true },
-                containerColor = Dz.Sakura,
-                contentColor = Color.White,
-                shape = CircleShape,
-                modifier = Modifier
-                    .size(58.dp)
-                    .padding(bottom = 6.dp)
-            ) {
-                Icon(Icons.Rounded.Add, contentDescription = "记一笔", modifier = Modifier.size(26.dp))
+            if (!(tab == 1 && billsSelect)) {
+                FloatingActionButton(
+                    onClick = { showAdd = true },
+                    containerColor = Dz.Sakura,
+                    contentColor = Color.White,
+                    shape = CircleShape,
+                    modifier = Modifier
+                        .size(58.dp)
+                        .padding(bottom = 6.dp)
+                ) {
+                    Icon(Icons.Rounded.Add, contentDescription = "记一笔", modifier = Modifier.size(26.dp))
+                }
             }
         },
         floatingActionButtonPosition = FabPosition.End
@@ -246,7 +250,11 @@ fun AppRoot() {
         ) {
             when (tab) {
                 0 -> HomeScreen(data, month, onMonthChange = { month = it }, onGoTab = { tab = it })
-                1 -> BillsScreen(data, month, onMonthChange = { month = it })
+                1 -> BillsScreen(
+                    data, month,
+                    onMonthChange = { month = it },
+                    onSelectModeChange = { billsSelect = it }
+                )
                 2 -> StatsScreen(data, month, onMonthChange = { month = it })
                 else -> MineScreen(data, month, onMonthChange = { month = it })
             }
