@@ -84,8 +84,11 @@ class PaymentAccessibilityService : AccessibilityService() {
             return
         }
 
-        // 同一个页面可能被反复解析（窗口内容变化会连续触发），按页面指纹挡一下
-        val pageKey = "${captured.wallet.db}|${captured.amountCents}|${captured.payee}|${now / 60000}"
+        // 同一个页面可能被反复解析（窗口内容变化会连续触发），按页面指纹挡一下。
+        // 有交易单号就用单号；没有就用「秒」，不用「分钟」——
+        // 分钟级指纹会把同一分钟内同店同金额的两笔真实消费当成同一页，第二笔直接被挡掉。
+        val pageKey = captured.externalId?.let { "no|$it" }
+            ?: "${captured.wallet.db}|${captured.amountCents}|${captured.payee}|${now / 1000}"
         if (recentPages.contains(pageKey)) return
         recentPages.addLast(pageKey)
         if (recentPages.size > 30) recentPages.removeFirst()

@@ -57,7 +57,9 @@ object PaymentAccessibilityParser {
         PageRule(
             Wallet.WECHAT, "微信-支付结果",
             mustContain = listOf("支付成功", "已支付", "付款成功"),
-            mustNotContain = listOf("聊天", "朋友圈", "正在输入"),
+            // 只命中一个「支付成功」就认，但聊天页的痕迹要排掉：
+            // 聊天界面里有人发「支付成功 20 元」这种文字，也会被当成支付结果页
+            mustNotContain = listOf("聊天", "朋友圈", "正在输入", "发送", "按住", "相册", "表情", "语音"),
             minHits = 1
         ),
         PageRule(

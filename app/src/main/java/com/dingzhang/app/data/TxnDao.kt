@@ -311,9 +311,22 @@ class TxnDao(private val helper: DbHelper) {
      * 退款该算到哪个分类？找 90 天内同商户最近的一笔支出，沿用它的分类。
      * 找不到返回 null，调用方会挂到「其他」。
      */
-    fun findRefundTarget(payee: String, at: Long): Txn? {
+    /**
+     * 退款挂回哪笔支出。
+     * 同商户反复消费时，只按「最近一笔」会挂错：1 月吃 100、2 月吃 200，
+     * 2 月退的是 1 月那 100，却会被挂到 2 月那笔。
+     * 所以金额能对上时优先按金额找。
+     */
+    fun findRefundTarget(payee: String, amountCents: Long?, at: Long): Txn? {
         if (payee.isBlank()) return null
         val from = at - 90L * 24 * 60 * 60 * 1000
+        if (amountCents != null) {
+            helper.readableDatabase.rawQuery(
+                "SELECT * FROM txn WHERE kind = 'expense' AND occurred_at BETWEEN ? AND ? " +
+                    "AND payee LIKE ? AND amount_cents = ? ORDER BY occurred_at DESC LIMIT 1",
+                arrayOf(from.toString(), at.toString(), "%$payee%", amountCents.toString())
+            ).use { if (it.moveToFirst()) return it.toTxn() }
+        }
         helper.readableDatabase.rawQuery(
             "SELECT * FROM txn WHERE kind = 'expense' AND occurred_at BETWEEN ? AND ? AND payee LIKE ? " +
                 "ORDER BY occurred_at DESC LIMIT 1",

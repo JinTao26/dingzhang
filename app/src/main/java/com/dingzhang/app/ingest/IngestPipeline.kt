@@ -108,10 +108,17 @@ object IngestPipeline {
         val byNo = c.externalId?.let { dao.findByExternalId(c.wallet, it) }
         // 单号找不到时按「钱包 + 金额 + 方向 + 时间」找；先按方向收窄，
         // 否则 50 元消费和 50 元退款会互相被当成重复
-        val dup = byNo ?: dao.findNearDuplicate(
+        val nearDup = byNo ?: dao.findNearDuplicate(
             c.wallet, c.amountCents, c.occurredAt, DUP_WINDOW_MS,
             kindDb = (c.kindHint ?: TxnKind.EXPENSE).db
         )
+        // 两边都带了交易单号却不一样，那就是同店同金额的两笔真消费，不能并成一笔。
+        // 只有单号缺失时，才靠金额 + 时间 + 商户去猜重复。
+        val dup = nearDup?.takeIf { d ->
+            val a = c.externalId
+            val b = d.externalId
+            !(a != null && b != null && a != b)
+        }
         if (dup != null) {
             val incomingIsBill = c.source == Source.BILL_IMPORT
             val existingIsBill = dup.source == Source.BILL_IMPORT
@@ -175,7 +182,9 @@ object IngestPipeline {
         val categoryId = when (kind) {
             TxnKind.TRANSFER -> "other"
             // 退款挂回原来那笔支出的分类：统计时才从「餐饮」里扣，而不是跑到收入里去
-            TxnKind.REFUND -> dao.findRefundTarget(payee, c.occurredAt)?.categoryId ?: "other"
+            TxnKind.REFUND ->
+                (dao.findRefundTarget(payee, c.amountCents, c.occurredAt)
+                    ?: dao.findRefundTarget(payee, null, c.occurredAt))?.categoryId ?: "other"
             TxnKind.EXPENSE -> platformCat ?: cls.categoryId
             else -> cls.categoryId
         }
