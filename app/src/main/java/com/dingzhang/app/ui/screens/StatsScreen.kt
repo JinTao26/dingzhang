@@ -788,9 +788,6 @@ private fun CategoryBar(c: CategoryTotal, total: Long, onClick: () -> Unit) {
     }
 }
 
-/** 点分类弹出来的明细。列表最多摆 200 条，再多也没人在手机上翻。 */
-@Composable
-
 /** 左侧三档刻度：最高、一半、0。金额用短格式，别把轴撑爆 */
 @Composable
 private fun AxisLabels(max: Long, height: androidx.compose.ui.unit.Dp) {
@@ -912,6 +909,8 @@ private fun TxnSliceDialog(
     }
 }
 
+/** 点分类弹出来的明细。列表最多摆 200 条，再多也没人在手机上翻。 */
+@Composable
 private fun CategoryDetailDialog(
     categoryId: String,
     txns: List<Txn>,
