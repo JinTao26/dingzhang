@@ -1,6 +1,7 @@
 package com.dingzhang.app.ui.screens
 
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -276,7 +277,13 @@ fun BillsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
             }
         }
 
-        Box(Modifier.weight(1f)) {
+        // 批量模式下按系统返回键就退出，不用去点右上角
+    BackHandler(enabled = selectMode) {
+        selectMode = false
+        picked = emptySet()
+    }
+
+    Box(Modifier.weight(1f)) {
         if (filtered.isEmpty()) {
             when {
                 searching -> EmptyHint("没搜到", "换个关键词试试。金额、卡号也可以搜")
@@ -314,7 +321,8 @@ fun BillsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
             Row(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(horizontal = 18.dp, vertical = 14.dp)
+                    // 底下那个是「记一笔」的悬浮按钮，批量条得让开，不然删除键点不着
+                    .padding(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 86.dp)
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(20.dp))
                     .background(Dz.Card)
@@ -445,7 +453,6 @@ fun BillsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                 maxYuan = ""
                 catFilter = emptySet()
             },
-            onApply = { showFilter = false },
             onDismiss = { showFilter = false }
         )
     }
@@ -607,12 +614,17 @@ fun TxnDetailDialog(
         Column(
             modifier = Modifier
                 .fillMaxWidth(0.93f)
-                .heightIn(max = 600.dp)
+                .heightIn(max = 620.dp)
                 .clip(RoundedCornerShape(28.dp))
                 .background(Dz.Card)
-                .verticalScroll(rememberScrollState())
                 .padding(20.dp)
         ) {
+            // 只有上半段滚，删除和关闭钉在底部 —— 删一笔不用先滑到底
+            Column(
+                Modifier
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState())
+            ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 MascotFace(40.dp)
                 Column(Modifier.weight(1f).padding(start = 10.dp)) {
@@ -745,6 +757,15 @@ fun TxnDetailDialog(
                 Spacer(Modifier.height(8.dp))
             }
 
+            }
+
+            Spacer(Modifier.height(8.dp))
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(Dz.Cream)
+            )
             Spacer(Modifier.height(6.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -953,7 +974,6 @@ private fun FilterDialog(
     onMax: (String) -> Unit,
     onToggleCat: (String) -> Unit,
     onReset: () -> Unit,
-    onApply: () -> Unit,
     onDismiss: () -> Unit
 ) {
     Dialog(
@@ -1124,29 +1144,24 @@ private fun FilterDialog(
 
             Spacer(Modifier.height(10.dp))
 
+            // 选了就即时生效，不再要「应用」这一步；只剩重置
             Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center
             ) {
-                TextButton(onClick = onReset) {
-                    Text("重置", color = Dz.InkSoft, fontSize = 15.sp)
-                }
-                Button(
-                    onClick = onApply,
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Dz.Sakura,
-                        contentColor = Color.White
-                    ),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("应用筛选")
-                }
+                Text(
+                    "重置全部",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Dz.InkSoft,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Dz.Card)
+                        .clickable { onReset() }
+                        .padding(horizontal = 26.dp, vertical = 12.dp)
+                )
             }
-            Spacer(Modifier.height(30.dp))
+            // 底部黑边和手势条会吃掉一段，多留出位置
+            Spacer(Modifier.height(40.dp))
         }
     }
 }
