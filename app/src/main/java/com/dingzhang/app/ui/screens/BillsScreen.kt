@@ -755,6 +755,38 @@ fun TxnDetailDialog(
                 if (txn.categoryLocked) MiniTag("分类已锁定")
             }
 
+            if (txn.rawText.isNotBlank()) {
+                var rawOpen by remember(txn.id) { mutableStateOf(false) }
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    if (rawOpen) "收起它收到的原文" else "看它收到的原文",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Dz.InkSoft,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { rawOpen = !rawOpen }
+                        .padding(vertical = 3.dp)
+                )
+                if (rawOpen) {
+                    Text(
+                        txn.rawText,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Dz.InkFaint,
+                        modifier = Modifier
+                            .padding(top = 4.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Dz.Cream)
+                            .padding(10.dp)
+                    )
+                    Text(
+                        "这句话就是系统给我的全部信息。记错的时候把它发给我，我按它改规则",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Dz.InkFaint,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+            }
+
             if (txn.externalId != null) {
                 Text(
                     "单号 ${txn.externalId}",

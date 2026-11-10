@@ -142,7 +142,16 @@ object IngestPipeline {
             kind = kind,
             categoryId = categoryId,
             wallet = c.wallet,
-            payee = payee.ifBlank { "未知商户" },
+            payee = payee.ifBlank {
+                // 通知里本来就没店名时，写渠道名比写「未知商户」诚实：
+                // 用户一眼知道这条是从微信通知来的，账单导入后会自动补上真名
+                when (c.wallet) {
+                    Wallet.WECHAT -> "微信支付"
+                    Wallet.ALIPAY -> "支付宝"
+                    Wallet.BANK -> "银行卡"
+                    else -> "未知商户"
+                }
+            },
             note = c.note.trim(),
             occurredAt = c.occurredAt,
             source = c.source,
