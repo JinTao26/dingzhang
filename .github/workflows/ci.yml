@@ -34,3 +34,19 @@ jobs:
         with:
           name: debug-apk
           path: app/build/outputs/apk/debug/*.apk
+
+      # 顺手把 release 也编一遍：开了代码压缩（R8）之后，只有 release 构建才会跑到，
+      # 用 CI 提前发现压缩规则的问题，别等到发版那天才炸
+      - name: Assemble release (with R8)
+        run: gradle :app:assembleRelease --no-daemon
+
+      - name: Report release size
+        run: |
+          ls -l app/build/outputs/apk/release/
+          du -h app/build/outputs/apk/release/app-release.apk
+
+      - name: Upload release apk
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-apk
+          path: app/build/outputs/apk/release/*.apk

@@ -48,10 +48,19 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // 打开代码压缩：主要作用是删掉没有用到的图标和库代码
+            // （material-icons-extended 有几千个图标，不裁的话全打包进来）。
+            // proguard-rules.pro 里把应用自己的类原样 keep 住了，行为不变。
+            isMinifyEnabled = true
+            isShrinkResources = true
             signingConfig = signingConfigs.getByName("release")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
+    }
+
+    androidResources {
+        // 只留中文。库自带的语言资源全删掉，界面本来就只有中文
+        localeFilters += listOf("zh")
     }
 
     packaging {
