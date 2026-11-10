@@ -59,7 +59,9 @@ object PaymentAccessibilityParser {
     private val timeLabels = listOf("支付时间", "交易时间", "创建时间", "付款时间")
     private val tradeNoLabels = listOf("交易单号", "订单号", "商户单号", "交易号")
 
-    private val incomeCues = listOf("收款到账", "已收款", "到账金额", "收入")
+    private val incomeCues = listOf(
+        "收款到账", "已收款", "到账金额", "收入", "红包到账", "收到红包", "收到转账", "已收钱"
+    )
     private val transferCues = listOf("还款", "提现", "转账")
 
     /**

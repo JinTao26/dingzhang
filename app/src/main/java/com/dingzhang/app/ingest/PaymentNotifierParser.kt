@@ -24,12 +24,21 @@ object PaymentNotifierParser {
     private val AMOUNT_WITH_YUAN = Regex("([0-9][0-9,]*(?:\\.[0-9]{1,2})?)\\s*元")
 
     private val incomeCues = listOf(
-        "收款到账", "收款成功", "已收款", "到账", "入账", "退款到账", "已退回", "收入到账"
+        "收款到账", "收款成功", "已收款", "到账", "入账", "退款到账", "已退回", "收入到账",
+        // 收红包 / 收转账：别人转进来的钱要算收入，不能当成没发生
+        "红包到账", "收到红包", "收到转账", "已收钱", "存入零钱", "入账金额", "转入成功"
     )
     private val expenseCues = listOf(
-        "支付成功", "付款成功", "已支付", "已付款", "扣款", "消费", "付款", "支付"
+        "支付成功", "付款成功", "已支付", "已付款", "扣款", "消费", "付款", "支付",
+        // 发红包 / 转给朋友：这是实打实花出去的钱
+        "发红包", "发出红包", "已转账给", "转账给"
     )
-    private val transferCues = listOf("还款成功", "已还款", "提现成功", "转账成功", "余额转入")
+    /** 只有这些是「自己的钱换个口袋」：提现、还款、零钱转余额，不该进收支统计。 */
+    private val transferCues = listOf(
+        "还款成功", "已还款", "提现成功", "余额转入", "零钱转入", "信用卡还款", "自动还款"
+    )
+    /** 明确写给别人的，算支出 */
+    private val outgoingCues = listOf("转账给", "转给", "已转出", "转出", "已转账给")
     private val refundCues = listOf("退款", "已退回", "退回")
 
     /** 这些通知肯定不是一笔消费，先挡掉，省得后面误判。 */
@@ -73,7 +82,8 @@ object PaymentNotifierParser {
         val isIncome = incomeCues.any { corpus.contains(it) }
         val isExpense = expenseCues.any { corpus.contains(it) }
         val isTransfer = transferCues.any { corpus.contains(it) }
-        if (!isIncome && !isExpense && !isTransfer) return null
+        val isOutgoing = outgoingCues.any { corpus.contains(it) }
+        if (!isIncome && !isExpense && !isTransfer && !isOutgoing) return null
 
         val amount = extractAmount(corpus) ?: return null
 
@@ -83,17 +93,23 @@ object PaymentNotifierParser {
             .flatMap { it.split("\n") }
         val payee = extractPayee(corpus)
             ?: IngestPipeline.guessPayeeFromLines(lines)
-            ?: when (wallet) {
-                Wallet.WECHAT -> "微信支付"
-                Wallet.ALIPAY -> "支付宝"
+            ?: when {
+                // 红包和转账本来就没有商户，别写成「微信支付」这种没有信息量的泛称
+                corpus.contains("红包") -> "红包"
+                corpus.contains("转账") || corpus.contains("转入") -> "转账"
+                wallet == Wallet.WECHAT -> "微信支付"
+                wallet == Wallet.ALIPAY -> "支付宝"
                 else -> ""
             }
 
         val kind = when {
-            isTransfer -> TxnKind.TRANSFER
             // 「退款到账」也会命中 incomeCues，得先在退款上判一次
             refundCues.any { corpus.contains(it) } -> TxnKind.REFUND
+            // 提现、还款、零钱转余额：钱只是换了位置，不进收支统计
+            isTransfer -> TxnKind.TRANSFER
             isIncome && !isExpense -> TxnKind.INCOME
+            isExpense || isOutgoing -> TxnKind.EXPENSE
+            // 只写「转账成功」看不出方向时按支出处理：收钱那一侧一般会带「已收款 / 收款到账」
             else -> TxnKind.EXPENSE
         }
 
