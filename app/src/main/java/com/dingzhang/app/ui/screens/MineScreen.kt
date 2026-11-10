@@ -631,31 +631,6 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                         .padding(horizontal = 10.dp, vertical = 5.dp)
                 )
             }
-            Spacer(Modifier.height(8.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        "打开时自动检查更新",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = Dz.Ink
-                    )
-                    Text(
-                        settings?.skipVersion?.takeIf { it.isNotBlank() }?.let {
-                            "已跳过 $it，出下一版仍会提示"
-                        } ?: "有新版会开屏提示，可以选「暂不更新」",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Dz.InkFaint
-                    )
-                }
-                Switch(
-                    checked = autoCheck,
-                    onCheckedChange = { v ->
-                        autoCheck = v
-                        settings?.autoCheckUpdate = v
-                    },
-                    colors = SwitchDefaults.colors(checkedTrackColor = Dz.Sakura)
-                )
-            }
         }
     }
 
@@ -1169,6 +1144,15 @@ private fun HelpPage(onClose: () -> Unit) {
             HelpStep("3", "短信：首次弹窗点「允许」；之前拒过就去 设置 → 应用 → 叮账 → 权限 → 短信")
             HelpStep("4", "后台存活：设置 → 电池 → 应用耗电管理 → 叮账 → 允许后台活动")
             HelpStep("5", "Android 13 以上侧载：设置 → 应用 → 叮账 → 右上角 ⋮ → 允许受限设置")
+        }
+        Spacer(Modifier.height(10.dp))
+
+        FoldCard("怎么更新叮账", "没有应用商店，新版只能自己装") {
+            HelpStep("1", "「我的」页拉到最下面，版本号旁边点「检查更新」")
+            HelpStep("2", "有新版本会告诉你版本号和这次改了什么，点「去下载」")
+            HelpStep("3", "会在浏览器打开下载页，下那个 apk 文件")
+            HelpStep("4", "GitHub 打不开的话，在网址前面加 https://ghproxy.net/ 再试")
+            HelpStep("5", "装的时候系统问「是否更新」，点更新就行，账都在")
         }
         Spacer(Modifier.height(10.dp))
 

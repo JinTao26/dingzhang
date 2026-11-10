@@ -10,14 +10,11 @@ import java.net.URL
 /**
  * 版本更新检查。
  *
- * 侧载 App 没有应用商店，更新只能自己查。国内直连 `api.github.com` 经常超时，
- * 所以改成两个源依次尝试：
- *   1. 仓库根目录的 `version.json`，经 jsDelivr 分发（`cdn.jsdelivr.net` 国内多数网络可达）
- *   2. GitHub 官方 Releases API
- * 两个都不通，就如实告诉用户「连不上更新源」并给出镜像地址，
- * 而不是像以前那样只在日志里写一行、界面上什么都没有。
+ * 侧载 App 没有应用商店，更新只能自己查。所以走 GitHub 公开 API：
+ * `GET /repos/{owner}/{repo}/releases/latest`，一次请求拿到 tag、更新说明和 APK 直链。
  *
- * 下载链接统一换成 ghproxy 镜像前缀：`https://ghproxy.net/https://github.com/...`，实测能下 APK。
+ * 只打这一个源。中间试过经 jsDelivr 分发 version.json，多一次请求、多一层缓存，
+ * 国内反而更慢，已经撤掉。连不上就如实说连不上，并给出 ghproxy 镜像页。
  *
  * 不做静默自安装：下载完交给系统安装器，用户自己点确认。
  */
@@ -32,7 +29,6 @@ object UpdateChecker {
     /** 国内可达的下载镜像前缀 */
     const val MIRROR_PREFIX = "https://ghproxy.net/"
 
-    private const val MANIFEST_URL = "https://cdn.jsdelivr.net/gh/$OWNER/$REPO@main/version.json"
     private const val API_URL = "https://api.github.com/repos/$OWNER/$REPO/releases/latest"
 
     data class Result(
@@ -48,56 +44,21 @@ object UpdateChecker {
         val message: String = ""
     )
 
-    /** 连不上时冷却一阵，避免用户每切一次前台就打一轮请求 */
-    private var lastFailAt = 0L
-    private const val FAIL_COOLDOWN_MS = 15 * 60 * 1000L
-
     suspend fun check(current: String): Result = withContext(Dispatchers.IO) {
-        if (System.currentTimeMillis() - lastFailAt < FAIL_COOLDOWN_MS) {
-            return@withContext Result(
-                current, ok = false,
-                message = "上次没连上更新源，过一会儿再试"
-            )
-        }
-
-        val manifest = httpText(MANIFEST_URL)?.let {
-            runCatching { parseManifest(current, it) }.getOrNull()
-        }
-        if (manifest != null) return@withContext manifest
-
         val release = httpText(API_URL)?.let {
             runCatching { parseRelease(current, it) }.getOrNull()
         }
         if (release != null) return@withContext release
 
-        lastFailAt = System.currentTimeMillis()
-        Log.w(TAG, "两个更新源都没连上")
+        Log.w(TAG, "更新源没连上")
         Result(
             current, ok = false,
-            message = "连不上更新源（jsDelivr 和 GitHub 都没通）。" +
-                "可以打开镜像页手动下载：${MIRROR_PREFIX}${RELEASE_PAGE}"
+            message = "连不上 GitHub。有网的话可以打开镜像页看看有没有新版：" +
+                "${MIRROR_PREFIX}${RELEASE_PAGE}"
         )
     }
 
     // ------------------------------------------------------------------ 解析
-
-    private fun parseManifest(current: String, body: String): Result? {
-        val j = JSONObject(body)
-        val ver = j.optString("version").trim()
-        if (ver.isBlank()) return null
-        val has = isNewer(ver, current)
-        Log.i(TAG, "version.json：当前 $current / 最新 $ver / 有更新=$has")
-        return Result(
-            currentVersion = current,
-            latestVersion = ver,
-            notes = j.optString("notes").trim().take(1200),
-            pageUrl = j.optString("page").trim().ifBlank { RELEASE_PAGE },
-            apkUrl = j.optString("apk").trim().takeIf { it.startsWith("http") }?.let { mirrorOf(it) },
-            publishedAt = j.optString("published_at"),
-            hasUpdate = has,
-            message = if (has) "发现新版本 $ver" else "已经是最新版本"
-        )
-    }
 
     private fun parseRelease(current: String, body: String): Result? {
         val j = JSONObject(body)
