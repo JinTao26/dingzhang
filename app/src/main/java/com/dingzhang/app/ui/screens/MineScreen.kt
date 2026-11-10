@@ -92,12 +92,12 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
     var importing by remember { mutableStateOf(false) }
     var result by remember { mutableStateOf<ImportResult?>(null) }
     var confirmClear by remember { mutableStateOf(false) }
-    var budgetEdit by remember { mutableStateOf(false) }
+    var budgetEdit by remember { mutableStateOf(0) }   // 0 关，1 每月，2 每年
     var budgetInput by remember { mutableStateOf("") }
 
     // 预算自己填：常用档给四个快选，想填多少填多少
-    if (budgetEdit) {
-        Dialog(onDismissRequest = { budgetEdit = false }) {
+    if (budgetEdit != 0) {
+        Dialog(onDismissRequest = { budgetEdit = 0 }) {
             Column(
                 Modifier
                     .fillMaxWidth()
@@ -105,7 +105,11 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                     .background(Dz.Card)
                     .padding(18.dp)
             ) {
-                Text("每月预算", style = MaterialTheme.typography.titleLarge, color = Dz.Ink)
+                Text(
+                    if (budgetEdit == 1) "每月预算" else "每年预算",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = Dz.Ink
+                )
                 Spacer(Modifier.height(10.dp))
                 OutlinedTextField(
                     value = budgetInput,
@@ -120,19 +124,23 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                 )
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    "填 0 表示不设预算，首页那条「预算还剩」就不显示了",
+                    "填 0 就是不设。每月预算会出现在首页的「预算还剩」上",
                     style = MaterialTheme.typography.labelSmall,
                     color = Dz.InkFaint
                 )
                 Spacer(Modifier.height(12.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = { budgetEdit = false }) {
+                    TextButton(onClick = { budgetEdit = 0 }) {
                         Text("取消", color = Dz.InkSoft)
                     }
                     TextButton(onClick = {
-                        val y = budgetInput.toDoubleOrNull() ?: 0.0
-                        settings?.monthlyBudgetCents = (y * 100).toLong()
-                        budgetEdit = false
+                        val y = (budgetInput.toDoubleOrNull() ?: 0.0) * 100
+                        if (budgetEdit == 1) {
+                            settings?.monthlyBudgetCents = y.toLong()
+                        } else {
+                            settings?.yearBudgetCents = y.toLong()
+                        }
+                        budgetEdit = 0
                         DingZhangApp.bumpDataVersion()
                     }) {
                         Text("保存", color = Dz.SakuraDeep, fontWeight = FontWeight.Bold)
@@ -388,61 +396,52 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
 
         Spacer(Modifier.height(12.dp))
 
-        // ---------- 参数 ----------
+        // ---------- 预算 ----------
         DzCard {
-            Text("记账口味", style = MaterialTheme.typography.titleLarge, color = Dz.Ink)
-            Spacer(Modifier.height(10.dp))
+            Text("预算", style = MaterialTheme.typography.titleLarge, color = Dz.Ink)
+            Text(
+                "设了每月预算，首页会多一条「预算还剩」。0 就是不设，不影响记账",
+                style = MaterialTheme.typography.bodySmall,
+                color = Dz.InkFaint,
+                modifier = Modifier.padding(top = 2.dp, bottom = 12.dp)
+            )
 
-            Text("小于这个金额不记账", style = MaterialTheme.typography.bodyMedium, color = Dz.InkSoft)
-            Spacer(Modifier.height(6.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf(100L to "1 元", 500L to "5 元", 1000L to "10 元").forEach { (cents, label) ->
-                    SettingChip(
-                        label = label,
-                        active = (settings?.ignoreBelowCents ?: 100L) == cents
-                    ) {
-                        settings?.ignoreBelowCents = cents
-                        DingZhangApp.bumpDataVersion()
-                    }
+            BudgetRow(
+                label = "每月预算",
+                cents = settings?.monthlyBudgetCents ?: 0L,
+                quick = listOf(
+                    1_000_00L to "1000", 3_000_00L to "3000",
+                    5_000_00L to "5000", 10_000_00L to "1万"
+                ),
+                onQuick = {
+                    settings?.monthlyBudgetCents = it
+                    DingZhangApp.bumpDataVersion()
+                },
+                onCustom = {
+                    budgetInput = ((settings?.monthlyBudgetCents ?: 0L) / 100)
+                        .takeIf { it > 0 }?.toString() ?: ""
+                    budgetEdit = 1
                 }
-            }
+            )
 
-            Spacer(Modifier.height(14.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("每月预算", style = MaterialTheme.typography.bodyMedium, color = Dz.InkSoft)
-                Spacer(Modifier.weight(1f))
-                Text(
-                    "¥${Money.yuan(settings?.monthlyBudgetCents ?: 300_000L)}",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = Dz.Ink
-                )
-                Spacer(Modifier.width(8.dp))
-                Box(
-                    Modifier
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(Dz.SakuraSoft)
-                        .clickable {
-                            budgetInput = ((settings?.monthlyBudgetCents ?: 300_000L) / 100).toString()
-                            budgetEdit = true
-                        }
-                        .padding(horizontal = 10.dp, vertical = 5.dp)
-                ) {
-                    Text("自定义", style = MaterialTheme.typography.labelSmall, color = Dz.SakuraDeep)
+            Spacer(Modifier.height(16.dp))
+
+            BudgetRow(
+                label = "每年预算",
+                cents = settings?.yearBudgetCents ?: 0L,
+                quick = listOf(
+                    30_000_00L to "3万", 50_000_00L to "5万", 100_000_00L to "10万"
+                ),
+                onQuick = {
+                    settings?.yearBudgetCents = it
+                    DingZhangApp.bumpDataVersion()
+                },
+                onCustom = {
+                    budgetInput = ((settings?.yearBudgetCents ?: 0L) / 100)
+                        .takeIf { it > 0 }?.toString() ?: ""
+                    budgetEdit = 2
                 }
-            }
-            Spacer(Modifier.height(6.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf(100_000L to "1000", 300_000L to "3000", 500_000L to "5000", 1_000_000L to "1万")
-                    .forEach { (cents, label) ->
-                        SettingChip(
-                            label = label,
-                            active = (settings?.monthlyBudgetCents ?: 300_000L) == cents
-                        ) {
-                            settings?.monthlyBudgetCents = cents
-                            DingZhangApp.bumpDataVersion()
-                        }
-                    }
-            }
+            )
 
             if (data.ignoredPayees.isNotEmpty()) {
                 Spacer(Modifier.height(14.dp))
@@ -910,6 +909,41 @@ private fun ThemeSwatch(
             color = pack.ink,
             maxLines = 1
         )
+    }
+}
+
+@Composable
+private fun BudgetRow(
+    label: String,
+    cents: Long,
+    quick: List<Pair<Long, String>>,
+    onQuick: (Long) -> Unit,
+    onCustom: () -> Unit
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = Dz.InkSoft)
+        Spacer(Modifier.weight(1f))
+        Text(
+            if (cents > 0) "¥${Money.yuan(cents)}" else "未设置",
+            style = MaterialTheme.typography.labelLarge,
+            color = if (cents > 0) Dz.Ink else Dz.InkFaint
+        )
+        Spacer(Modifier.width(8.dp))
+        Box(
+            Modifier
+                .clip(RoundedCornerShape(10.dp))
+                .background(Dz.SakuraSoft)
+                .clickable { onCustom() }
+                .padding(horizontal = 10.dp, vertical = 5.dp)
+        ) {
+            Text("自定义", style = MaterialTheme.typography.labelSmall, color = Dz.SakuraDeep)
+        }
+    }
+    Spacer(Modifier.height(8.dp))
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        quick.forEach { (c, l) ->
+            SettingChip(label = l, active = cents == c) { onQuick(c) }
+        }
     }
 }
 

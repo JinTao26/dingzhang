@@ -16,9 +16,9 @@ class Settings(context: Context) {
         get() = sp.getBoolean("auto_commit", true)
         set(v) = sp.edit().putBoolean("auto_commit", v).apply()
 
-    /** 小于这个金额不进账，避免 1 分钱测试单和订阅试扣款刷屏。单位：分。 */
+    /** 小于这个金额不进账。默认 0（不过滤），这个设置项已经从界面上拿掉了。 */
     var ignoreBelowCents: Long
-        get() = sp.getLong("ignore_below", 100)
+        get() = sp.getLong("ignore_below", 0)
         set(v) = sp.edit().putLong("ignore_below", v).apply()
 
     /** 无障碍通道是否启用（用户在 App 内开关，真正生效还要系统授权）。 */
@@ -33,6 +33,11 @@ class Settings(context: Context) {
     var monthlyBudgetCents: Long
         get() = sp.getLong("budget", 300_00L)
         set(v) = sp.edit().putLong("budget", v).apply()
+
+    /** 每年预算。0 表示没设，不参与任何显示。 */
+    var yearBudgetCents: Long
+        get() = sp.getLong("budget_year", 0L)
+        set(v) = sp.edit().putLong("budget_year", v).apply()
 
     var lastBillImportAt: Long
         get() = sp.getLong("last_import", 0L)

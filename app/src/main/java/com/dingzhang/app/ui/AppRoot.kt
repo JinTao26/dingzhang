@@ -87,6 +87,7 @@ data class AppData(
     val monthTxns: List<Txn> = emptyList(),
     val daysInMonth: Int = 30,
     val budgetCents: Long = 0,
+    val yearBudgetCents: Long = 0,
     val sourceCounts: Map<Source, Int> = emptyMap(),
     // ---- 年视图 ----
     val yearLabel: String = "",
@@ -175,6 +176,7 @@ private fun loadAppData(month: String): AppData {
         monthTxns = monthList,
         daysInMonth = days,
         budgetCents = settings?.monthlyBudgetCents ?: 0,
+        yearBudgetCents = settings?.yearBudgetCents ?: 0,
         sourceCounts = dao.countBySource(start, end),
         yearLabel = year.toString(),
         yearExpense = yExpense,

@@ -145,7 +145,7 @@ fun StatsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
         ScopeTabs(yearScope) { yearScope = it }
 
         Spacer(Modifier.height(12.dp))
-        SummaryCard(expense, income, yearScope)
+        SummaryCard(expense, income, yearScope, data.yearBudgetCents)
 
         if (cats.isEmpty()) {
             Spacer(Modifier.height(12.dp))
@@ -289,7 +289,7 @@ private fun RowScope.ScopeChip(text: String, active: Boolean, onClick: () -> Uni
 
 /** 支出 / 收入 / 结余。收入以前只能靠手记，现在银行入账提醒也能进来。 */
 @Composable
-private fun SummaryCard(expense: Long, income: Long, isYear: Boolean) {
+private fun SummaryCard(expense: Long, income: Long, isYear: Boolean, yearBudget: Long) {
     val net = income - expense
     DzCard(padding = 18.dp) {
         Row(verticalAlignment = Alignment.Top) {
@@ -329,6 +329,25 @@ private fun SummaryCard(expense: Long, income: Long, isYear: Boolean) {
                     fontWeight = FontWeight.Bold,
                     color = if (net >= 0) Dz.Income else Dz.Expense,
                     modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+        }
+
+        if (isYear && yearBudget > 0) {
+            val used = expense * 100f / yearBudget
+            Spacer(Modifier.height(12.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "年预算 ¥${Money.yuan(yearBudget)} · 已用 ${used.toInt()}%",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (used > 100f) Dz.Expense else Dz.InkSoft
+                )
+                Spacer(Modifier.weight(1f))
+                Text(
+                    if (expense > yearBudget) "超了 ¥${Money.yuan(expense - yearBudget)}"
+                    else "还剩 ¥${Money.yuan(yearBudget - expense)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (expense > yearBudget) Dz.Expense else Dz.Income
                 )
             }
         }
