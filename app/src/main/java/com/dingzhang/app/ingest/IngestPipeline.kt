@@ -90,7 +90,7 @@ object IngestPipeline {
                     if (!dup.categoryLocked && payee.isNotBlank()) {
                         val rs = cachedRules ?: dao.rules()
                         val cls = CategoryEngine.classify(payee, c.note, c.raw, rs)
-                        if (cls.matched && cls.kind == dup.kind && cls.categoryId != dup.categoryId) {
+                        if (cls.matched != null && cls.kind == dup.kind && cls.categoryId != dup.categoryId) {
                             dao.updateCategory(dup.id, cls.categoryId, false)
                             Log.d(TAG, "按账单重算分类 #${dup.id} ${dup.categoryId} -> ${cls.categoryId}")
                         }
