@@ -109,6 +109,12 @@ fun HomeScreen(
                 DingZhangApp.bumpDataVersion()
                 pickTxn = null
                 Toast.makeText(ctx, "已删除", Toast.LENGTH_SHORT).show()
+            },
+            onSetKind = { k ->
+                IngestPipeline.dao?.setKind(txn.id, k)
+                DingZhangApp.bumpDataVersion()
+                pickTxn = txn.copy(kind = k)
+                Toast.makeText(ctx, kindToast(k), Toast.LENGTH_SHORT).show()
             }
         )
     }

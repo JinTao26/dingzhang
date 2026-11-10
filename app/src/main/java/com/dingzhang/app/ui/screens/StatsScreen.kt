@@ -43,6 +43,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.dingzhang.app.DingZhangApp
 import com.dingzhang.app.core.model.Categories
 import com.dingzhang.app.core.model.CategoryTotal
 import com.dingzhang.app.core.model.Dates
@@ -57,6 +58,7 @@ import com.dingzhang.app.ui.components.EmptyHint
 import com.dingzhang.app.ui.components.MonthPickerDialog
 import com.dingzhang.app.ui.components.ui
 import com.dingzhang.app.ui.shiftMonth
+import com.dingzhang.app.ingest.IngestPipeline
 import com.dingzhang.app.ui.theme.Dz
 import kotlin.math.abs
 
@@ -72,20 +74,42 @@ fun StatsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
     var yearScope by remember { mutableStateOf(false) }
     var showPicker by remember { mutableStateOf(false) }
     var detailCategory by remember { mutableStateOf<String?>(null) }
+    var detailTxn by remember { mutableStateOf<Txn?>(null) }
+    // 只在这次看的时候过滤，不动库里的数据：单笔 ≥ 200 元的不算「日常」
+    var skipBig by remember { mutableStateOf(false) }
+    val bigCut = 20_000L
 
-    val cats = if (yearScope) data.yearByCategory else data.byCategory
+    val catsBase = if (yearScope) data.yearByCategory else data.byCategory
+    val incomeCatsBase = if (yearScope) data.yearIncomeByCategory else data.incomeByCategory
+    val txns = if (yearScope) data.yearTxns else data.monthTxns
+    val viewTxns = if (skipBig) txns.filter { it.amountCents < bigCut } else txns
+
+    val cats = if (skipBig) aggCats(viewTxns, false) else catsBase
     // 收入来源可能很多（工资、奖金、报销、红包、理财），单独一块列在下面
-    val incomeCats = if (yearScope) data.yearIncomeByCategory else data.incomeByCategory
+    val incomeCats = if (skipBig) aggCats(viewTxns, true) else incomeCatsBase
     val incomeTotal = incomeCats.sumOf { it.cents }
     // 环图与百分比的分母用分类合计，保证环内自洽；
     // 顶部那个「支出」用 SQL 的合计（它包含净额为负、被 HAVING 挡掉的分类）
     val ringTotal = cats.sumOf { it.cents }
-    val expense = if (yearScope) data.yearExpense else data.monthExpense
-    val income = if (yearScope) data.yearIncome else data.monthIncome
-    val count = if (yearScope) data.yearCount else data.monthCount
+    val expense = if (skipBig) netExpense(viewTxns)
+    else if (yearScope) data.yearExpense else data.monthExpense
+    val income = if (skipBig) viewTxns.filter { it.kind == TxnKind.INCOME }.sumOf { it.amountCents }
+    else if (yearScope) data.yearIncome else data.monthIncome
+    val count = if (skipBig) viewTxns.count { it.kind != TxnKind.TRANSFER }
+    else if (yearScope) data.yearCount else data.monthCount
+    // 柱状图也按同一口径重算，避免上下数字对不上
+    val dailyMap = if (!skipBig) data.daily else viewTxns
+        .filter { it.kind == TxnKind.EXPENSE || it.kind == TxnKind.REFUND }
+        .groupBy { Dates.dayOf(it.occurredAt).takeLast(2).toIntOrNull() ?: 0 }
+        .filterKeys { it > 0 }
+        .mapValues { e -> e.value.sumOf { if (it.kind == TxnKind.REFUND) -it.amountCents else it.amountCents } }
+    val monthlyMap = if (!skipBig) data.monthly else viewTxns
+        .filter { it.kind == TxnKind.EXPENSE || it.kind == TxnKind.REFUND }
+        .groupBy { Dates.monthOf(it.occurredAt) }
+        .mapValues { e -> e.value.sumOf { if (it.kind == TxnKind.REFUND) -it.amountCents else it.amountCents } }
+
     val title = if (yearScope) "${data.yearLabel} 年" else data.monthLabel
     val sources = if (yearScope) data.yearSourceCounts else data.sourceCounts
-    val txns = if (yearScope) data.yearTxns else data.monthTxns
 
     if (showPicker) {
         MonthPickerDialog(
@@ -98,9 +122,38 @@ fun StatsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
     detailCategory?.let { cid ->
         CategoryDetailDialog(
             categoryId = cid,
-            txns = txns.filter { it.categoryId == cid },
+            txns = viewTxns.filter { it.categoryId == cid },
             isYear = yearScope,
-            onDismiss = { detailCategory = null }
+            onDismiss = { detailCategory = null },
+            onTxnClick = { detailTxn = it }
+        )
+    }
+
+    // 统计页里点开一笔：和明细页一样能改分类、改商户名、改这笔记成什么
+    detailTxn?.let { t ->
+        TxnDetailDialog(
+            txn = t,
+            onDismiss = { detailTxn = null },
+            onPickCategory = { catId ->
+                IngestPipeline.correctCategory(t.id, catId)
+                DingZhangApp.bumpDataVersion()
+                detailTxn = null
+            },
+            onRenamePayee = { name ->
+                IngestPipeline.dao?.updatePayee(t.id, name)
+                DingZhangApp.bumpDataVersion()
+                detailTxn = t.copy(payee = name)
+            },
+            onDelete = {
+                IngestPipeline.dao?.delete(t.id)
+                DingZhangApp.bumpDataVersion()
+                detailTxn = null
+            },
+            onSetKind = { k ->
+                IngestPipeline.dao?.setKind(t.id, k)
+                DingZhangApp.bumpDataVersion()
+                detailTxn = t.copy(kind = k)
+            }
         )
     }
 
@@ -143,6 +196,9 @@ fun StatsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
 
         Spacer(Modifier.height(10.dp))
         ScopeTabs(yearScope) { yearScope = it }
+
+        Spacer(Modifier.height(10.dp))
+        DailyOnlyRow(skipBig, bigCut) { skipBig = it }
 
         Spacer(Modifier.height(12.dp))
         SummaryCard(expense, income, yearScope, data.yearBudgetCents)
@@ -193,7 +249,7 @@ fun StatsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                     Text("单位：元", style = MaterialTheme.typography.labelSmall, color = Dz.InkFaint)
                 }
                 Spacer(Modifier.height(12.dp))
-                if (yearScope) MonthlyBars(data) else DailyBars(data)
+                if (yearScope) MonthlyBars(monthlyMap, data.yearLabel) else DailyBars(dailyMap, data.daysInMonth)
             }
         }
 
@@ -283,6 +339,66 @@ private fun RowScope.ScopeChip(text: String, active: Boolean, onClick: () -> Uni
             style = MaterialTheme.typography.labelLarge,
             color = if (active) Dz.SakuraDeep else Dz.InkFaint,
             fontWeight = if (active) FontWeight.Bold else FontWeight.Normal
+        )
+    }
+}
+
+/** 把一批流水按分类归拢，退款冲减支出。skipBig 打开时用它重算，避免数字对不上。 */
+private fun aggCats(txns: List<Txn>, income: Boolean): List<CategoryTotal> {
+    val sums = HashMap<String, Long>()
+    val counts = HashMap<String, Int>()
+    txns.forEach { t ->
+        val hit = if (income) t.kind == TxnKind.INCOME
+        else (t.kind == TxnKind.EXPENSE || t.kind == TxnKind.REFUND)
+        if (!hit) return@forEach
+        val v = if (t.kind == TxnKind.REFUND) -t.amountCents else t.amountCents
+        sums[t.categoryId] = (sums[t.categoryId] ?: 0L) + v
+        counts[t.categoryId] = (counts[t.categoryId] ?: 0) + 1
+    }
+    return sums.entries
+        .filter { it.value > 0 }
+        .sortedByDescending { it.value }
+        .map { CategoryTotal(it.key, it.value, counts[it.key] ?: 0) }
+}
+
+/** 支出净额：支出减去退款，转账不算。 */
+private fun netExpense(txns: List<Txn>): Long = txns.fold(0L) { acc, t ->
+    acc + when (t.kind) {
+        TxnKind.EXPENSE -> t.amountCents
+        TxnKind.REFUND -> -t.amountCents
+        else -> 0L
+    }
+}
+
+/** 「只看日常」开关。只在这次看的时候过滤，库里的数据一个字不动。 */
+@Composable
+private fun DailyOnlyRow(on: Boolean, cutCents: Long, onChange: (Boolean) -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(if (on) Dz.SakuraSoft else Dz.Cream)
+            .clickable { onChange(!on) }
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                if (on) "只看日常消费 · 已排除大额" else "只看日常消费",
+                style = MaterialTheme.typography.titleSmall,
+                color = if (on) Dz.SakuraDeep else Dz.InkSoft
+            )
+            Text(
+                "单笔 ≥ ¥${Money.short(cutCents)} 的先不算，AA 和大件分开看",
+                style = MaterialTheme.typography.labelSmall,
+                color = Dz.InkFaint,
+                modifier = Modifier.padding(top = 1.dp)
+            )
+        }
+        Text(
+            if (on) "开" else "关",
+            style = MaterialTheme.typography.labelLarge,
+            color = if (on) Dz.SakuraDeep else Dz.InkFaint
         )
     }
 }
@@ -551,7 +667,8 @@ private fun CategoryDetailDialog(
     categoryId: String,
     txns: List<Txn>,
     isYear: Boolean,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onTxnClick: (Txn) -> Unit
 ) {
     val cat = Categories.of(categoryId)
     val net = txns.fold(0L) { acc, t ->
@@ -608,7 +725,9 @@ private fun CategoryDetailDialog(
                         Row(
                             Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 9.dp),
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable { onTxnClick(t) }
+                                .padding(vertical = 9.dp, horizontal = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(Modifier.weight(1f)) {
@@ -659,8 +778,8 @@ private fun signedText(t: Txn): String = when (t.kind) {
 
 /** 月视图：这个月每天花了多少。 */
 @Composable
-private fun DailyBars(data: AppData) {
-    val max = (data.daily.values.maxOrNull() ?: 0L).coerceAtLeast(1L)
+private fun DailyBars(daily: Map<Int, Long>, daysInMonth: Int) {
+    val max = (daily.values.maxOrNull() ?: 0L).coerceAtLeast(1L)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -668,25 +787,24 @@ private fun DailyBars(data: AppData) {
         horizontalArrangement = Arrangement.spacedBy(2.dp),
         verticalAlignment = Alignment.Bottom
     ) {
-        for (day in 1..data.daysInMonth) {
-            val v = data.daily[day] ?: 0L
+        for (day in 1..daysInMonth) {
+            val v = (daily[day] ?: 0L).coerceAtLeast(0L)
             Bar(v, max)
         }
     }
     Spacer(Modifier.height(6.dp))
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text("1", style = MaterialTheme.typography.labelSmall, color = Dz.InkFaint)
-        Text("${data.daysInMonth / 2}", style = MaterialTheme.typography.labelSmall, color = Dz.InkFaint)
-        Text("${data.daysInMonth}", style = MaterialTheme.typography.labelSmall, color = Dz.InkFaint)
+        Text("${daysInMonth / 2}", style = MaterialTheme.typography.labelSmall, color = Dz.InkFaint)
+        Text("$daysInMonth", style = MaterialTheme.typography.labelSmall, color = Dz.InkFaint)
     }
 }
 
 /** 年视图：这一年每个月花了多少。12 根柱子，比不了更粗的粒度有意义。 */
 @Composable
-private fun MonthlyBars(data: AppData) {
-    val year = data.yearLabel
+private fun MonthlyBars(monthly: Map<String, Long>, year: String) {
     val vals = (1..12).map { m ->
-        data.monthly["$year-${m.toString().padStart(2, '0')}"] ?: 0L
+        (monthly["$year-${m.toString().padStart(2, '0')}"] ?: 0L).coerceAtLeast(0L)
     }
     val max = (vals.maxOrNull() ?: 0L).coerceAtLeast(1L)
     Row(

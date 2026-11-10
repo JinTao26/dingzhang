@@ -505,6 +505,12 @@ fun BillsScreen(
                 DingZhangApp.bumpDataVersion()
                 selected = null
                 Toast.makeText(ctx, "已删除", Toast.LENGTH_SHORT).show()
+            },
+            onSetKind = { k ->
+                IngestPipeline.dao?.setKind(txn.id, k)
+                DingZhangApp.bumpDataVersion()
+                selected = txn.copy(kind = k)
+                Toast.makeText(ctx, kindToast(k), Toast.LENGTH_SHORT).show()
             }
         )
     }
@@ -626,7 +632,8 @@ fun TxnDetailDialog(
     onDismiss: () -> Unit,
     onPickCategory: (String) -> Unit,
     onRenamePayee: (String) -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onSetKind: (TxnKind) -> Unit
 ) {
     var renameOpen by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
@@ -741,6 +748,20 @@ fun TxnDetailDialog(
                     maxLines = 1,
                     modifier = Modifier.padding(top = 8.dp)
                 )
+            }
+
+            Spacer(Modifier.height(16.dp))
+            Text("这笔算什么", style = MaterialTheme.typography.titleMedium, color = Dz.Ink)
+            Text(
+                "别人转来的 AA 钱标成「退款」，会从那一类支出里扣掉，不算成收入",
+                style = MaterialTheme.typography.bodySmall,
+                color = Dz.InkFaint,
+                modifier = Modifier.padding(top = 2.dp, bottom = 10.dp)
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                KindChip("支出", txn.kind == TxnKind.EXPENSE) { onSetKind(TxnKind.EXPENSE) }
+                KindChip("收入", txn.kind == TxnKind.INCOME) { onSetKind(TxnKind.INCOME) }
+                KindChip("退款", txn.kind == TxnKind.REFUND) { onSetKind(TxnKind.REFUND) }
             }
 
             Spacer(Modifier.height(16.dp))
@@ -884,6 +905,27 @@ private fun CategoryCell(id: String, active: Boolean, modifier: Modifier, onClic
             modifier = Modifier.padding(top = 4.dp)
         )
     }
+}
+
+internal fun kindToast(k: TxnKind): String = when (k) {
+    TxnKind.REFUND -> "已标成退款，会从这一类支出里扣掉"
+    TxnKind.INCOME -> "已标成收入"
+    TxnKind.EXPENSE -> "已标成支出"
+    TxnKind.TRANSFER -> "已标成转账"
+}
+
+@Composable
+private fun KindChip(text: String, active: Boolean, onClick: () -> Unit) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelMedium,
+        color = if (active) Color.White else Dz.InkSoft,
+        modifier = Modifier
+            .clip(RoundedCornerShape(11.dp))
+            .background(if (active) Dz.Sakura else Dz.Cream)
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp, vertical = 7.dp)
+    )
 }
 
 @Composable
