@@ -300,7 +300,7 @@ private fun SummaryCard(expense: Long, income: Long, isYear: Boolean, yearBudget
                     color = Dz.InkFaint
                 )
                 Text(
-                    "¥${Money.yuan(expense)}",
+                    "¥${Money.short(expense)}",
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = Dz.Ink,
@@ -314,7 +314,7 @@ private fun SummaryCard(expense: Long, income: Long, isYear: Boolean, yearBudget
                     color = Dz.InkFaint
                 )
                 Text(
-                    "¥${Money.yuan(income)}",
+                    "¥${Money.short(income)}",
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = Dz.Income,
@@ -324,7 +324,7 @@ private fun SummaryCard(expense: Long, income: Long, isYear: Boolean, yearBudget
             Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
                 Text("结余", style = MaterialTheme.typography.labelSmall, color = Dz.InkFaint)
                 Text(
-                    (if (net >= 0) "+" else "-") + "¥${Money.yuan(abs(net))}",
+                    (if (net >= 0) "+" else "-") + "¥${Money.short(abs(net))}",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = if (net >= 0) Dz.Income else Dz.Expense,
@@ -338,14 +338,14 @@ private fun SummaryCard(expense: Long, income: Long, isYear: Boolean, yearBudget
             Spacer(Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "年预算 ¥${Money.yuan(yearBudget)} · 已用 ${used.toInt()}%",
+                    "年预算 ¥${Money.short(yearBudget)} · 已用 ${used.toInt()}%",
                     style = MaterialTheme.typography.bodySmall,
                     color = if (used > 100f) Dz.Expense else Dz.InkSoft
                 )
                 Spacer(Modifier.weight(1f))
                 Text(
-                    if (expense > yearBudget) "超了 ¥${Money.yuan(expense - yearBudget)}"
-                    else "还剩 ¥${Money.yuan(yearBudget - expense)}",
+                    if (expense > yearBudget) "超了 ¥${Money.short(expense - yearBudget)}"
+                    else "还剩 ¥${Money.short(yearBudget - expense)}",
                     style = MaterialTheme.typography.bodySmall,
                     color = if (expense > yearBudget) Dz.Expense else Dz.Income
                 )
@@ -391,14 +391,14 @@ private fun RingCard(
                     color = Dz.InkFaint
                 )
                 Text(
-                    "¥${Money.yuan(ringTotal)}",
+                    "¥${Money.short(ringTotal)}",
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
                     color = Dz.Ink
                 )
                 Text(
-                    if (isYear) "月均 ¥${Money.yuan(ringTotal / 12)}"
-                    else "日均 ¥${Money.yuan(ringTotal / 30)}",
+                    if (isYear) "月均 ¥${Money.short(ringTotal / 12)}"
+                    else "日均 ¥${Money.short(ringTotal / 30)}",
                     style = MaterialTheme.typography.labelSmall,
                     color = Dz.InkFaint
                 )
@@ -433,7 +433,7 @@ private fun RingCard(
                                     maxLines = 1
                                 )
                                 Text(
-                                    "¥${Money.yuan(c.cents)} · ${(c.cents.toFloat() / ringTotal * 100).toInt()}%",
+                                    "¥${Money.short(c.cents)} · ${(c.cents.toFloat() / ringTotal * 100).toInt()}%",
                                     fontSize = 10.sp,
                                     color = Dz.InkFaint,
                                     maxLines = 1
@@ -511,7 +511,7 @@ private fun CategoryBar(c: CategoryTotal, total: Long, onClick: () -> Unit) {
                 )
                 Spacer(Modifier.weight(1f))
                 Text(
-                    "¥${Money.yuan(c.cents)}",
+                    "¥${Money.short(c.cents)}",
                     style = MaterialTheme.typography.labelLarge,
                     color = Dz.Ink,
                     textAlign = TextAlign.End,
@@ -574,7 +574,7 @@ private fun CategoryDetailDialog(
                 Column(Modifier.weight(1f).padding(start = 10.dp)) {
                     Text(cat.name, style = MaterialTheme.typography.titleMedium, color = Dz.Ink)
                     Text(
-                        "${txns.size} 笔 · 合计 ¥${Money.yuan(net)}",
+                        "${txns.size} 笔 · 合计 ¥${Money.short(net)}",
                         style = MaterialTheme.typography.labelSmall,
                         color = Dz.InkFaint
                     )
@@ -651,10 +651,10 @@ private fun CategoryDetailDialog(
 }
 
 private fun signedText(t: Txn): String = when (t.kind) {
-    TxnKind.REFUND -> "+¥${Money.yuan(t.amountCents)}"
-    TxnKind.INCOME -> "+¥${Money.yuan(t.amountCents)}"
-    TxnKind.TRANSFER -> "¥${Money.yuan(t.amountCents)}"
-    TxnKind.EXPENSE -> "-¥${Money.yuan(t.amountCents)}"
+    TxnKind.REFUND -> "+¥${Money.short(t.amountCents)}"
+    TxnKind.INCOME -> "+¥${Money.short(t.amountCents)}"
+    TxnKind.TRANSFER -> "¥${Money.short(t.amountCents)}"
+    TxnKind.EXPENSE -> "-¥${Money.short(t.amountCents)}"
 }
 
 /** 月视图：这个月每天花了多少。 */

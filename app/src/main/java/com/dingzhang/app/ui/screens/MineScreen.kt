@@ -924,7 +924,7 @@ private fun BudgetRow(
         Text(label, style = MaterialTheme.typography.bodyMedium, color = Dz.InkSoft)
         Spacer(Modifier.weight(1f))
         Text(
-            if (cents > 0) "¥${Money.yuan(cents)}" else "未设置",
+            if (cents > 0) "¥${Money.short(cents)}" else "未设置",
             style = MaterialTheme.typography.labelLarge,
             color = if (cents > 0) Dz.Ink else Dz.InkFaint
         )

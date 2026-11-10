@@ -213,7 +213,7 @@ fun HomeScreen(
                     if (budget > 0) {
                         val left = budget - data.monthExpense
                         Text(
-                            if (left >= 0) "预算还剩 ¥${Money.yuan(left)}" else "超了 ¥${Money.yuan(-left)}",
+                            if (left >= 0) "预算还剩 ¥${Money.short(left)}" else "超了 ¥${Money.short(-left)}",
                             color = Color.White.copy(alpha = 0.92f),
                             style = MaterialTheme.typography.labelSmall
                         )
@@ -228,7 +228,7 @@ fun HomeScreen(
                         modifier = Modifier.padding(bottom = 7.dp, end = 3.dp)
                     )
                     Text(
-                        Money.yuan(data.monthExpense),
+                        Money.short(data.monthExpense),
                         color = Color.White,
                         style = MaterialTheme.typography.displayLarge,
                         maxLines = 1,
@@ -242,7 +242,7 @@ fun HomeScreen(
                 EnergyBar(ratio, Modifier.fillMaxWidth(), 8.dp)
                 Spacer(Modifier.height(10.dp))
                 Text(
-                    "共 ${data.monthCount} 笔 · 今天 ¥${Money.yuan(data.todayExpense)}",
+                    "共 ${data.monthCount} 笔 · 今天 ¥${Money.short(data.todayExpense)}",
                     color = Color.White.copy(alpha = 0.82f),
                     style = MaterialTheme.typography.bodySmall
                 )
@@ -253,14 +253,14 @@ fun HomeScreen(
                     val yearRatio = data.yearExpense.toFloat() / data.yearBudgetCents.toFloat()
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            "年预算 ¥${Money.yuan(data.yearBudgetCents)} · 已用 ${(yearRatio * 100).coerceAtLeast(0f).toInt()}%",
+                            "年预算 ¥${Money.short(data.yearBudgetCents)} · 已用 ${(yearRatio * 100).coerceAtLeast(0f).toInt()}%",
                             color = Color.White.copy(alpha = 0.82f),
                             style = MaterialTheme.typography.bodySmall
                         )
                         Spacer(Modifier.weight(1f))
                         val yLeft = data.yearBudgetCents - data.yearExpense
                         Text(
-                            if (yLeft >= 0) "还剩 ¥${Money.yuan(yLeft)}" else "超了 ¥${Money.yuan(-yLeft)}",
+                            if (yLeft >= 0) "还剩 ¥${Money.short(yLeft)}" else "超了 ¥${Money.short(-yLeft)}",
                             color = Color.White.copy(alpha = 0.92f),
                             style = MaterialTheme.typography.labelSmall
                         )
@@ -275,8 +275,8 @@ fun HomeScreen(
 
         // ---------- 三个小指标 ----------
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            MetricChip("今日支出", "¥" + Money.yuan(data.todayExpense), Dz.Sakura, Modifier.weight(1f))
-            MetricChip("本月收入", "¥" + Money.yuan(data.monthIncome), Dz.Mint, Modifier.weight(1f))
+            MetricChip("今日支出", "¥" + Money.short(data.todayExpense), Dz.Sakura, Modifier.weight(1f))
+            MetricChip("本月收入", "¥" + Money.short(data.monthIncome), Dz.Mint, Modifier.weight(1f))
             MetricChip("记账笔数", "${data.monthCount}", Dz.Lilac, Modifier.weight(1f))
         }
 
@@ -319,7 +319,7 @@ fun HomeScreen(
                     Text("在自动扣的钱", style = MaterialTheme.typography.titleLarge, color = Dz.Ink)
                     Spacer(Modifier.weight(1f))
                     Text(
-                        "约 ¥${Money.yuan(RecurringDetector.monthlyTotal(data.recurring))}/月",
+                        "约 ¥${Money.short(RecurringDetector.monthlyTotal(data.recurring))}/月",
                         style = MaterialTheme.typography.labelMedium,
                         color = Dz.SakuraDeep
                     )
@@ -352,7 +352,7 @@ fun HomeScreen(
                             )
                         }
                         Text(
-                            "¥${Money.yuan(r.amountCents)}",
+                            "¥${Money.short(r.amountCents)}",
                             style = MaterialTheme.typography.labelLarge,
                             color = Dz.Ink
                         )

@@ -42,13 +42,50 @@ object Money {
         return f.format(v)
     }
 
+    /**
+     * 界面上给人看的金额。规则：
+     * - 没小数就不硬补 .00，有几分就写几分；
+     * - 上万直接换成「万」，上亿换成「亿」，最多留一位小数 ——
+     *   免得一长串数字把一行挤爆，也免得一行里几千和十万一样长。
+     */
+    fun short(cents: Long): String {
+        val abs = kotlin.math.abs(cents)
+        return when {
+            abs >= 10_000_000_000L -> trim1(cents / 10_000_000_000.0) + "亿"
+            abs >= 1_000_000L -> trim1(cents / 1_000_000.0) + "万"
+            else -> wholeYuan(cents)
+        }
+    }
+
+    /** 12.0 -> "12"；12.35 -> "12.4" */
+    private fun trim1(v: Double): String {
+        val b = BigDecimal.valueOf(v)
+            .setScale(1, RoundingMode.HALF_UP)
+            .stripTrailingZeros()
+        return b.toPlainString()
+    }
+
+    /** 千分位整元；真有零头才带小数，且不吃掉 .5 这类常见值 */
+    private fun wholeYuan(cents: Long): String {
+        val neg = cents < 0
+        val abs = kotlin.math.abs(cents)
+        val yuanPart = java.text.DecimalFormat("#,##0").format(abs / 100)
+        val fen = abs % 100
+        val body = when {
+            fen == 0L -> yuanPart
+            fen % 10 == 0L -> "$yuanPart.${fen / 10}"
+            else -> "$yuanPart.${fen.toString().padStart(2, '0')}"
+        }
+        return if (neg) "-$body" else body
+    }
+
     /** 带正负号，用于列表右侧 */
     fun signed(cents: Long, kind: TxnKind): String = when (kind) {
-        TxnKind.EXPENSE -> "-" + yuan(cents)
-        TxnKind.INCOME -> "+" + yuan(cents)
-        TxnKind.TRANSFER -> yuan(cents)
+        TxnKind.EXPENSE -> "-" + short(cents)
+        TxnKind.INCOME -> "+" + short(cents)
+        TxnKind.TRANSFER -> short(cents)
         // 退款用负号：它减的是支出，不是加的收入
-        TxnKind.REFUND -> "-" + yuan(cents)
+        TxnKind.REFUND -> "-" + short(cents)
     }
 }
 
