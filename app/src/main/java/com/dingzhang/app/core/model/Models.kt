@@ -80,7 +80,9 @@ data class Txn(
     val externalId: String? = null, // 微信/支付宝交易单号
     val categoryLocked: Boolean = false,
     val account: String = "",       // 零钱 / 花呗 / 招行储蓄卡…
-    val fingerprint: String = ""
+    val fingerprint: String = "",
+    // 统计里算「日常」还是「大额」：0 按金额自动判，1 用户指定日常，2 用户指定大额
+    val bigClass: Int = 0
 )
 
 /** 用户教给它的分类规则，优先级高于内置词典。 */

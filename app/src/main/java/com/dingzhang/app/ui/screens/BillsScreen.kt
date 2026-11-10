@@ -511,6 +511,20 @@ fun BillsScreen(
                 DingZhangApp.bumpDataVersion()
                 selected = txn.copy(kind = k)
                 Toast.makeText(ctx, kindToast(k), Toast.LENGTH_SHORT).show()
+            },
+            onSetBig = { v ->
+                IngestPipeline.dao?.setBigClass(txn.id, v)
+                DingZhangApp.bumpDataVersion()
+                selected = txn.copy(bigClass = v)
+                Toast.makeText(
+                    ctx,
+                    when (v) {
+                        1 -> "已算进日常"
+                        2 -> "已算进大额"
+                        else -> "已恢复按金额自动判"
+                    },
+                    Toast.LENGTH_SHORT
+                ).show()
             }
         )
     }
@@ -633,7 +647,8 @@ fun TxnDetailDialog(
     onPickCategory: (String) -> Unit,
     onRenamePayee: (String) -> Unit,
     onDelete: () -> Unit,
-    onSetKind: (TxnKind) -> Unit
+    onSetKind: (TxnKind) -> Unit,
+    onSetBig: (Int) -> Unit = {}
 ) {
     var renameOpen by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
@@ -762,6 +777,20 @@ fun TxnDetailDialog(
                 KindChip("支出", txn.kind == TxnKind.EXPENSE) { onSetKind(TxnKind.EXPENSE) }
                 KindChip("收入", txn.kind == TxnKind.INCOME) { onSetKind(TxnKind.INCOME) }
                 KindChip("退款", txn.kind == TxnKind.REFUND) { onSetKind(TxnKind.REFUND) }
+            }
+
+            Spacer(Modifier.height(16.dp))
+            Text("算日常还是大额", style = MaterialTheme.typography.titleMedium, color = Dz.Ink)
+            Text(
+                "统计里的日常/大额默认按金额切，不对的话在这儿改一笔。大餐算日常、电器算大额都行",
+                style = MaterialTheme.typography.bodySmall,
+                color = Dz.InkFaint,
+                modifier = Modifier.padding(top = 2.dp, bottom = 10.dp)
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                KindChip("自动", txn.bigClass == 0) { onSetBig(0) }
+                KindChip("日常", txn.bigClass == 1) { onSetBig(1) }
+                KindChip("大额", txn.bigClass == 2) { onSetBig(2) }
             }
 
             Spacer(Modifier.height(16.dp))

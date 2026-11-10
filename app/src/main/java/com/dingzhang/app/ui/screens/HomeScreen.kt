@@ -115,6 +115,20 @@ fun HomeScreen(
                 DingZhangApp.bumpDataVersion()
                 pickTxn = txn.copy(kind = k)
                 Toast.makeText(ctx, kindToast(k), Toast.LENGTH_SHORT).show()
+            },
+            onSetBig = { v ->
+                IngestPipeline.dao?.setBigClass(txn.id, v)
+                DingZhangApp.bumpDataVersion()
+                pickTxn = txn.copy(bigClass = v)
+                Toast.makeText(
+                    ctx,
+                    when (v) {
+                        1 -> "已算进日常"
+                        2 -> "已算进大额"
+                        else -> "已恢复按金额自动判"
+                    },
+                    Toast.LENGTH_SHORT
+                ).show()
             }
         )
     }

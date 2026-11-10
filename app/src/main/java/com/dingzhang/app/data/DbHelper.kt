@@ -10,6 +10,7 @@ import android.database.sqlite.SQLiteOpenHelper
  */
 class DbHelper(context: Context) : SQLiteOpenHelper(context.applicationContext, NAME, null, VERSION) {
 
+    // big_class：0 按金额自动判 / 1 用户指定为日常 / 2 用户指定为大额
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
             """
@@ -28,7 +29,8 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context.applicationContext, 
                 external_id     TEXT,
                 category_locked INTEGER NOT NULL DEFAULT 0,
                 account         TEXT    NOT NULL DEFAULT '',
-                fingerprint     TEXT    NOT NULL DEFAULT ''
+                fingerprint     TEXT    NOT NULL DEFAULT '',
+                big_class       INTEGER NOT NULL DEFAULT 0
             )
             """.trimIndent()
         )
@@ -67,15 +69,14 @@ class DbHelper(context: Context) : SQLiteOpenHelper(context.applicationContext, 
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        // v0.3 之前没有线上数据，升级直接重建；正式发版要改成迁移脚本。
-        db.execSQL("DROP TABLE IF EXISTS txn")
-        db.execSQL("DROP TABLE IF EXISTS rule")
-        db.execSQL("DROP TABLE IF EXISTS import_job")
-        onCreate(db)
+        // 已经有真账在里面了，只能往前加列，绝不能重建表。
+        if (oldVersion < 2) {
+            db.execSQL("ALTER TABLE txn ADD COLUMN big_class INTEGER NOT NULL DEFAULT 0")
+        }
     }
 
     companion object {
         const val NAME = "dingzhang.db"
-        const val VERSION = 1
+        const val VERSION = 2
     }
 }

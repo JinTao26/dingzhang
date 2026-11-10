@@ -94,9 +94,15 @@ fun StatsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
     val catsBase = if (yearScope) data.yearByCategory else data.byCategory
     val incomeCatsBase = if (yearScope) data.yearIncomeByCategory else data.incomeByCategory
     val txns = if (yearScope) data.yearTxns else data.monthTxns
+    // 默认按金额切，但用户在详情里指名过的（大餐→日常、电器→大额）以他为准
+    fun isBig(t: Txn) = when (t.bigClass) {
+        1 -> false
+        2 -> true
+        else -> t.amountCents >= bigCut
+    }
     val viewTxns = when (view) {
-        1 -> txns.filter { it.amountCents < bigCut }
-        2 -> txns.filter { it.amountCents >= bigCut }
+        1 -> txns.filter { !isBig(it) }
+        2 -> txns.filter { isBig(it) }
         else -> txns
     }
 
@@ -211,6 +217,11 @@ fun StatsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                 IngestPipeline.dao?.setKind(t.id, k)
                 DingZhangApp.bumpDataVersion()
                 detailTxn = t.copy(kind = k)
+            },
+            onSetBig = { v ->
+                IngestPipeline.dao?.setBigClass(t.id, v)
+                DingZhangApp.bumpDataVersion()
+                detailTxn = t.copy(bigClass = v)
             }
         )
     }

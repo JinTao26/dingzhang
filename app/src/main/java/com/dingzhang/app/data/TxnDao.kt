@@ -33,6 +33,7 @@ class TxnDao(private val helper: DbHelper) {
             put("category_locked", if (txn.categoryLocked) 1 else 0)
             put("account", txn.account)
             put("fingerprint", txn.fingerprint)
+            put("big_class", txn.bigClass)
         }
         return helper.writableDatabase.insert("txn", null, cv)
     }
@@ -102,6 +103,13 @@ class TxnDao(private val helper: DbHelper) {
     fun setStatus(id: Long, status: TxnStatus) {
         helper.writableDatabase.update(
             "txn", ContentValues().apply { put("status", status.db) }, "id = ?", arrayOf(id.toString())
+        )
+    }
+
+    /** 手动指定这笔算日常还是大额（0 恢复成按金额自动判）。 */
+    fun setBigClass(id: Long, value: Int) {
+        helper.writableDatabase.update(
+            "txn", ContentValues().apply { put("big_class", value) }, "id = ?", arrayOf(id.toString())
         )
     }
 
@@ -397,7 +405,8 @@ class TxnDao(private val helper: DbHelper) {
         externalId = getString(getColumnIndexOrThrow("external_id")),
         categoryLocked = getInt(getColumnIndexOrThrow("category_locked")) == 1,
         account = getString(getColumnIndexOrThrow("account")) ?: "",
-        fingerprint = getString(getColumnIndexOrThrow("fingerprint")) ?: ""
+        fingerprint = getString(getColumnIndexOrThrow("fingerprint")) ?: "",
+        bigClass = getInt(getColumnIndexOrThrow("big_class"))
     )
 
     private fun Cursor.toList(): List<Txn> {
