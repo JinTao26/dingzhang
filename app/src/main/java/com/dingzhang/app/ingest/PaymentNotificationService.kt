@@ -92,6 +92,8 @@ class PaymentNotificationService : NotificationListenerService() {
                 outcome.txn?.categoryId ?: "other"
             )
             DingZhangApp.bumpDataVersion()
+        } else if (outcome.merged) {
+            DingZhangApp.bumpDataVersion()
         }
     }
 

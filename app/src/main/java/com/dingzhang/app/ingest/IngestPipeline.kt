@@ -55,6 +55,23 @@ object IngestPipeline {
 
     private fun isGenericPayee(s: String): Boolean = s.trim() in genericPayees
 
+    /**
+     * 「弱商户名」= 泛称，或者压根不像店名（不含店铺词、又太短或太长）。
+     *
+     * 为什么要单独判这个：页面猜错时可能写出「订单支付」「查看详情」这种名字，
+     * 它不是泛称，按老规则就永远不许被覆盖 —— 一笔错名锁死一辈子。
+     * 只要新来的名字更像店名，就允许覆盖；反过来不允许，免得好名字被烂名字冲掉。
+     */
+    private fun isWeakPayee(s: String): Boolean {
+        val t = s.trim()
+        if (t.isEmpty() || isGenericPayee(t)) return true
+        val shopHints = listOf(
+            "店", "超市", "公司", "餐厅", "饭", "面", "茶", "咖啡", "馆", "铺", "商行",
+            "广场", "中心", "苑", "里", "坊", "社", "药", "医", "站", "场", "院", "厅", "吧", "屋", "城"
+        )
+        return shopHints.none { t.contains(it) } && (t.length <= 3 || t.length > 20)
+    }
+
     // ------------------------------------------------------------------ 公共入口
 
     /**
@@ -106,8 +123,19 @@ object IngestPipeline {
                     // 同一笔钱被两条通道各记了一次。先记的那条常常只有泛称
                     // （银行短信里压根没有商户名），这次来了真名就顺手补上，
                     // 不必等用户去导账单
-                    if (isGenericPayee(dup.payee) && !isGenericPayee(payee)) {
+                    // 旧名字是泛称或不像店名，新名字更像店名 —— 才允许覆盖
+                    if (isWeakPayee(dup.payee) && !isWeakPayee(payee)) {
                         dao.updatePayee(dup.id, payee, c.account)
+                        // 商户名换了必须按新名字重算分类：否则「微信支付」补成「海底捞」
+                        // 之后还挂在「其他」上，等于白补。用户手动改过的分类不动。
+                        if (!dup.categoryLocked && dup.kind == TxnKind.EXPENSE) {
+                            val rs = cachedRules ?: dao.rules()
+                            val cls = CategoryEngine.classify(payee, c.note, c.raw, rs)
+                            if (cls.matched != null && cls.categoryId != dup.categoryId) {
+                                dao.updateCategory(dup.id, cls.categoryId, false)
+                                Log.d(TAG, "按新商户名重算分类 #${dup.id} ${dup.categoryId} -> ${cls.categoryId}")
+                            }
+                        }
                         Log.d(TAG, "补商户名 #${dup.id} ${dup.payee} -> $payee")
                         return Outcome(
                             false, "已补上商户名：$payee",

@@ -55,12 +55,20 @@ class PaymentAccessibilityService : AccessibilityService() {
     private fun parsePage(pkg: String) {
         if (!IngestPipeline.isReady) IngestPipeline.init(applicationContext)
 
+        // 等了 350ms，用户可能已经切到别的 App。窗口和事件包名对不上，
+        // 就拿错页面去解析了（微信记的成了支付宝的页面），所以先对一次。
+        val root = rootInActiveWindow ?: return
+        if (root.packageName?.toString() != pkg) {
+            Log.d(TAG, "窗口已切走，跳过本次解析")
+            return
+        }
+
         val now = System.currentTimeMillis()
         val need = if (lastParseOk[pkg] == true) 1200L else 350L
         if (now - (lastParseAt[pkg] ?: 0L) < need) return
+        // 拿到可用窗口才算一次解析，别让空窗口白白吃掉冷却时间
         lastParseAt[pkg] = now
 
-        val root = rootInActiveWindow ?: return
         val texts = ArrayList<String>(64)
         collectTexts(root, texts, 0)
         if (texts.isEmpty()) return
@@ -92,6 +100,9 @@ class PaymentAccessibilityService : AccessibilityService() {
                 outcome.txn?.amountCents ?: captured.amountCents,
                 outcome.txn?.categoryId ?: "other"
             )
+            DingZhangApp.bumpDataVersion()
+        } else if (outcome.merged) {
+            // 这笔记过了，但商户名/分类刚被补全，界面也得跟着变
             DingZhangApp.bumpDataVersion()
         }
     }
