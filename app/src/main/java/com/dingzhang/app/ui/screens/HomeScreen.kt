@@ -246,6 +246,28 @@ fun HomeScreen(
                     color = Color.White.copy(alpha = 0.82f),
                     style = MaterialTheme.typography.bodySmall
                 )
+
+                // 年预算放在这张卡最下面：看这个月的同时也能知道今年用了多少
+                if (data.yearBudgetCents > 0) {
+                    Spacer(Modifier.height(10.dp))
+                    val yearRatio = data.yearExpense.toFloat() / data.yearBudgetCents.toFloat()
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "年预算 ¥${Money.yuan(data.yearBudgetCents)} · 已用 ${(yearRatio * 100).coerceAtLeast(0f).toInt()}%",
+                            color = Color.White.copy(alpha = 0.82f),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Spacer(Modifier.weight(1f))
+                        val yLeft = data.yearBudgetCents - data.yearExpense
+                        Text(
+                            if (yLeft >= 0) "还剩 ¥${Money.yuan(yLeft)}" else "超了 ¥${Money.yuan(-yLeft)}",
+                            color = Color.White.copy(alpha = 0.92f),
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    EnergyBar(yearRatio, Modifier.fillMaxWidth(), 5.dp)
+                }
             }
         }
 
