@@ -65,6 +65,15 @@ object IngestPipeline {
     private fun isWeakPayee(s: String): Boolean {
         val t = s.trim()
         if (t.isEmpty() || isGenericPayee(t)) return true
+        // 页面上的状态词、按钮词混进来时（「订单支付」「查看交易详情」），
+        // 这种名字不算真店名，必须允许被后面更准的名字覆盖掉
+        val pageWords = listOf(
+            "支付", "付款", "收款", "查看", "详情", "账单", "订单", "交易", "成功", "完成",
+            "确认", "取消", "返回", "关闭", "更多", "帮助", "客服", "优惠", "立减", "积分",
+            "余额", "零钱", "扫码", "碰一下", "首页", "我的", "服务"
+        )
+        if (pageWords.any { t.contains(it) }) return true
+
         val shopHints = listOf(
             "店", "超市", "公司", "餐厅", "饭", "面", "茶", "咖啡", "馆", "铺", "商行",
             "广场", "中心", "苑", "里", "坊", "社", "药", "医", "站", "场", "院", "厅", "吧", "屋", "城"
@@ -94,7 +103,15 @@ object IngestPipeline {
         }
 
         // ---- 跨通道去重 / 对账 ----
-        val dup = dao.findNearDuplicate(c.wallet, c.amountCents, c.occurredAt, DUP_WINDOW_MS)
+        // 有交易单号就先按单号找：号相同一定是同一笔，
+        // 别让「同商户同金额的两笔」因为时间挨得近被错并成一笔。
+        val byNo = c.externalId?.let { dao.findByExternalId(c.wallet, it) }
+        // 单号找不到时按「钱包 + 金额 + 方向 + 时间」找；先按方向收窄，
+        // 否则 50 元消费和 50 元退款会互相被当成重复
+        val dup = byNo ?: dao.findNearDuplicate(
+            c.wallet, c.amountCents, c.occurredAt, DUP_WINDOW_MS,
+            kindDb = (c.kindHint ?: TxnKind.EXPENSE).db
+        )
         if (dup != null) {
             val incomingIsBill = c.source == Source.BILL_IMPORT
             val existingIsBill = dup.source == Source.BILL_IMPORT
@@ -191,7 +208,7 @@ object IngestPipeline {
             rawText = c.raw.take(300),
             externalId = c.billNo ?: c.externalId,
             account = c.account,
-            fingerprint = fingerprintOf(c.wallet, c.amountCents, c.payee)
+            fingerprint = fingerprintOf(c.wallet, c.amountCents, c.payee, c.occurredAt)
         )
 
         val id = dao.insert(txn)
@@ -227,7 +244,7 @@ object IngestPipeline {
             source = Source.MANUAL,
             status = TxnStatus.CONFIRMED,
             categoryLocked = true,
-            fingerprint = fingerprintOf(wallet, amountCents, payee)
+            fingerprint = fingerprintOf(wallet, amountCents, payee, occurredAt)
         )
         val id = dao.insert(txn)
         if (id <= 0) return null
@@ -430,8 +447,13 @@ object IngestPipeline {
         return pairs.firstOrNull { h.contains(it.first) }?.second
     }
 
-    fun fingerprintOf(wallet: Wallet, amountCents: Long, payee: String): String {
-        val minuteBucket = System.currentTimeMillis() / (10 * 60 * 1000L)
-        return "${wallet.db}|$amountCents|$minuteBucket|${payee.take(8)}"
+    /**
+     * 指纹用于「备份恢复时同一笔别重复导入」，所以必须锚在交易发生时间上。
+     * 以前用的是 System.currentTimeMillis()，恢复备份时同一笔会被算成新指纹，
+     * 换个时间点恢复就可能整批重复导入。
+     */
+    fun fingerprintOf(wallet: Wallet, amountCents: Long, payee: String, at: Long): String {
+        val tenMinBucket = at / (10 * 60 * 1000L)
+        return "${wallet.db}|$amountCents|$tenMinBucket|${payee.take(8)}"
     }
 }

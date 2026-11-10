@@ -43,11 +43,43 @@ class TxnDao(private val helper: DbHelper) {
      * 判据：同渠道 + 同金额 + 时间差在 windowMs 内。
      * 之所以不用唯一索引，是因为同一天同金额同商户连买两次是真实存在的，硬性唯一会吞单。
      */
-    fun findNearDuplicate(wallet: Wallet, amountCents: Long, at: Long, windowMs: Long): Txn? {
+    /**
+     * 同一笔交易的交易单号（支付宝 trade_no、微信交易单号）是硬证据：
+     * 号一样一定是同一笔，用来跨通道对账最稳，不用靠金额和时间的运气。
+     */
+    fun findByExternalId(wallet: Wallet, externalId: String): Txn? {
+        val no = externalId.trim()
+        if (no.length < 10) return null
+        val cursor = helper.readableDatabase.rawQuery(
+            "SELECT * FROM txn WHERE external_id = ? LIMIT 1",
+            arrayOf(no)
+        )
+        cursor.use { return if (it.moveToFirst()) it.toTxn() else null }
+    }
+
+    /**
+     * 邻近查重。带上 kind 是因为「同商户 50 元支付 + 50 元退款」在
+     * 3 分钟内金额、钱包、时间全都一样，不带 kind 的话退款会被当成重复直接丢掉，
+     * 那笔支出就永远冲不掉了。
+     */
+    fun findNearDuplicate(
+        wallet: Wallet,
+        amountCents: Long,
+        at: Long,
+        windowMs: Long,
+        kindDb: String? = null
+    ): Txn? {
         val cursor = helper.readableDatabase.rawQuery(
             "SELECT * FROM txn WHERE wallet = ? AND amount_cents = ? AND occurred_at BETWEEN ? AND ? " +
+                (if (kindDb != null) "AND kind = ? " else "") +
                 "ORDER BY ABS(occurred_at - ?) ASC LIMIT 1",
-            arrayOf(wallet.db, amountCents.toString(), (at - windowMs).toString(), (at + windowMs).toString(), at.toString())
+            if (kindDb != null) {
+                arrayOf(wallet.db, amountCents.toString(), (at - windowMs).toString(),
+                    (at + windowMs).toString(), kindDb, at.toString())
+            } else {
+                arrayOf(wallet.db, amountCents.toString(), (at - windowMs).toString(),
+                    (at + windowMs).toString(), at.toString())
+            }
         )
         cursor.use { return if (it.moveToFirst()) it.toTxn() else null }
     }

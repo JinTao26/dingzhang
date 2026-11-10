@@ -200,8 +200,11 @@ object PaymentAccessibilityParser {
         // 顺序反过来的话，页面同时写着「原价 ¥35.00 / 优惠 ¥5.00 / 实付 ¥30.00」，
         // 第一个扫到的 ¥ 是 35，记的就是没打折的金额。
         // findValue 是精确前缀匹配，所以「金额」不会误吃到「优惠金额」这一行。
-        findValue(texts, amountLabels)?.let {
-            Money.parseToCents(it)?.let { c -> if (c > 0) return c }
+        // 按标签的优先级一个个找，而不是把标签一锅端给 findValue。
+        // findValue 是按控件树顺序扫的，页面上「金额 35」排在「实付金额 30」前面就会取错。
+        for (label in amountLabels) {
+            val v = findValue(texts, listOf(label)) ?: continue
+            Money.parseToCents(v)?.let { c -> if (c > 0) return c }
         }
 
         // 「-25.00」这种负号在单独的节点上时，合并判断
