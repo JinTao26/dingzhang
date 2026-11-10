@@ -49,7 +49,8 @@ object IngestPipeline {
 
     /** 这些名字等于「不知道是谁」。后到的通道若带真商户名，应该覆盖掉它们。 */
     private val genericPayees = setOf(
-        "", "未知", "未知商户", "微信支付", "支付宝", "云闪付", "银行", "银行卡", "储蓄卡"
+        "", "未知", "未知商户", "未知用户", "未知商家", "未知对方", "未知收款方",
+        "微信支付", "支付宝", "云闪付", "银行", "银行卡", "储蓄卡", "零钱"
     )
 
     private fun isGenericPayee(s: String): Boolean = s.trim() in genericPayees
@@ -299,11 +300,26 @@ object IngestPipeline {
         "使用零钱", "零钱", "余额", "银行卡", "储蓄卡", "信用卡", "付款方式",
         "支付方式", "优惠", "立减", "折扣", "积分", "退款", "转账", "还款",
         "返回", "完成", "取消", "关闭", "详情", "更多", "复制", "分享",
-        "帮助", "客服", "确认", "查看", "元", "¥", "￥"
+        // 注意：这里不能放「元」「¥」「￥」——用 contains 匹配会把「元祖蛋糕」
+        // 这种带「元」的店名一起排掉，金额行交给 guessPayeeFromLines 里单独判
+        "帮助", "客服", "确认", "查看"
     )
 
     /** 从一行行文本里猜商户名，猜不到返回 null（调用方自己决定兜底成什么）。 */
     fun guessPayeeFromLines(lines: List<String>): String? {
+        // 无障碍的控件树不保证按「商户名 → 金额 → 支付方式」排，
+        // 取第一条经常抓到「查看账单」「¥35.00」这类边角料，
+        // 所以给每个候选打分，挑最像店名的那个；一个像样的都没有才退回第一条。
+        val shopWords = listOf(
+            "店", "超市", "餐厅", "饭店", "面馆", "咖啡", "茶馆", "馆", "铺", "摊",
+            "公司", "有限", "商场", "广场", "中心", "城", "苑", "园", "里", "坊", "记",
+            "舍", "社", "药", "医", "站", "场", "院", "厅", "吧", "屋", "号", "楼"
+        )
+        val addressWords = "省市区县镇街路号栋层"
+        var best: String? = null
+        var bestScore = 0
+        var first: String? = null
+
         for (raw in lines) {
             val t = raw.trim()
             if (t.length !in 2..30) continue
@@ -312,10 +328,28 @@ object IngestPipeline {
             // 「11.50」这种金额、「11月9日 18:12」这种时间都排除：数字占一半以上
             val digits = t.count { it.isDigit() }
             if (digits > 0 && digits * 2 >= t.length) continue
-            val cleaned = cleanPayee(t)
-            if (cleaned.length >= 2) return cleaned
+
+            var cleaned = cleanPayee(t)
+            if (cleaned.length < 2) continue
+            // 「¥35」「35元」这类不是店名。「元祖蛋糕」这种带「元」的店名不能被误杀，
+            // 所以这里只在「有钱币符号」或「结尾是元且带数字」时排除。
+            if (cleaned.contains("¥") || cleaned.contains("￥")) continue
+            if (cleaned.endsWith("元") && cleaned.any { it.isDigit() }) continue
+
+            if (first == null) first = cleaned
+
+            var score = 0
+            if (shopWords.any { cleaned.contains(it) }) score += 3
+            if (cleaned.length in 3..15) score += 1
+            if (cleaned.any { it in addressWords }) score += 1
+            if (digits > 0) score -= 1
+            if (cleaned.any { it.isLetter() && it.code < 128 }) score -= 1  // 掺英文的多半是按钮/状态
+            if (score > bestScore) {
+                bestScore = score
+                best = cleaned
+            }
         }
-        return null
+        return best ?: first
     }
 
     fun cleanPayee(raw: String): String {

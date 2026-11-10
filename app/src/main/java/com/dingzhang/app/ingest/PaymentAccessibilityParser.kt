@@ -27,14 +27,22 @@ object PaymentAccessibilityParser {
         /** 页面上必须同时出现这些词，才认为「这是在支付/账单页」 */
         val mustContain: List<String>,
         /** 出现在这些词里说明这不是交易页（聊天页、首页、营销页） */
-        val mustNotContain: List<String> = emptyList()
+        val mustNotContain: List<String> = emptyList(),
+        /**
+         * 命中几个词才算这个页面。
+         * 「支付成功」「付款成功」本身就是强信号，页面只写一个也要认；
+         * 账单详情页全是弱标签（交易金额 / 支付时间 / 订单号…），要凑两个才敢认，
+         * 否则随便一个含「支付时间」的页面就会被当成账单。
+         */
+        val minHits: Int = 2
     )
 
     val rules = listOf(
         PageRule(
             Wallet.ALIPAY, "支付宝-付款成功",
             mustContain = listOf("付款成功", "支付成功", "成功付款"),
-            mustNotContain = listOf("收款码", "扫一扫", "首页", "我的")
+            mustNotContain = listOf("收款码", "扫一扫", "首页", "我的"),
+            minHits = 1
         ),
         PageRule(
             Wallet.ALIPAY, "支付宝-账单详情",
@@ -49,7 +57,8 @@ object PaymentAccessibilityParser {
         PageRule(
             Wallet.WECHAT, "微信-支付结果",
             mustContain = listOf("支付成功", "已支付", "付款成功"),
-            mustNotContain = listOf("聊天", "朋友圈", "正在输入")
+            mustNotContain = listOf("聊天", "朋友圈", "正在输入"),
+            minHits = 1
         ),
         PageRule(
             Wallet.WECHAT, "微信-账单详情",
@@ -102,7 +111,7 @@ object PaymentAccessibilityParser {
         // 必须命中某条页面规则
         val matchedRules = rules.filter { r ->
             r.wallet == wallet &&
-                r.mustContain.count { flat.contains(it) } >= 2 &&
+                r.mustContain.count { flat.contains(it) } >= r.minHits &&
                 r.mustNotContain.none { flat.contains(it) }
         }
         if (matchedRules.isEmpty()) return null

@@ -60,8 +60,10 @@ class PaymentNotificationService : NotificationListenerService() {
         // 绝大部分通知和钱无关，先用「元」粗筛，省下每条都跑正则的开销
         if (!isPaymentApp && !(text + bigText).contains("元")) return
 
-        // 同一条通知可能被重复回调，用 key + 文本摘要挡一下
-        val dedupKey = (sbn.key ?: "") + "|" + text.hashCode()
+        // 同一条通知可能被重复回调，用 key + 内容摘要挡一下。
+        // 注意要把 title 和 bigText 一起算进去：微信支付的通知会「更新」自己，
+        // 标题变了、正文没变的情况只比 text 会把更新后的内容直接丢掉。
+        val dedupKey = (sbn.key ?: "") + "|" + (title + "|" + text + "|" + bigText).hashCode()
         if (recentKeys.contains(dedupKey)) return
         recentKeys.addLast(dedupKey)
         if (recentKeys.size > 40) recentKeys.removeFirst()
