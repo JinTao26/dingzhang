@@ -329,12 +329,27 @@ fun BillsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                val allOn = filtered.isNotEmpty() && picked.size >= filtered.size
                 Text(
-                    if (picked.isEmpty()) "点条目勾选要删的账" else "已选 ${picked.size} 笔",
+                    if (picked.isEmpty()) "点条目勾选" else "已选 ${picked.size} 笔",
                     style = MaterialTheme.typography.titleMedium,
-                    color = if (picked.isEmpty()) Dz.InkFaint else Dz.Ink,
-                    modifier = Modifier.weight(1f)
+                    color = if (picked.isEmpty()) Dz.InkFaint else Dz.Ink
                 )
+                Spacer(Modifier.width(8.dp))
+                // 全选 / 全不选，按的是当前筛选出来的这些
+                Text(
+                    if (allOn) "全不选" else "全选",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Dz.SakuraDeep,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Dz.SakuraSoft)
+                        .clickable {
+                            picked = if (allOn) emptySet() else filtered.map { it.id }.toSet()
+                        }
+                        .padding(horizontal = 10.dp, vertical = 7.dp)
+                )
+                Spacer(Modifier.weight(1f))
                 Text(
                     "改分类",
                     style = MaterialTheme.typography.labelLarge,
@@ -343,7 +358,7 @@ fun BillsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                         .clip(RoundedCornerShape(14.dp))
                         .background(Dz.Cream)
                         .clickable(enabled = picked.isNotEmpty()) { batchPickCat = true }
-                        .padding(horizontal = 14.dp, vertical = 9.dp)
+                        .padding(horizontal = 12.dp, vertical = 9.dp)
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
@@ -354,7 +369,7 @@ fun BillsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                         .clip(RoundedCornerShape(14.dp))
                         .background(if (picked.isEmpty()) Dz.Cream else Dz.Expense)
                         .clickable(enabled = picked.isNotEmpty()) { confirmBatch = true }
-                        .padding(horizontal = 20.dp, vertical = 9.dp)
+                        .padding(horizontal = 16.dp, vertical = 9.dp)
                 )
             }
         }
