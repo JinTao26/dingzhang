@@ -72,6 +72,7 @@ import com.dingzhang.app.data.Exporter
 import com.dingzhang.app.ingest.BillImporter
 import com.dingzhang.app.ingest.ImportResult
 import com.dingzhang.app.ingest.IngestPipeline
+import com.dingzhang.app.share.ShareKit
 import com.dingzhang.app.ui.AppData
 import com.dingzhang.app.ui.components.DzCard
 import com.dingzhang.app.ui.components.MascotFace
@@ -521,6 +522,8 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
         DzCard {
             Text("更多", style = MaterialTheme.typography.titleLarge, color = Dz.Ink)
             Spacer(Modifier.height(10.dp))
+            ActionRow("分享给朋友", "发到微信、QQ 都行，只带下载地址") { ShareKit.share(ctx) }
+            Spacer(Modifier.height(6.dp))
             ActionRow("帮助", "微信和支付宝怎么导账单、各项权限怎么开") { subPage = 3 }
             Spacer(Modifier.height(6.dp))
             ActionRow("意见反馈", "发到作者邮箱，自动带上机型和各通道开关") { subPage = 1 }

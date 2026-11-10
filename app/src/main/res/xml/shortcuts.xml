@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_launcher"
+        android:shortcutId="share_app"
+        android:shortcutLongLabel="分享给朋友"
+        android:shortcutShortLabel="分享">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetClass="com.dingzhang.app.ShareShortcutActivity"
+            android:targetPackage="com.dingzhang.app" />
+    </shortcut>
+
+</shortcuts>

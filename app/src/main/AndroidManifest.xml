@@ -37,7 +37,20 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- 长按桌面图标弹出的快捷菜单 -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity>
+
+        <!-- 长按图标「分享给朋友」用的透明壳，弹完分享面板就退出 -->
+        <activity
+            android:name=".ShareShortcutActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
         <!-- 通道 A：通知监听，抓微信 / 支付宝的支付通知 -->
         <service
