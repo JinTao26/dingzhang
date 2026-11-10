@@ -84,9 +84,19 @@ object IngestPipeline {
             when {
                 // 官方账单是权威数据，回头把通知/无障碍记的那笔补全成「已对账」
                 incomingIsBill && !existingIsBill -> {
+                    // 账单是官方流水，商户名以账单为准，直接覆盖通知/短信记的那个
                     dao.promoteToMatched(dup.id, c.billNo ?: c.externalId, payee, c.account)
-                    Log.d(TAG, "账单补全已有记录 #${dup.id} ${dup.payee} ${dup.amountCents / 100.0}")
-                    return Outcome(false, "已与账单对上号：${dup.payee}", dup, merged = true)
+                    // 商户名换了，分类也该按新名字重算一遍（用户手动改过的不动）
+                    if (!dup.categoryLocked && payee.isNotBlank()) {
+                        val rs = cachedRules ?: dao.rules()
+                        val cls = CategoryEngine.classify(payee, c.note, c.raw, rs)
+                        if (cls.matched && cls.kind == dup.kind && cls.categoryId != dup.categoryId) {
+                            dao.updateCategory(dup.id, cls.categoryId, false)
+                            Log.d(TAG, "按账单重算分类 #${dup.id} ${dup.categoryId} -> ${cls.categoryId}")
+                        }
+                    }
+                    Log.d(TAG, "账单补全已有记录 #${dup.id} ${dup.payee} -> $payee ${dup.amountCents / 100.0}")
+                    return Outcome(false, "已与账单对上号：$payee", dup, merged = true)
                 }
                 !incomingIsBill && existingIsBill -> {
                     return Outcome(false, "已有更权威的账单记录", dup)

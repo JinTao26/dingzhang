@@ -1103,16 +1103,19 @@ private fun PrinciplePage(onClose: () -> Unit) {
             ExplainLine("②", "通知", "读支付通知，最快，但有的机型不带金额")
             ExplainLine("③", "银行提醒", "手机银行推送、公众号、短信，管不经过微信支付宝的钱")
             ExplainLine("④", "账单", "你导出的官方流水，最权威，用来补历史和核对")
-            ExplainLine("⑤", "手记", "兜底，顺便教会它新说法")
-            Spacer(Modifier.height(12.dp))
-            Text(
-                "说清楚做不到的：微信/支付宝没有面向个人的开放流水接口，所以不存在「后台自动同步」。" +
-                    "淘宝页面被 App 主动屏蔽了无障碍，读不到；云闪付的支付页也不会主动弹出来。" +
-                    "这些情况请用账单导入补。Android 13 以上侧载的 App，「通知使用权」和「无障碍」" +
-                    "会被收进「受限设置」，需要在系统设置里手动解除限制。",
-                style = MaterialTheme.typography.bodySmall,
-                color = Dz.InkFaint
-            )
+            ExplainLine("⑤", "手记", "兜底，记不起的账自己补一笔")
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        DzCard {
+            Text("说清楚做不到的", style = MaterialTheme.typography.titleMedium, color = Dz.Ink)
+            Spacer(Modifier.height(8.dp))
+            LimitLine("微信红包和转账，多数在聊天界面里完成，不产生系统支付通知。通知这条通道抓不到收红包、收转账这类账。")
+            LimitLine("红包、转账想自动记上，可靠的办法是导一次微信账单：账单里「微信红包」「转账」是独立交易类型，还标了收还是支。")
+            LimitLine("微信和支付宝没有面向个人的开放流水接口，所以不存在「后台自动同步」这种东西。")
+            LimitLine("淘宝页面被它自己屏蔽了无障碍，读不到；云闪付的支付页也不会主动弹出来。")
+            LimitLine("Android 13 以上侧载的 App，通知使用权和无障碍会被收进「受限设置」，要去系统设置里手动解除。")
         }
         Spacer(Modifier.height(24.dp))
     }
@@ -1133,11 +1136,15 @@ private fun HelpPage(onClose: () -> Unit) {
             .padding(horizontal = 18.dp, vertical = 10.dp)
     ) {
         SubPageBar("帮助", onClose)
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "点一下标题展开步骤，看完再收起来，页面不会太长",
+            style = MaterialTheme.typography.bodyMedium,
+            color = Dz.InkFaint,
+            modifier = Modifier.padding(start = 2.dp, bottom = 10.dp)
+        )
 
-        DzCard {
-            Text("微信账单怎么导出", style = MaterialTheme.typography.titleMedium, color = Dz.Ink)
-            Spacer(Modifier.height(4.dp))
+        FoldCard("微信账单怎么导出", "6 步，导出 csv 或 xlsx，最长一年") {
             HelpStep("1", "微信 → 我 → 服务 → 钱包")
             HelpStep("2", "右上角「账单」，再点右上角「常见问题」")
             HelpStep("3", "「下载账单」→ 用途选「用于个人对账」")
@@ -1145,42 +1152,86 @@ private fun HelpPage(onClose: () -> Unit) {
             HelpStep("5", "邮件里收到压缩包，解压得到 csv 或 xlsx")
             HelpStep("6", "回「我的 → 导入账单」，选那个文件")
         }
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(10.dp))
 
-        DzCard {
-            Text("支付宝账单怎么导出", style = MaterialTheme.typography.titleMedium, color = Dz.Ink)
-            Spacer(Modifier.height(4.dp))
+        FoldCard("支付宝账单怎么导出", "5 步，压缩包带密码") {
             HelpStep("1", "支付宝 → 我的 → 账单")
             HelpStep("2", "右上角「…」→「开具交易流水证明」")
             HelpStep("3", "用途选「用于个人对账」，选时间范围，填邮箱")
             HelpStep("4", "邮件里收到压缩包（带解压密码，密码在短信或邮件正文里）")
             HelpStep("5", "解压后回「我的 → 导入账单」")
         }
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(10.dp))
 
-        DzCard {
-            Text("权限怎么开", style = MaterialTheme.typography.titleMedium, color = Dz.Ink)
-            Spacer(Modifier.height(4.dp))
+        FoldCard("权限怎么开", "五个权限，缺一个就会漏账") {
             HelpStep("1", "通知使用权：设置 → 应用 → 特殊应用权限 → 通知使用权 → 叮账 → 允许")
             HelpStep("2", "无障碍：设置 → 无障碍（辅助功能）→ 已下载的服务 → 叮账 → 开启")
             HelpStep("3", "短信：首次弹窗点「允许」；之前拒过就去 设置 → 应用 → 叮账 → 权限 → 短信")
             HelpStep("4", "后台存活：设置 → 电池 → 应用耗电管理 → 叮账 → 允许后台活动")
             HelpStep("5", "Android 13 以上侧载：设置 → 应用 → 叮账 → 右上角 ⋮ → 允许受限设置")
         }
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(10.dp))
 
-        DzCard {
-            Text("还是没记上？", style = MaterialTheme.typography.titleMedium, color = Dz.Ink)
-            Spacer(Modifier.height(4.dp))
+        FoldCard("还是没记上？", "先分清是没开通道，还是这类消息本来就拿不到") {
             Text(
-                "先看「自动记账原理与限制」那一页。区分两种情况：通道没开（去上一张卡里开），" +
-                    "还是这类消息本来就拿不到（淘宝页面被屏蔽、微信红包要点开、通知里没写金额）。" +
+                "先看「自动记账原理与限制」那一页。两种情况要分清：通道没开（回到上一块把权限开上），" +
+                    "还是这类消息本来就拿不到 —— 淘宝页面被屏蔽、微信红包和转账不出通知、通知里没写金额。" +
                     "后一种只能靠导入账单补。",
-                style = MaterialTheme.typography.bodySmall,
-                color = Dz.InkFaint
+                style = MaterialTheme.typography.bodyMedium,
+                color = Dz.InkSoft
             )
         }
         Spacer(Modifier.height(24.dp))
+    }
+}
+
+/** 默认收起的说明卡：点标题展开，省得整页太长 */
+@Composable
+private fun FoldCard(title: String, subtitle: String, content: @Composable () -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    DzCard {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { open = !open },
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleMedium, color = Dz.Ink)
+                if (subtitle.isNotBlank()) {
+                    Text(
+                        subtitle,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Dz.InkFaint,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
+            }
+            Text(
+                if (open) "收起" else "展开",
+                style = MaterialTheme.typography.labelLarge,
+                color = Dz.SakuraDeep
+            )
+        }
+        if (open) {
+            Spacer(Modifier.height(8.dp))
+            content()
+        }
+    }
+}
+
+/** 限制说明的一条。字号用 bodyMedium，别再拿最小的字讲最重要的事。 */
+@Composable
+private fun LimitLine(text: String) {
+    Row(Modifier.padding(vertical = 5.dp)) {
+        Text(
+            "·",
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+            color = Dz.SakuraDeep
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(text, style = MaterialTheme.typography.bodyMedium, color = Dz.InkSoft)
     }
 }
 

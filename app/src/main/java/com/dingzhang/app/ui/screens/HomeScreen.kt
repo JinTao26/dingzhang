@@ -54,7 +54,6 @@ import com.dingzhang.app.data.RecurringDetector
 import com.dingzhang.app.ingest.IngestPipeline
 import com.dingzhang.app.ui.AppData
 import com.dingzhang.app.ui.components.CategoryBadge
-import com.dingzhang.app.ui.components.CategoryPickerDialog
 import com.dingzhang.app.ui.components.DzCard
 import com.dingzhang.app.ui.components.EmptyHint
 import com.dingzhang.app.ui.components.EnergyBar
@@ -83,23 +82,34 @@ fun HomeScreen(
         )
     }
 
+    // 首页「最近」点开的效果和明细页完全一样：改分类、改商户名、删除
     pickTxn?.let { txn ->
-        CategoryPickerDialog(
-            payee = txn.payee,
-            currentId = txn.categoryId,
-            onPick = { catId ->
+        TxnDetailDialog(
+            txn = txn,
+            onDismiss = { pickTxn = null },
+            onPickCategory = { catId ->
                 val r = IngestPipeline.correctCategory(txn.id, catId)
                 DingZhangApp.bumpDataVersion()
                 pickTxn = null
                 val name = Categories.of(catId).name
-                // 只报「改成了什么 + 连带改了几笔」，不再把商户名和学到的规则念一遍
+                // 只报「改成了什么 + 连带改了几笔」，不念商户名和学到的规则
                 val msg = buildString {
                     append("已改成 $name")
                     if (r.updated > 0) append("，同商户 $r.updated 笔一起改")
                 }
                 Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show()
             },
-            onDismiss = { pickTxn = null }
+            onRenamePayee = { newName ->
+                IngestPipeline.dao?.updatePayee(txn.id, newName)
+                DingZhangApp.bumpDataVersion()
+                pickTxn = txn.copy(payee = newName)
+            },
+            onDelete = {
+                IngestPipeline.dao?.delete(txn.id)
+                DingZhangApp.bumpDataVersion()
+                pickTxn = null
+                Toast.makeText(ctx, "已删除", Toast.LENGTH_SHORT).show()
+            }
         )
     }
     Column(

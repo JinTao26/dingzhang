@@ -62,6 +62,19 @@ class TxnDao(private val helper: DbHelper) {
         helper.writableDatabase.update("txn", cv, "id = ?", arrayOf(id.toString()))
     }
 
+    /** 批量删除。多选删账走这里，一条事务，比逐条 delete 快很多。 */
+    fun deleteMany(ids: Collection<Long>) {
+        if (ids.isEmpty()) return
+        val db = helper.writableDatabase
+        db.beginTransaction()
+        try {
+            ids.forEach { db.delete("txn", "id = ?", arrayOf(it.toString())) }
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+    }
+
     /** 只改商户名。银行短信只有「尾号1234消费45元」，事后能从账单/详情页补上真名。 */
     fun updatePayee(id: Long, payee: String, account: String? = null) {
         val cv = ContentValues().apply {

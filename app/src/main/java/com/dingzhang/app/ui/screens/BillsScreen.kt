@@ -27,6 +27,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
@@ -93,6 +94,10 @@ fun BillsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
     var rangeTxns by remember { mutableStateOf<List<Txn>>(emptyList()) }
     var hits by remember { mutableStateOf<List<Txn>>(emptyList()) }
     var showFilter by remember { mutableStateOf(false) }
+    // 批量删账：进多选模式后点条目是勾选，不是打开详情
+    var selectMode by remember { mutableStateOf(false) }
+    var picked by remember { mutableStateOf(setOf<Long>()) }
+    var confirmBatch by remember { mutableStateOf(false) }
     var minYuan by remember { mutableStateOf("") }   // 金额下限，单位元，空 = 不限
     var maxYuan by remember { mutableStateOf("") }   // 金额上限
     var catFilter by remember { mutableStateOf<Set<String>>(emptySet()) }
@@ -202,6 +207,20 @@ fun BillsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                         color = Dz.InkSoft
                     )
                 }
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    if (selectMode) "取消" else "批量",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (selectMode) Dz.SakuraDeep else Dz.InkSoft,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (selectMode) Dz.SakuraSoft else Dz.Card)
+                        .clickable {
+                            selectMode = !selectMode
+                            picked = emptySet()
+                        }
+                        .padding(horizontal = 12.dp, vertical = 7.dp)
+                )
             }
 
             Spacer(Modifier.height(8.dp))
@@ -255,6 +274,7 @@ fun BillsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
             }
         }
 
+        Box(Modifier.weight(1f)) {
         if (filtered.isEmpty()) {
             when {
                 searching -> EmptyHint("没搜到", "换个关键词试试。金额、卡号也可以搜")
@@ -273,8 +293,101 @@ fun BillsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                         DayHeader(day, list)
                     }
                     items(list, key = { it.id }) { txn ->
-                        TxnLine(txn) { selected = txn }
+                        TxnLine(
+                            txn = txn,
+                            pickMode = selectMode,
+                            picked = txn.id in picked
+                        ) {
+                            if (selectMode) {
+                                picked = if (txn.id in picked) picked - txn.id else picked + txn.id
+                            } else {
+                                selected = txn
+                            }
+                        }
                     }
+                }
+            }
+        }
+        if (selectMode) {
+            Row(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(horizontal = 18.dp, vertical = 14.dp)
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Dz.Card)
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    if (picked.isEmpty()) "点条目勾选要删的账" else "已选 ${picked.size} 笔",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = if (picked.isEmpty()) Dz.InkFaint else Dz.Ink,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    "删除",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (picked.isEmpty()) Dz.InkFaint else Color.White,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(if (picked.isEmpty()) Dz.Cream else Dz.Expense)
+                        .clickable(enabled = picked.isNotEmpty()) { confirmBatch = true }
+                        .padding(horizontal = 20.dp, vertical = 9.dp)
+                )
+            }
+        }
+        }
+    }
+
+    if (confirmBatch) {
+        Dialog(onDismissRequest = { confirmBatch = false }) {
+            Column(
+                Modifier
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(Dz.Card)
+                    .padding(22.dp)
+            ) {
+                Text("删掉这 ${picked.size} 笔？", style = MaterialTheme.typography.titleLarge, color = Dz.Ink)
+                Text(
+                    "删了就找不回来了，这笔钱也不会再出现在统计里。",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Dz.InkSoft,
+                    modifier = Modifier.padding(top = 6.dp, bottom = 18.dp)
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        "取消",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Dz.InkSoft,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Dz.Cream)
+                            .clickable { confirmBatch = false }
+                            .padding(vertical = 12.dp)
+                    )
+                    Text(
+                        "删除",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Color.White,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Dz.Expense)
+                            .clickable {
+                                val ids = picked
+                                confirmBatch = false
+                                selectMode = false
+                                picked = emptySet()
+                                IngestPipeline.dao?.deleteMany(ids)
+                                DingZhangApp.bumpDataVersion()
+                                Toast.makeText(ctx, "已删除 ${ids.size} 笔", Toast.LENGTH_SHORT).show()
+                            }
+                            .padding(vertical = 12.dp)
+                    )
                 }
             }
         }
@@ -361,7 +474,12 @@ private fun DayHeader(day: String, list: List<Txn>) {
 }
 
 @Composable
-private fun TxnLine(txn: Txn, onClick: () -> Unit) {
+private fun TxnLine(
+    txn: Txn,
+    pickMode: Boolean = false,
+    picked: Boolean = false,
+    onClick: () -> Unit
+) {
     Column(
         Modifier
             .fillMaxWidth()
@@ -372,6 +490,24 @@ private fun TxnLine(txn: Txn, onClick: () -> Unit) {
             .padding(horizontal = 14.dp, vertical = 12.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
+            if (pickMode) {
+                Box(
+                    Modifier
+                        .size(24.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(if (picked) Dz.Sakura else Dz.Cream),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (picked) {
+                        Icon(
+                            Icons.Rounded.Check, null,
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+                Spacer(Modifier.width(10.dp))
+            }
             CategoryBadge(txn.categoryId, 38.dp)
             Column(Modifier.weight(1f).padding(start = 12.dp)) {
                 Text(
@@ -420,8 +556,9 @@ private fun TxnLine(txn: Txn, onClick: () -> Unit) {
     }
 }
 
+/** 一笔账的详情：改分类、改商户名、删除。明细页和首页「最近」共用这一个。 */
 @Composable
-private fun TxnDetailDialog(
+fun TxnDetailDialog(
     txn: Txn,
     onDismiss: () -> Unit,
     onPickCategory: (String) -> Unit,
@@ -429,6 +566,7 @@ private fun TxnDetailDialog(
     onDelete: () -> Unit
 ) {
     var renameOpen by remember { mutableStateOf(false) }
+    var confirmDelete by remember { mutableStateOf(false) }
     var nameInput by remember(txn.id, txn.payee) { mutableStateOf(txn.payee) }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Column(
@@ -580,8 +718,9 @@ private fun TxnDetailDialog(
                     color = Dz.Expense,
                     modifier = Modifier
                         .clip(RoundedCornerShape(12.dp))
-                        .clickable { onDelete() }
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                        .background(Dz.Expense.copy(alpha = 0.08f))
+                        .clickable { confirmDelete = true }
+                        .padding(horizontal = 14.dp, vertical = 9.dp)
                 )
                 Spacer(Modifier.weight(1f))
                 Text(
@@ -594,6 +733,54 @@ private fun TxnDetailDialog(
                         .clickable { onDismiss() }
                         .padding(horizontal = 18.dp, vertical = 8.dp)
                 )
+            }
+        }
+    }
+
+    if (confirmDelete) {
+        Dialog(onDismissRequest = { confirmDelete = false }) {
+            Column(
+                Modifier
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(Dz.Card)
+                    .padding(22.dp)
+            ) {
+                Text("删掉这笔？", style = MaterialTheme.typography.titleLarge, color = Dz.Ink)
+                Text(
+                    "删了就找不回来了。如果是记重了、或者压根不该记，删掉正好。",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Dz.InkSoft,
+                    modifier = Modifier.padding(top = 6.dp, bottom = 18.dp)
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        "取消",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Dz.InkSoft,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Dz.Cream)
+                            .clickable { confirmDelete = false }
+                            .padding(vertical = 12.dp)
+                    )
+                    Text(
+                        "删除",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Color.White,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Dz.Expense)
+                            .clickable {
+                                confirmDelete = false
+                                onDelete()
+                            }
+                            .padding(vertical = 12.dp)
+                    )
+                }
             }
         }
     }
