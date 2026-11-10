@@ -66,6 +66,15 @@ object PaymentAccessibilityParser {
         )
     )
 
+    /**
+     * 金额标签，从最明确的往最泛的排。
+     * 「金额」放最后：有些页面把它当成模块标题用。
+     */
+    private val amountLabels = listOf(
+        "实付金额", "实际支付", "实际付款", "实际扣款", "扣款金额", "实付",
+        "付款金额", "支付金额", "订单金额", "交易金额", "金额"
+    )
+
     private val amountWithSymbol = Regex("[¥￥]\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)")
     private val amountPlain = Regex("([0-9][0-9,]*(?:\\.[0-9]{1,2})?)\\s*元")
     /** 账单详情页的大字金额：「-20.00」，负号、没有货币符号 */
@@ -187,15 +196,20 @@ object PaymentAccessibilityParser {
      * 3. 任意带 ¥ 或「元」的
      */
     private fun extractAmount(texts: List<String>): Long? {
+        // 先认明确的「实付 / 实际扣款」标签，再退回扫描 ¥ 符号。
+        // 顺序反过来的话，页面同时写着「原价 ¥35.00 / 优惠 ¥5.00 / 实付 ¥30.00」，
+        // 第一个扫到的 ¥ 是 35，记的就是没打折的金额。
+        // findValue 是精确前缀匹配，所以「金额」不会误吃到「优惠金额」这一行。
+        findValue(texts, amountLabels)?.let {
+            Money.parseToCents(it)?.let { c -> if (c > 0) return c }
+        }
+
         // 「-25.00」这种负号在单独的节点上时，合并判断
         for (t in texts) {
             val m = amountWithSymbol.find(t)
             if (m != null) {
                 Money.parseToCents(m.groupValues[1])?.let { if (it > 0) return it }
             }
-        }
-        findValue(texts, listOf("交易金额", "支付金额", "金额", "实付"))?.let {
-            Money.parseToCents(it)?.let { c -> if (c > 0) return c }
         }
         for (t in texts) {
             val m = amountSigned.find(t)

@@ -338,10 +338,15 @@ object IngestPipeline {
         // 无障碍的控件树不保证按「商户名 → 金额 → 支付方式」排，
         // 取第一条经常抓到「查看账单」「¥35.00」这类边角料，
         // 所以给每个候选打分，挑最像店名的那个；一个像样的都没有才退回第一条。
-        val shopWords = listOf(
-            "店", "超市", "餐厅", "饭店", "面馆", "咖啡", "茶馆", "馆", "铺", "摊",
-            "公司", "有限", "商场", "广场", "中心", "城", "苑", "园", "里", "坊", "记",
-            "舍", "社", "药", "医", "站", "场", "院", "厅", "吧", "屋", "号", "楼"
+        // 店名特征分两种：后缀（以它结尾才算）和行业词（出现在哪都算）。
+        // 单字一律只认后缀 —— 否则「城」「里」「记」这种字出现在正文里也会给无辜候选加分。
+        val shopSuffix = listOf(
+            "店", "馆", "铺", "摊", "铺子", "记", "坊", "社", "苑", "园", "厅", "吧", "屋", "楼",
+            "城", "里", "行", "部", "站", "场", "院", "舍"
+        )
+        val shopWord = listOf(
+            "超市", "餐厅", "饭店", "面馆", "咖啡", "茶馆", "商场", "广场", "中心",
+            "公司", "有限", "药店", "医院", "菜场", "便利店"
         )
         val addressWords = "省市区县镇街路号栋层"
         var best: String? = null
@@ -367,7 +372,8 @@ object IngestPipeline {
             if (first == null) first = cleaned
 
             var score = 0
-            if (shopWords.any { cleaned.contains(it) }) score += 3
+            if (shopSuffix.any { cleaned.endsWith(it) }) score += 3
+            if (shopWord.any { cleaned.contains(it) }) score += 3
             if (cleaned.length in 3..15) score += 1
             if (cleaned.any { it in addressWords }) score += 1
             if (digits > 0) score -= 1
@@ -377,6 +383,9 @@ object IngestPipeline {
                 best = cleaned
             }
         }
+        // 一个像店名的都没有时，退回第一条像样的文本 —— 不是返回 null。
+        // 返回 null 会让这笔退成「微信支付」这种泛称，用户看到的就是「未知商户」；
+        // 而 first 万一是错的，「弱商户名」机制允许后续用更准的名字把它覆盖掉。
         return best ?: first
     }
 
