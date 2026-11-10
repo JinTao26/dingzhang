@@ -5,8 +5,8 @@
         android:enabled="true"
         android:icon="@drawable/ic_launcher"
         android:shortcutId="share_app"
-        android:shortcutLongLabel="分享给朋友"
-        android:shortcutShortLabel="分享">
+        android:shortcutLongLabel="@string/shortcut_share_long"
+        android:shortcutShortLabel="@string/shortcut_share_short">
         <intent
             android:action="android.intent.action.VIEW"
             android:targetClass="com.dingzhang.app.ShareShortcutActivity"
