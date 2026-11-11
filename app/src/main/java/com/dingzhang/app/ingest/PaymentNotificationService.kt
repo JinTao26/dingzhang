@@ -113,14 +113,15 @@ class PaymentNotificationService : NotificationListenerService() {
         }
         if (captured == null) return
 
-        val outcome = IngestPipeline.submit(captured)
-        Log.d(TAG, "通知记账: ${outcome.accepted} ${outcome.reason}")
-
-        // 静默入账：不弹「记上了」的提示，付完钱不该被打扰
-        if (outcome.accepted) {
-            DingZhangApp.bumpDataVersion()
-        } else if (outcome.merged) {
-            DingZhangApp.bumpDataVersion()
+        // 静默入账：不弹「记上了」的提示，付完钱不该被打扰。
+        // 入库走后台队列，通知回调在主线程，不能拿来跑 SQL。
+        IngestPipeline.submitAsync(captured) { outcome ->
+            Log.d(TAG, "通知记账: ${outcome.accepted} ${outcome.reason}")
+            IngestLog.add(
+                "通知",
+                if (outcome.accepted) "记上了" else "没记上",
+                "${captured.payee} ${captured.amountCents / 100.0} 元 · ${outcome.reason}"
+            )
         }
     }
 

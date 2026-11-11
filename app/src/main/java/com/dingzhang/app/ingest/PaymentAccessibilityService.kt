@@ -35,6 +35,8 @@ class PaymentAccessibilityService : AccessibilityService() {
     /** 事件到达那一刻抄下来的页面文字。 */
     private var pendingTexts: List<String> = emptyList()
 
+    private var lastSnapAt = 0L
+
     override fun onServiceConnected() {
         super.onServiceConnected()
         IngestPipeline.init(applicationContext)
@@ -65,13 +67,18 @@ class PaymentAccessibilityService : AccessibilityService() {
         // 事件刚到这一刻是唯一能百分之百拿到这一页的时机。
         // 等 0.15s 之后再去 getWindows()，页面可能已经切走、或被系统权限弹窗盖住，
         // 拿到就是一个空列表 —— 现场看到的一整屏「没有可读的窗口」就是这么来的。
-        rootFromEvent(pkg, e)?.let { r ->
-            pendingRoot = r
-            // 顺手把这一刻的文字抄一份。等到采样时页面可能已经关掉，
-            // 节点也可能失效，但抄下来的字符串一直在。
-            val t = ArrayList<String>(160)
-            collectTexts(r, t, 0)
-            if (t.isNotEmpty()) pendingTexts = t
+        // 内容变化事件最快 120ms 一次，每次都走一遍整棵树太重，这里限一下频率
+        val tick = System.currentTimeMillis()
+        if (tick - lastSnapAt >= SNAP_MIN_MS) {
+            rootFromEvent(pkg, e)?.let { r ->
+                lastSnapAt = tick
+                pendingRoot = r
+                // 顺手把这一刻的文字抄一份。等到采样时页面可能已经关掉，
+                // 节点也可能失效，但抄下来的字符串一直在。
+                val t = ArrayList<String>(160)
+                collectTexts(r, t, 0)
+                if (t.isNotEmpty()) pendingTexts = t
+            }
         }
 
         scheduleProbe(pkg)
@@ -200,23 +207,18 @@ class PaymentAccessibilityService : AccessibilityService() {
         recentPages.addLast(pageKey)
         if (recentPages.size > 30) recentPages.removeFirst()
 
-        val outcome = IngestPipeline.submit(captured)
-        Log.i(TAG, "无障碍记账: accepted=${outcome.accepted} ${outcome.reason}")
-        IngestLog.add(
-            "无障碍",
-            if (outcome.accepted) "记上了" else "没记上",
-            "${captured.payee} ${captured.amountCents / 100.0} 元 · ${outcome.reason}"
-        )
-
+        // 入库丢后台：主线程只负责在这一刻把页面文字交出去，不碰数据库
+        IngestPipeline.submitAsync(captured) { outcome ->
+            Log.i(TAG, "无障碍记账: accepted=${outcome.accepted} ${outcome.reason}")
+            IngestLog.add(
+                "无障碍",
+                if (outcome.accepted) "记上了" else "没记上",
+                "${captured.payee} ${captured.amountCents / 100.0} 元 · ${outcome.reason}"
+            )
+        }
         // 记完什么都不弹。用户要的是「无感」：付完钱该干嘛干嘛，账已经躺在里面了。
         // 只有预算超线这种用户主动要求的事才发通知（见 core/BudgetAlert）。
-        if (outcome.accepted) {
-            DingZhangApp.bumpDataVersion()
-        } else if (outcome.merged) {
-            // 这笔记过了，但商户名/分类刚被补全，界面也得跟着变
-            DingZhangApp.bumpDataVersion()
-        }
-        return outcome.accepted || outcome.merged
+        return true
     }
 
     /**
@@ -298,6 +300,9 @@ class PaymentAccessibilityService : AccessibilityService() {
 
     companion object {
         private const val TAG = "A11y"
+
+        /** 事件快照的最小间隔，内容变化事件最快 120ms 一次，没必要每次都走全树 */
+        private const val SNAP_MIN_MS = 400L
 
         private val moneyPatterns = listOf(
             Regex("[¥￥]\\s*[0-9]"),

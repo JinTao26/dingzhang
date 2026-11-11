@@ -140,16 +140,32 @@ object Dates {
     /** 解析账单里的各种时间写法：2024-11-05 12:33:10 / 2024/11/5 12:33 / 2024-11-05 */
     fun parseBillTime(raw: String?): Long? {
         if (raw.isNullOrBlank()) return null
-        val normalized = raw.trim().replace("/", "-").replace(" ", " ").replace("\u00a0", " ")
+        // 各家导出的时间写法太多，先归一化再按几个格式试。
+        // 归一化做不好，整张账单会一行都解析不出来 —— 表面上就是「这个文件里没有可导入的交易」。
+        var normalized = raw.trim()
+            .replace("\u00a0", " ")
+            .replace("T", " ")                    // ISO：2026-11-01T12:34:56
+            .replace(Regex("(\\d{2}:\\d{2}:\\d{2})\\.\\d+"), "$1")  // 去毫秒
+            .replace("年", "-").replace("月", "-").replace("日", " ")      // 2026年11月1日
+            .replace("/", "-")                    // 2026/11/01
+            .replace(".", "-")                    // 2026.11.01（vivo 账单的写法）
+            .replace(Regex("-+"), "-")
+            .replace(Regex("\\s+"), " ")
+            .trim()
         val patterns = listOf(
             "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd HH:mm", "yyyy-MM-dd",
-            "yyyy-M-d HH:mm:ss", "yyyy-M-d HH:mm", "yyyy-M-d"
+            "yyyy-M-d HH:mm:ss", "yyyy-M-d HH:mm", "yyyy-M-d",
+            "yyyy-MM-dd HH:mm:ss.SSS"
         )
         for (p in patterns) {
             try {
                 val sdf = SimpleDateFormat(p, Locale.CHINA).apply { isLenient = true }
-                val d = sdf.parse(normalized)
-                if (d != null) return d.time
+                // 必须把整串消费完才算匹配上。
+                // 否则 "2026-1-5 12:00:00" 会被 "yyyy-MM-dd HH:mm:ss" 只吃掉前面的日期，
+                // 时间被悄悄丢掉，后面的去重窗口就全判错了。
+                val pos = java.text.ParsePosition(0)
+                val d = sdf.parse(normalized, pos)
+                if (d != null && pos.index >= normalized.length) return d.time
             } catch (e: Exception) {
                 // 换下一个格式
             }

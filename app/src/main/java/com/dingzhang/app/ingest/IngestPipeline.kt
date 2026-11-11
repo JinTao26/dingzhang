@@ -2,6 +2,7 @@ package com.dingzhang.app.ingest
 
 import android.content.Context
 import android.util.Log
+import com.dingzhang.app.DingZhangApp
 import com.dingzhang.app.classify.CategoryEngine
 import com.dingzhang.app.classify.RuleLearning
 import com.dingzhang.app.core.model.Categories
@@ -10,6 +11,7 @@ import com.dingzhang.app.core.model.Txn
 import com.dingzhang.app.core.BudgetAlert
 import com.dingzhang.app.core.model.TxnKind
 import com.dingzhang.app.core.model.TxnStatus
+import java.util.concurrent.Executors
 import com.dingzhang.app.core.model.Wallet
 import com.dingzhang.app.data.DbHelper
 import com.dingzhang.app.data.Settings
@@ -27,7 +29,20 @@ object IngestPipeline {
     /** 超过这个时间窗就不认为是同一笔，避免把「一天买两次同一瓶水」吞掉。 */
     private const val DUP_WINDOW_MS = 20 * 60 * 1000L
     /** 窗口内时间又很接近的，直接判为重复。 */
+    /**
+     * 跨通道（通知记了一条、无障碍又记一条）认作同一笔的窗口。
+     * 同一笔的推送和页面事件一般只差几秒到几十秒，六分钟足够宽松。
+     */
     private const val DUP_STRICT_MS = 6 * 60 * 1000L
+
+    /**
+     * 同一通道里认作同一笔的窗口，比跨通道短得多。
+     *
+     * 以前两个场景共用一个六分钟窗口：同一台手机连买两杯同价咖啡（间隔一分钟），
+     * 第二杯会被当成「刚才那条的重复」直接吞掉 —— 用户体感就是「又少记一笔」。
+     * 同一个通道连续两条，本来就更像两笔真消费，窗口收到 90 秒。
+     */
+    private const val SAME_CHANNEL_STRICT_MS = 90 * 1000L
 
     @Volatile private var daoRef: TxnDao? = null
     @Volatile private var settingsRef: Settings? = null
@@ -92,6 +107,38 @@ object IngestPipeline {
      * 所有通道的统一入口。
      * @param cachedRules 批量导入时把规则一次性取出来传进来，避免每行都查一次库。
      */
+    /**
+     * 后台提交。
+     *
+     * 无障碍和通知的回调都在主线程：一次 submit 里有几次查询加一次写入，
+     * 几十毫秒起步，事件密集时叠起来就把帧吃掉了，极端情况就是 ANR。
+     * 这里丢进单线程队列，顺序执行也天然避开了几个通道同时写 SQLite 的锁冲突。
+     */
+    private val worker = Executors.newSingleThreadExecutor { r ->
+        Thread(r, "dz-ingest")
+    }
+
+    fun submitAsync(c: Captured, onDone: ((Outcome) -> Unit)? = null) {
+        try {
+            worker.execute {
+                val o = try {
+                    submit(c)
+                } catch (t: Throwable) {
+                    Log.w(TAG, "后台入库异常", t)
+                    Outcome(false, "入库异常")
+                }
+                if (o.accepted || o.merged) {
+                    // 界面要跟着变；StateFlow 本身线程安全，通知到主线程的收集器即可
+                    DingZhangApp.bumpDataVersion()
+                }
+                onDone?.let { cb -> runCatching { cb(o) } }
+            }
+        } catch (t: Throwable) {
+            Log.w(TAG, "投递失败，退回同步", t)
+            submit(c)
+        }
+    }
+
     @Synchronized
     fun submit(c: Captured, cachedRules: List<com.dingzhang.app.core.model.LearnedRule>? = null): Outcome {
         val dao = daoRef ?: return Outcome(false, "管道未初始化")
@@ -148,7 +195,7 @@ object IngestPipeline {
                 !incomingIsBill && existingIsBill -> {
                     return Outcome(false, "已有更权威的账单记录", dup)
                 }
-                gap <= DUP_STRICT_MS -> {
+                gap <= (if (dup.source == c.source) SAME_CHANNEL_STRICT_MS else DUP_STRICT_MS) -> {
                     // 同一笔钱被两条通道各记了一次。先记的那条常常只有泛称
                     // （银行短信里压根没有商户名），这次来了真名就顺手补上，
                     // 不必等用户去导账单

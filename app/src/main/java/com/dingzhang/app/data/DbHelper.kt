@@ -10,6 +10,15 @@ import android.database.sqlite.SQLiteOpenHelper
  */
 class DbHelper(context: Context) : SQLiteOpenHelper(context.applicationContext, NAME, null, VERSION) {
 
+    /**
+     * 写都走 IngestPipeline 的单线程队列，但界面侧还要随时读（首页、统计、账单页）。
+     * 不开 WAL 的话，写事务一开读就被挡住，自动记账正在入库时点进 App 会明显顿一下。
+     */
+    override fun onConfigure(db: SQLiteDatabase) {
+        super.onConfigure(db)
+        runCatching { db.enableWriteAheadLogging() }
+    }
+
     // big_class：0 按金额自动判 / 1 用户指定为日常 / 2 用户指定为大额
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(

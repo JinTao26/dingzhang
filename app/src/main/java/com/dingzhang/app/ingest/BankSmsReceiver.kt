@@ -42,11 +42,9 @@ class BankSmsReceiver : BroadcastReceiver() {
             return
         }
 
-        val outcome = IngestPipeline.submit(captured)
-        Log.d(TAG, "短信入账：${captured.payee} ${captured.amountCents / 100.0} -> ${outcome.reason}")
-        // 静默入账：不弹提示
-        if (outcome.accepted || outcome.merged) {
-            DingZhangApp.bumpDataVersion()
+        // 广播回调也在主线程，而且系统只给十秒，不能拿来跑 SQL
+        IngestPipeline.submitAsync(captured) { outcome ->
+            Log.d(TAG, "短信入账：${captured.payee} ${captured.amountCents / 100.0} -> ${outcome.reason}")
         }
     }
 
