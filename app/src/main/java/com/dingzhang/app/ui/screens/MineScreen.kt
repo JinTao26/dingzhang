@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBack
@@ -357,6 +358,9 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                 onGrant = { smsPermission.launch(Manifest.permission.RECEIVE_SMS) }
             )
         }
+
+        Spacer(Modifier.height(12.dp))
+        PermissionGuideCard(ctx, a11yOn, nlsOn)
 
         Spacer(Modifier.height(12.dp))
 
@@ -1351,6 +1355,150 @@ private fun HelpPage(onClose: () -> Unit) {
 }
 
 /** 默认收起的说明卡：点标题展开，省得整页太长 */
+/**
+ * 开权限的具体路径。同一个开关各家藏在不同地方、叫不同名字，纯文字讲一遍没人找得到，
+ * 所以这里认当前这台手机的品牌，直接给到能照着点的层级，再配一个跳到对应设置页的按钮。
+ */
+@Composable
+private fun PermissionGuideCard(ctx: Context, a11yOn: Boolean, nlsOn: Boolean) {
+    val mine = com.dingzhang.app.core.RomGuides.currentId()
+    var romId by remember { mutableStateOf(mine) }
+    val g = com.dingzhang.app.core.RomGuides.byId(romId)
+
+    FoldCard(
+        title = "开权限的具体路径",
+        subtitle = if (romId == mine) "认到你这台是 ${g.label}（${g.rom}）" else "在看 ${g.label} 的路径"
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            com.dingzhang.app.core.RomGuides.all.forEach { r ->
+                val sel = r.id == romId
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(if (sel) Dz.Sakura else Dz.Cream)
+                        .clickable { romId = r.id }
+                        .padding(horizontal = 9.dp, vertical = 5.dp)
+                ) {
+                    Text(
+                        r.label,
+                        fontSize = 11.sp,
+                        fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal,
+                        color = if (sel) Color.White else Dz.InkSoft,
+                        maxLines = 1
+                    )
+                }
+            }
+        }
+
+        GuideStep(
+            no = "①",
+            title = "无障碍服务",
+            path = g.a11y,
+            state = if (a11yOn) 1 else 0,
+            actionLabel = if (a11yOn) "已开启" else "去打开",
+            onGo = { openSystem(ctx, android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS) }
+        )
+        GuideStep(
+            no = "②",
+            title = "通知使用权",
+            path = g.nls,
+            state = if (nlsOn) 1 else 0,
+            actionLabel = if (nlsOn) "已开启" else "去打开",
+            onGo = { openSystem(ctx, android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS) }
+        )
+        GuideStep(
+            no = "③",
+            title = "别让它被系统杀掉",
+            path = if (g.keep2.isBlank()) g.keep else g.keep + "\n" + g.keep2,
+            state = -1,
+            actionLabel = "去应用信息",
+            onGo = { openAppInfo(ctx) }
+        )
+
+        Text(
+            "各家的系统版本之间有出入，上面找不到就在设置最上面的搜索框里搜「无障碍」或「通知使用权」，" +
+                "一般都能直接跳过去。步骤 ③ 是自动记账能不能一直在后台说话的关键，比前两步更容易被忽略",
+            fontSize = 11.sp,
+            color = Dz.InkFaint,
+            modifier = Modifier.padding(top = 10.dp)
+        )
+    }
+}
+
+/** 一条路径。state：1 已开启、0 未开启、-1 没有系统状态可查。 */
+@Composable
+private fun GuideStep(
+    no: String,
+    title: String,
+    path: String,
+    state: Int,
+    actionLabel: String,
+    onGo: () -> Unit
+) {
+    Column(Modifier.fillMaxWidth().padding(top = 12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "$no $title",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Dz.Ink
+            )
+            if (state == 1) {
+                Text(
+                    "已开启",
+                    fontSize = 11.sp,
+                    color = Dz.Mint,
+                    modifier = Modifier.padding(start = 6.dp)
+                )
+            } else if (state == 0) {
+                Text(
+                    "未开启",
+                    fontSize = 11.sp,
+                    color = Dz.Warn,
+                    modifier = Modifier.padding(start = 6.dp)
+                )
+            }
+            Spacer(Modifier.weight(1f))
+            if (state != 1) {
+                TextButton(
+                    onClick = onGo,
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                        horizontal = 8.dp, vertical = 0.dp
+                    )
+                ) {
+                    Text(actionLabel, fontSize = 12.sp, color = Dz.SakuraDeep)
+                }
+            }
+        }
+        Text(
+            path,
+            fontSize = 12.sp,
+            color = Dz.InkSoft,
+            lineHeight = 18.sp,
+            modifier = Modifier.padding(top = 3.dp)
+        )
+    }
+}
+
+/** 保活设置大多挂在应用信息页里，从这里进最快。 */
+private fun openAppInfo(ctx: Context) {
+    try {
+        ctx.startActivity(
+            Intent(
+                android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.parse("package:" + ctx.packageName)
+            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
+    } catch (e: Exception) {
+        Toast.makeText(ctx, "打不开应用信息，请到系统设置里找叮账", Toast.LENGTH_LONG).show()
+    }
+}
+
 @Composable
 private fun FoldCard(title: String, subtitle: String, content: @Composable () -> Unit) {
     var open by remember { mutableStateOf(false) }
