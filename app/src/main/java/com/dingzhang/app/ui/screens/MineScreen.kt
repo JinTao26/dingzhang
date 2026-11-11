@@ -171,6 +171,9 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
     // 每次进入本页实时读系统权限状态，用户从设置页回来就能看到变化
     val a11yOn = isA11yEnabled(ctx)
     val nlsOn = isNlsEnabled(ctx)
+    // 「系统里勾着」和「真的在跑」是两件事，这里分开判断
+    val a11yDead = com.dingzhang.app.ingest.ChannelHealth.a11yLooksDead(ctx)
+    val a11yIdleMs = com.dingzhang.app.ingest.ChannelHealth.a11yIdleMs()
 
     // 银行短信要一条运行时权限；部分机型（小米/华为等）需要用户自己去系统设置里放开
     var smsGranted by remember {
@@ -294,6 +297,25 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                 },
                 onGrant = { openSystem(ctx, android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS) }
             )
+            if (a11yOn && a11yDead) {
+                Text(
+                    "系统里是开着的，但已经很久没收到过页面事件了，多半被系统停掉了。点这里关掉再开一次",
+                    fontSize = 11.sp,
+                    color = Dz.SakuraDeep,
+                    modifier = Modifier
+                        .padding(top = 4.dp, start = 2.dp)
+                        .clickable {
+                            openSystem(ctx, android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                        }
+                )
+            } else if (a11yOn && a11yIdleMs in 1..86_400_000L) {
+                Text(
+                    "上次收到页面事件：${a11yIdleMs / 60_000} 分钟前",
+                    fontSize = 11.sp,
+                    color = Dz.InkFaint,
+                    modifier = Modifier.padding(top = 4.dp, start = 2.dp)
+                )
+            }
             Spacer(Modifier.height(6.dp))
             ChannelRow(
                 title = "通知监听",

@@ -105,6 +105,9 @@ class PaymentAccessibilityService : AccessibilityService() {
         // 拿到可用窗口才算一次解析，别让空窗口白白吃掉冷却时间
         lastParseAt[pkg] = now
 
+        // 能读到窗口说明服务确实活着一一这一笔心跳比任何「开关是开的」都可信
+        ChannelHealth.markAlive("a11y")
+
         val texts = ArrayList<String>(200)
         roots.forEach { collectTexts(it, texts, 0) }
         if (texts.isEmpty()) {

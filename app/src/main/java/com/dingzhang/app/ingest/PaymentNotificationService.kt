@@ -31,11 +31,18 @@ class PaymentNotificationService : NotificationListenerService() {
     override fun onListenerConnected() {
         super.onListenerConnected()
         Log.i(TAG, "通知监听已连接")
+        ChannelHealth.markAlive("nls")
     }
 
     override fun onListenerDisconnected() {
         super.onListenerDisconnected()
         Log.w(TAG, "通知监听已断开，可能是被系统回收了")
+        // 断线可以自己拉回来，不用惊动用户
+        try {
+            requestRebind(android.content.ComponentName(this, PaymentNotificationService::class.java))
+        } catch (t: Throwable) {
+            Log.w(TAG, "重绑失败：${t.message}")
+        }
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
@@ -43,6 +50,7 @@ class PaymentNotificationService : NotificationListenerService() {
         val pkg = sbn.packageName ?: return
 
         if (!IngestPipeline.isReady) IngestPipeline.init(applicationContext)
+        ChannelHealth.markAlive("nls")
         val settings = IngestPipeline.settings ?: return
 
         val extras = sbn.notification?.extras ?: return

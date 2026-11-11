@@ -217,6 +217,10 @@ fun AppRoot() {
 
     // 记账后的检查负责「不打开 App 也能提醒」，这里补一次「打开 App 时兜底」
     LaunchedEffect(Unit) { runCatching { com.dingzhang.app.core.BudgetAlert.check() } }
+    // 通知监听的 binder 掉了能自己拉回来，每次都顺手试一下（无害）
+    LaunchedEffect(Unit) {
+        runCatching { com.dingzhang.app.ingest.ChannelHealth.ensureNotificationListening(ctx) }
+    }
 
     if (showIntro) {
         IntroDialog {
