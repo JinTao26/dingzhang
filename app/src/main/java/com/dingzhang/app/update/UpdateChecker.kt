@@ -2,6 +2,9 @@ package com.dingzhang.app.update
 
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -40,6 +43,16 @@ object UpdateChecker {
      */
     private const val MANIFEST_URL = "https://cdn.jsdelivr.net/gh/$OWNER/$REPO@main/version.json"
 
+    /**
+     * 同一份清单的直连源，没有任何缓存。
+     *
+     * 只打 jsDelivr 一个源出过事：它是 CDN，`@main` 会被缓存十几个小时。
+     * 发完新版用户立刻点「检查更新」，拿到的还是上一版那份，界面上写着「已是最新版本」——
+     * 而那会儿新包其实已经挂出去了。现在两个源一起打，谁报的版本大就用谁，
+     * 只要有一个拿到新内容就不会漏。国内直连常常连不上，所以它只是其中一个，不是唯一。
+     */
+    private const val RAW_URL = "https://raw.githubusercontent.com/$OWNER/$REPO/main/version.json"
+
     data class Result(
         val currentVersion: String,
         val latestVersion: String? = null,
@@ -72,11 +85,34 @@ object UpdateChecker {
 
     // ------------------------------------------------------------------ 清单源
 
-    private fun manifest(current: String): Result? {
-        // jsDelivr 的边缘节点会缓存 @main 的内容，所以带一个按小时变的参数：
-        // 最多晚一小时看到新版，不加这个参数的话发版当天可能还拿到旧那份。
-        val url = MANIFEST_URL + "?_=" + (System.currentTimeMillis() / 3_600_000L)
-        val text = httpText(url) ?: return null
+    private suspend fun manifest(current: String): Result? {
+        val stamp = System.currentTimeMillis()
+        val urls = listOf(
+            "$RAW_URL?_=$stamp",                      // 实时，但国内可能连不上
+            "$MANIFEST_URL?_=${stamp / 3_600_000L}"    // 稳，但可能缓存旧内容
+        )
+
+        // 并发打两个源，取版本号大的那份。串行的话 raw 超时 6 秒会把整个检查拖垮。
+        val results = coroutineScope {
+            urls.map { u -> async { parseManifest(current, httpText(u)) } }.awaitAll()
+        }.filterNotNull()
+
+        return results.maxByOrNull { rank(it.latestVersion) }
+    }
+
+    /** 把版本号拆成可比较的数，用来在两个源之间挑更新的那份。 */
+    private fun rank(v: String?): Long {
+        val parts = (v ?: "").trim().removePrefix("v").split(".")
+        var n = 0L
+        for (i in 0 until 3) {
+            val p = parts.getOrNull(i)?.toLongOrNull() ?: 0L
+            n = n * 1000 + p.coerceIn(0, 999)
+        }
+        return n
+    }
+
+    private fun parseManifest(current: String, text: String?): Result? {
+        if (text == null) return null
         return try {
             val j = JSONObject(text)
             val v = j.optString("version").trim()
