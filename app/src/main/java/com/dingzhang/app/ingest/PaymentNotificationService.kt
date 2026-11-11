@@ -84,13 +84,8 @@ class PaymentNotificationService : NotificationListenerService() {
         val outcome = IngestPipeline.submit(captured)
         Log.d(TAG, "通知记账: ${outcome.accepted} ${outcome.reason}")
 
+        // 静默入账：不弹「记上了」的提示，付完钱不该被打扰
         if (outcome.accepted) {
-            NotificationHelper.notifyAutoCaptured(
-                this,
-                outcome.txn?.payee ?: captured.payee,
-                outcome.txn?.amountCents ?: captured.amountCents,
-                outcome.txn?.categoryId ?: "other"
-            )
             DingZhangApp.bumpDataVersion()
         } else if (outcome.merged) {
             DingZhangApp.bumpDataVersion()

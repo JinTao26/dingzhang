@@ -23,7 +23,11 @@ class PaymentAccessibilityService : AccessibilityService() {
     private val lastParseOk = HashMap<String, Boolean>()
     private val recentPages = ArrayDeque<String>()
     private val handler = Handler(Looper.getMainLooper())
-    private var pending: Runnable? = null
+    /** 三次采样的时间点（相对第一次事件）。 */
+    private val probeDelays = longArrayOf(150L, 450L, 1000L)
+    private var probePkg: String? = null
+    private var probeStep = 0
+    private var probeRun: Runnable? = null
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -43,16 +47,44 @@ class PaymentAccessibilityService : AccessibilityService() {
         val settings = IngestPipeline.settings ?: return
         if (!settings.accessibilityChannel) return
 
-        // 支付页刚跳出来时节点常常还没渲染完，第一次回调往往抓到空页面。
-        // 以前的写法是「1.2 秒内的事件直接丢掉」，结果页面晚 300ms 加载好就再也抓不到。
-        // 现在不丢事件：密集回调合并成一次，等页面稳定 350ms 后解析最后一次。
-        pending?.let { handler.removeCallbacks(it) }
-        val task = Runnable { parsePage(pkg) }
-        pending = task
-        handler.postDelayed(task, 350)
+        scheduleProbe(pkg)
     }
 
-    private fun parsePage(pkg: String) {
+    /**
+     * 连打三次采样：0.15s / 0.45s / 1.0s，哪次抓到就停。
+     *
+     * 支付结果页只停留一两秒（用户点「完成」就关了），固定等 350ms 一次采样太赌运气：
+     * 早了页面还没渲染完，晚了页面已经没了。三次窗口覆盖「刚出现」到「快要关掉」。
+     */
+    private fun scheduleProbe(pkg: String) {
+        // 同一个 App 正在采样中，就让它自己走完，别被密集的内容变化回调无限重排
+        if (probePkg == pkg && probeStep in 0 until probeDelays.size) return
+
+        probeRun?.let { handler.removeCallbacks(it) }
+        probePkg = pkg
+        probeStep = 0
+
+        val run = object : Runnable {
+            override fun run() {
+                val p = probePkg ?: return
+                if (parsePage(p)) {
+                    probeStep = probeDelays.size
+                    probeRun = null
+                    return
+                }
+                probeStep++
+                if (probeStep < probeDelays.size) {
+                    handler.postDelayed(this, probeDelays[probeStep] - probeDelays[probeStep - 1])
+                } else {
+                    probeRun = null
+                }
+            }
+        }
+        probeRun = run
+        handler.postDelayed(run, probeDelays[0])
+    }
+
+    private fun parsePage(pkg: String): Boolean {
         if (!IngestPipeline.isReady) IngestPipeline.init(applicationContext)
 
         // 等了 350ms，用户可能已经切到别的 App。窗口和事件包名对不上，
@@ -64,12 +96,12 @@ class PaymentAccessibilityService : AccessibilityService() {
                 "无障碍", "没有可读的窗口",
                 "活动窗口是 ${rootInActiveWindow?.packageName}，事件来自 $pkg"
             )
-            return
+            return false
         }
 
         val now = System.currentTimeMillis()
-        val need = if (lastParseOk[pkg] == true) 1200L else 350L
-        if (now - (lastParseAt[pkg] ?: 0L) < need) return
+        val need = if (lastParseOk[pkg] == true) 1200L else 0L
+        if (now - (lastParseAt[pkg] ?: 0L) < need) return false
         // 拿到可用窗口才算一次解析，别让空窗口白白吃掉冷却时间
         lastParseAt[pkg] = now
 
@@ -77,7 +109,7 @@ class PaymentAccessibilityService : AccessibilityService() {
         roots.forEach { collectTexts(it, texts, 0) }
         if (texts.isEmpty()) {
             IngestLog.add("无障碍", "窗口里没有文字节点", "共 ${roots.size} 个窗口 / $pkg")
-            return
+            return false
         }
 
         val captured = PaymentAccessibilityParser.parse(pkg, texts, now)
@@ -94,7 +126,7 @@ class PaymentAccessibilityService : AccessibilityService() {
             } else {
                 IngestLog.add("无障碍", "不是支付页", texts.take(4).joinToString(" / "))
             }
-            return
+            return false
         }
 
         // 同一个页面可能被反复解析（窗口内容变化会连续触发），按页面指纹挡一下。
@@ -104,7 +136,7 @@ class PaymentAccessibilityService : AccessibilityService() {
             ?: "${captured.wallet.db}|${captured.amountCents}|${captured.payee}|${now / 1000}"
         if (recentPages.contains(pageKey)) {
             IngestLog.add("无障碍", "同一页刚处理过", pageKey)
-            return
+            return true
         }
         recentPages.addLast(pageKey)
         if (recentPages.size > 30) recentPages.removeFirst()
@@ -117,18 +149,15 @@ class PaymentAccessibilityService : AccessibilityService() {
             "${captured.payee} ${captured.amountCents / 100.0} 元 · ${outcome.reason}"
         )
 
+        // 记完什么都不弹。用户要的是「无感」：付完钱该干嘛干嘛，账已经躺在里面了。
+        // 只有预算超线这种用户主动要求的事才发通知（见 core/BudgetAlert）。
         if (outcome.accepted) {
-            NotificationHelper.notifyAutoCaptured(
-                this,
-                outcome.txn?.payee ?: captured.payee,
-                outcome.txn?.amountCents ?: captured.amountCents,
-                outcome.txn?.categoryId ?: "other"
-            )
             DingZhangApp.bumpDataVersion()
         } else if (outcome.merged) {
             // 这笔记过了，但商户名/分类刚被补全，界面也得跟着变
             DingZhangApp.bumpDataVersion()
         }
+        return outcome.accepted || outcome.merged
     }
 
     /**
@@ -180,8 +209,9 @@ class PaymentAccessibilityService : AccessibilityService() {
     }
 
     override fun onDestroy() {
-        pending?.let { handler.removeCallbacks(it) }
-        pending = null
+        probeRun?.let { handler.removeCallbacks(it) }
+        probeRun = null
+        probePkg = null
         super.onDestroy()
     }
 

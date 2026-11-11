@@ -44,14 +44,9 @@ class BankSmsReceiver : BroadcastReceiver() {
 
         val outcome = IngestPipeline.submit(captured)
         Log.d(TAG, "短信入账：${captured.payee} ${captured.amountCents / 100.0} -> ${outcome.reason}")
+        // 静默入账：不弹提示
         if (outcome.accepted || outcome.merged) {
             DingZhangApp.bumpDataVersion()
-            NotificationHelper.notifyAutoCaptured(
-                app,
-                captured.payee,
-                captured.amountCents,
-                outcome.txn?.categoryId ?: "other"
-            )
         }
     }
 
