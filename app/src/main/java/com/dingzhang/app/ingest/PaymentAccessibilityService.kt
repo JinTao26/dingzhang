@@ -50,12 +50,10 @@ class PaymentAccessibilityService : AccessibilityService() {
         val isHost = PaymentAccessibilityParser.hostDisplayName(pkg) != null
         if (!isDirect && !isHost) return
 
-        // 购物 App 的页面变化极其密集（商品页、列表页一直在刷新），
-        // 而且那些页面根本不是付款页。只在「换了一个窗口」时看一眼：
-        // 收银台和支付结果页都是独立窗口，一个都不会漏。
-        if (isHost) {
-            if (e.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
-        } else if (e.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
+        // 只要这两类事件。购物 App 以前只放行「窗口状态变化」，赌的是收银台是独立窗口 ——
+        // 赌错了：得物这类是在同一个 Activity 里弹出支付宝 SDK 的，
+        // 窗口没换，就只有内容变化事件，只认状态变化等于一条都收不到。
+        if (e.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
             e.eventType != AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
         ) {
             return
@@ -68,18 +66,37 @@ class PaymentAccessibilityService : AccessibilityService() {
         // 等 0.15s 之后再去 getWindows()，页面可能已经切走、或被系统权限弹窗盖住，
         // 拿到就是一个空列表 —— 现场看到的一整屏「没有可读的窗口」就是这么来的。
         // 内容变化事件最快 120ms 一次，每次都走一遍整棵树太重，这里限一下频率
+        // 购物 App 的页面变化极其密集（商品页、列表页一直在刷），限流放宽一点；
+        // 微信支付宝自己的收银台是独立窗口，事件没那么多，可以紧一些。
+        val minGap = if (isHost) HOST_SNAP_MIN_MS else SNAP_MIN_MS
         val tick = System.currentTimeMillis()
-        if (tick - lastSnapAt >= SNAP_MIN_MS) {
-            rootFromEvent(pkg, e)?.let { r ->
-                lastSnapAt = tick
-                pendingRoot = r
-                // 顺手把这一刻的文字抄一份。等到采样时页面可能已经关掉，
-                // 节点也可能失效，但抄下来的字符串一直在。
-                val t = ArrayList<String>(160)
-                collectTexts(r, t, 0)
-                if (t.isNotEmpty()) pendingTexts = t
+        var snapped = false
+        if (tick - lastSnapAt >= minGap) {
+            lastSnapAt = tick
+
+            // 事件自带的文字先收下来。操作系统的无障碍事件本身就挂着这一页的文本，
+            // 不用顺着节点爬 —— 购物 App 的事件源节点经常是空的，爬树这条路走不通，
+            // 但事件里的文字一直都在。
+            val t = ArrayList<String>(160)
+            e.text?.mapNotNullTo(t) { it?.toString()?.trim()?.takeIf { s -> s.isNotEmpty() && s.length <= 60 } }
+            e.contentDescription?.toString()?.trim()
+                ?.takeIf { it.isNotEmpty() && it.length <= 60 }?.let { t.add(it) }
+
+            val snap = rootFromEvent(pkg, e)
+                ?: rootInActiveWindow?.takeIf { it.packageName?.toString() == pkg }
+            if (snap != null) {
+                pendingRoot = snap
+                collectTexts(snap, t, 0)
+            }
+            if (t.isNotEmpty()) {
+                pendingTexts = t.distinct()
+                snapped = true
             }
         }
+
+        // 拿到东西就当场判一次，不等采样。支付结果页只活一两秒，
+        // 用户付完立刻退出的话，0.15 秒后的第一次采样已经读不到它了。
+        if (snapped && parsePage(pkg)) return
 
         scheduleProbe(pkg)
     }
@@ -130,15 +147,26 @@ class PaymentAccessibilityService : AccessibilityService() {
             // 活动窗口读不到、getWindows() 也空（权限弹窗盖在上面时就是这样），
             // 退回到事件到达那一刻从事件源爬出来的那颗根
             pendingRoot?.let { r ->
-                if (r.packageName?.toString() == pkg) roots = listOf(r)
+                // 快照窗口可能本身就是支付宝/微信那一层（购物 App 内嵌付款），一样算数
+                val accept = if (PaymentAccessibilityParser.hostDisplayName(pkg) != null)
+                    setOf(pkg, PaymentNotifierParser.PKG_ALIPAY, PaymentNotifierParser.PKG_WECHAT)
+                else setOf(pkg)
+                if (r.packageName?.toString() in accept) roots = listOf(r)
             }
         }
         if (roots.isEmpty()) {
             val windowCount = runCatching { windows?.size }.getOrNull() ?: -1
+            // 光说「几个窗口」看不出问题。把窗口各自的包名列出来：
+            // 全是叮账自己，说明用户已经切走了；有一个支付宝的，说明差点就能读到。
+            val pkgs = runCatching {
+                windows?.mapNotNull { w -> w?.root?.packageName?.toString() }.distinct()
+            }.getOrNull().orEmpty()
             Log.d(TAG, "没有这个 App 的可读窗口")
             IngestLog.add(
                 "无障碍", "没有可读的窗口",
-                "活动窗口是 ${rootInActiveWindow?.packageName}，事件来自 $pkg，可读窗口 $windowCount 个"
+                "活动窗口是 ${rootInActiveWindow?.packageName ?: "无"}，事件来自 $pkg，" +
+                    "可读窗口 $windowCount 个" +
+                    if (pkgs.isEmpty()) "" else "（${pkgs.joinToString("、").take(90)}）"
             )
             return false
         }
@@ -251,14 +279,23 @@ class PaymentAccessibilityService : AccessibilityService() {
     }
 
     private fun rootsFor(pkg: String): List<AccessibilityNodeInfo> {
-        val out = ArrayList<AccessibilityNodeInfo>(3)
+        // 购物 App 在自家页面里唤起支付宝/微信 SDK 付款时，收银台那一层的窗口
+        // 包名常常是支付宝或微信自己的。只认宿主包名，就只能读到下面那层商品页，
+        // 收银台和结果页永远是「没有可读的窗口」。
+        val accept = if (PaymentAccessibilityParser.hostDisplayName(pkg) != null) {
+            setOf(pkg, PaymentNotifierParser.PKG_ALIPAY, PaymentNotifierParser.PKG_WECHAT)
+        } else {
+            setOf(pkg)
+        }
+
+        val out = ArrayList<AccessibilityNodeInfo>(4)
         rootInActiveWindow?.let { r ->
-            if (r.packageName?.toString() == pkg) out.add(r)
+            if (r.packageName?.toString() in accept && out.none { it === r }) out.add(r)
         }
         runCatching {
             windows?.forEach { w ->
                 val r = w?.root ?: return@forEach
-                if (r.packageName?.toString() == pkg && out.none { it === r }) out.add(r)
+                if (r.packageName?.toString() in accept && out.none { it === r }) out.add(r)
             }
         }
         return out
@@ -303,6 +340,14 @@ class PaymentAccessibilityService : AccessibilityService() {
 
         /** 事件快照的最小间隔，内容变化事件最快 120ms 一次，没必要每次都走全树 */
         private const val SNAP_MIN_MS = 400L
+
+        /**
+         * 购物 App 的快照间隔放宽到 800ms。
+         *
+         * 商品页、列表页、评论区一直在刷内容变化事件，和微信支付宝的收银台完全不是一个量级。
+         * 但也不能关掉：内嵌收银台就是在这些内容变化里出现的。
+         */
+        private const val HOST_SNAP_MIN_MS = 800L
 
         private val moneyPatterns = listOf(
             Regex("[¥￥]\\s*[0-9]"),
