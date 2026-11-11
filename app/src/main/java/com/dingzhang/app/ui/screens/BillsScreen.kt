@@ -1300,10 +1300,13 @@ private fun FilterDialog(
                 }
             }
 
+                // 多留这一截，最后一行分类能滚到手指够得着的地方，
+                // 而不是贴着屏幕底边 / 被手势条压住
+                Spacer(Modifier.height(52.dp))
             }  // 卡片区结束
 
             // 重置已经挪到顶栏，底部不再放按钮，省得被手势条压住
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(18.dp))
         }
     }
 }

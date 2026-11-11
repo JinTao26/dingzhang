@@ -532,7 +532,8 @@ private fun SummaryCard(expense: Long, income: Long, isYear: Boolean, yearBudget
                 Text(
                     if (expense > yearBudget) "超了 ¥${Money.short(expense - yearBudget)}"
                     else "还剩 ¥${Money.short(yearBudget - expense)}",
-                    style = MaterialTheme.typography.bodySmall,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
                     color = if (expense > yearBudget) Dz.Expense else Dz.Income
                 )
             }

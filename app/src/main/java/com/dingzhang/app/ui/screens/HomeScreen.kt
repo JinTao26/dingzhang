@@ -234,8 +234,9 @@ fun HomeScreen(
                         val left = budget - data.monthExpense
                         Text(
                             if (left >= 0) "预算还剩 ¥${Money.short(left)}" else "超了 ¥${Money.short(-left)}",
-                            color = Color.White.copy(alpha = 0.92f),
-                            style = MaterialTheme.typography.labelSmall
+                            color = Color.White.copy(alpha = 0.95f),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold
                         )
                     }
                 }
@@ -281,8 +282,9 @@ fun HomeScreen(
                         val yLeft = data.yearBudgetCents - data.yearExpense
                         Text(
                             if (yLeft >= 0) "还剩 ¥${Money.short(yLeft)}" else "超了 ¥${Money.short(-yLeft)}",
-                            color = Color.White.copy(alpha = 0.92f),
-                            style = MaterialTheme.typography.labelSmall
+                            color = Color.White.copy(alpha = 0.95f),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
                         )
                     }
                     Spacer(Modifier.height(6.dp))
