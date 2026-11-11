@@ -1,7 +1,7 @@
 {
-  "version": "0.5.15",
-  "notes": "支付完之后更容易自动记上了；金额更准，同时有原价、优惠、实付时取实付；退款能认出来了，会挂回原来那笔支出；同一个店连着买两次同样的金额，两笔都会记上；商户名更准，补全之后分类会跟着重算；支付宝账单自带的分类直接拿来用。",
-  "apk": "https://github.com/JinTao26/dingzhang/releases/download/v0.5.15/dingzhang.apk",
-  "page": "https://github.com/JinTao26/dingzhang/releases/tag/v0.5.15",
-  "published_at": "2026-11-10T14:10:00Z"
+  "version": "0.5.16",
+  "notes": "「我的 → 自动记账原理与限制」里多了一块「最近采集记录」，自动记账没记上的时候，能看到卡在哪一步；微信转账给朋友能认出来了，商户名是对方的名字，转账不算进支出。",
+  "apk": "https://github.com/JinTao26/dingzhang/releases/download/v0.5.16/dingzhang.apk",
+  "page": "https://github.com/JinTao26/dingzhang/releases/tag/v0.5.16",
+  "published_at": "2026-11-11T02:00:00Z"
 }
