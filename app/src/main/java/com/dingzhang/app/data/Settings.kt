@@ -62,6 +62,20 @@ class Settings(context: Context) {
         get() = sp.getInt("budget_alert_level", 0)
         set(v) = sp.edit().putInt("budget_alert_level", v).apply()
 
+    /**
+     * 两个自动通道最近一次真的收到东西的时间。
+     *
+     * 「系统里勾着」不等于「服务在跑」：进程被回收、binder 断开的时候，开关还是开着的，
+     * 但一条事件都不会来。靠这个时间戳才能看出「看起来开着、其实早就死了」。
+     */
+    var a11yLastAt: Long
+        get() = sp.getLong("a11y_last_at", 0L)
+        set(v) = sp.edit().putLong("a11y_last_at", v).apply()
+
+    var nlsLastAt: Long
+        get() = sp.getLong("nls_last_at", 0L)
+        set(v) = sp.edit().putLong("nls_last_at", v).apply()
+
     var lastBillImportAt: Long
         get() = sp.getLong("last_import", 0L)
         set(v) = sp.edit().putLong("last_import", v).apply()
