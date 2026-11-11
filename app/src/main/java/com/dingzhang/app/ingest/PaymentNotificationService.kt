@@ -60,13 +60,16 @@ class PaymentNotificationService : NotificationListenerService() {
         if (title.isBlank() && text.isBlank() && bigText.isBlank()) return
 
         val isPaymentApp = pkg == PaymentNotifierParser.PKG_WECHAT || pkg == PaymentNotifierParser.PKG_ALIPAY
+        // 京东这类购物 App 自己的支付成功通知：只认严格成交句，见 parseShoppingApp
+        val isShopping = PaymentNotifierParser.isShoppingApp(pkg)
 
-        // 微信/支付宝之外的包，只在「银行提醒」开着时才看
-        if (!isPaymentApp && !settings.bankPushChannel) return
-        if (isPaymentApp && !settings.notificationChannel && !settings.bankPushChannel) return
+        // 微信/支付宝/购物 App 之外的包，只在「银行提醒」开着时才看
+        if (!isPaymentApp && !isShopping && !settings.bankPushChannel) return
+        if ((isPaymentApp || isShopping) && !settings.notificationChannel && !settings.bankPushChannel) return
 
         // 绝大部分通知和钱无关，先用「元」粗筛，省下每条都跑正则的开销
-        if (!isPaymentApp && !(text + bigText).contains("元")) return
+        // （购物 App 的「使用【xx卡】支付16.90」不带「元」，所以它们跳过这道粗筛）
+        if (!isPaymentApp && !isShopping && !(text + bigText).contains("元")) return
 
         // 同一条通知可能被重复回调，用 key + 内容摘要挡一下。
         // 注意要把 title 和 bigText 一起算进去：微信支付的通知会「更新」自己，
@@ -84,7 +87,13 @@ class PaymentNotificationService : NotificationListenerService() {
         }
         // 微信里银行公众号的提醒、以及银行 App 的推送，交给银行解析器
         // 支付宝自己的通知已经由上面的解析器处理，不再往银行通道兜
-        if (captured == null && settings.bankPushChannel && pkg != PaymentNotifierParser.PKG_ALIPAY) {
+        // 购物 App：京东自己发的支付成功通知，严格规则在 parseShoppingApp 里
+        if (captured == null && isShopping && settings.notificationChannel) {
+            captured = PaymentNotifierParser.parseShoppingApp(pkg, title, text, bigText, postedAt)
+        }
+        if (captured == null && settings.bankPushChannel && pkg != PaymentNotifierParser.PKG_ALIPAY &&
+            !isShopping
+        ) {
             captured = parseBankAlert(pkg, title, text, bigText, postedAt)
         }
         if (captured == null) return

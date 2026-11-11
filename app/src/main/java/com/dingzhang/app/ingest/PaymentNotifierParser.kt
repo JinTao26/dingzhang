@@ -20,6 +20,35 @@ object PaymentNotifierParser {
     const val PKG_WECHAT = "com.tencent.mm"
     const val PKG_ALIPAY = "com.eg.android.AlipayGphone"
 
+    /**
+     * 购物 App 自己发的支付成功通知。
+     *
+     * 京东下单用京东支付 / 银行卡时，微信和支付宝都没有任何动静，
+     * 只有京东自己会推一条「使用【xx卡】支付 16.90」。这类通知是能救回一整类订单的，
+     * 但它同时也是营销推送的重灾区（「省钱金额已达 648.13 元」），
+     * 所以规则必须比微信支付宝严：只认明确的成交句，绝不认裸「¥xx」。
+     */
+    fun isShoppingApp(pkg: String): Boolean =
+        pkg.contains("jingdong") || pkg.contains("jd.jr") || pkg.contains("jdlite")
+
+    private val shoppingExpensePatterns = listOf(
+        Regex("使用【(.+?)】支付([0-9]+(?:\.[0-9]{1,2})?)"),
+        Regex("(?:支付|付款)成功[，,：:]?[¥￥]?([0-9]+(?:\.[0-9]{1,2})?)"),
+        Regex("成功支付[¥￥]?([0-9]+(?:\.[0-9]{1,2})?)"),
+        Regex("(?:支付|付款)完成[，,：:]?[¥￥]?([0-9]+(?:\.[0-9]{1,2})?)"),
+        Regex("已支付[¥￥]([0-9]+(?:\.[0-9]{1,2})?)"),
+        Regex("实付[¥￥]([0-9]+(?:\.[0-9]{1,2})?)")
+        // 刻意没有「支付([0-9.]+)」和「[¥￥]([0-9.]+)」：
+        // 后者会把「省钱金额已达648.13元」记成一笔支出
+    )
+
+    /** 出现任何一个就整条不算：这是营销文案、账单提醒、还没付的状态。 */
+    private val shoppingNoise = listOf(
+        "省钱", "优惠", "立减", "满减", "红包", "优惠券", "领券", "余额", "额度",
+        "可用", "还款", "账单已出", "待还款", "待付款", "待支付", "去支付", "请支付",
+        "免息", "分期", "白条额度", "提额", "签到", "积分", "推荐", "降价", "收藏"
+    )
+
     private val AMOUNT_WITH_SYMBOL = Regex("[¥￥]\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)")
     private val AMOUNT_WITH_YUAN = Regex("([0-9][0-9,]*(?:\\.[0-9]{1,2})?)\\s*元")
 
@@ -55,6 +84,93 @@ object PaymentNotifierParser {
         Regex("微信支付[\\-—]\\s*(.{2,24}?)(?:\\s|，|,|$|。|\\n)"),
         Regex("付款[\\-—]\\s*(.{2,24}?)(?:\\s|，|,|$|。|\\n)")
     )
+
+    /**
+     * 购物 App 的支付通知。
+     * @return 认不出来返回 null —— 下单提醒、物流、营销推送都会走到这里
+     */
+    fun parseShoppingApp(
+        pkg: String,
+        title: CharSequence?,
+        text: CharSequence?,
+        bigText: CharSequence?,
+        postedAt: Long
+    ): Captured? {
+        if (!isShoppingApp(pkg)) return null
+
+        val corpus = listOfNotNull(title?.toString(), text?.toString(), bigText?.toString())
+            .joinToString("\n")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+        if (corpus.isEmpty() || corpus.length > 400) return null
+
+        // 闸一：营销文案、账单提醒、未付款状态，一律不算
+        if (shoppingNoise.any { corpus.contains(it) }) return null
+
+        // 闸二：必须命中明确的成交句
+        var amountCents: Long? = null
+        var account = ""
+        for (p in shoppingExpensePatterns) {
+            val m = p.find(corpus) ?: continue
+            val rawAmount = m.groupValues.last()
+            val cents = Money.parseToCents(rawAmount) ?: continue
+            if (cents <= 0 || cents > 10_000_000_00L) continue
+            amountCents = cents
+            // 「使用【招商银行储蓄卡(7619)】支付16.90」—— 第一个捕获组是卡
+            if (m.groupValues.size >= 3 && m.groupValues[1].length in 2..24 &&
+                !m.groupValues[1].any { it.isDigit() }
+            ) {
+                account = m.groupValues[1]
+            }
+            break
+        }
+        val amount = amountCents ?: return null
+
+        val isRefund = corpus.contains("退款成功") || corpus.contains("已退款") ||
+            corpus.contains("退款到账")
+
+        // 钱包：通知里写了走的哪条路就记哪条，没写就记未知，不猜
+        val wallet = when {
+            corpus.contains("微信支付") || corpus.contains("零钱") -> Wallet.WECHAT
+            corpus.contains("支付宝") || corpus.contains("花呗") -> Wallet.ALIPAY
+            corpus.contains("储蓄卡") || corpus.contains("信用卡") || corpus.contains("银行卡") ->
+                Wallet.BANK
+            else -> Wallet.UNKNOWN
+        }
+
+        val payee = extractShoppingPayee(corpus) ?: defaultShoppingPayee(pkg)
+
+        return Captured(
+            amountCents = amount,
+            wallet = wallet,
+            payee = payee,
+            source = Source.NOTIFY,
+            occurredAt = postedAt,
+            account = account,
+            raw = corpus.take(300),
+            externalId = null,
+            kindHint = if (isRefund) TxnKind.REFUND else TxnKind.EXPENSE,
+            platformCategory = defaultShoppingPayee(pkg)
+        )
+    }
+
+    private fun defaultShoppingPayee(pkg: String): String = when {
+        pkg.contains("jingdong") || pkg.contains("jd.jr") || pkg.contains("jdlite") -> "京东"
+        else -> "网店"
+    }
+
+    /** 通知里能认出店铺就认，认不出就用平台名。 */
+    private fun extractShoppingPayee(corpus: String): String? {
+        val shop = Regex("([\\u4e00-\\u9fa5A-Za-z0-9·]{2,20}(?:旗舰店|专营店|专卖店|官方店|小店))")
+            .find(corpus)?.groupValues?.get(1)
+        if (!shop.isNullOrBlank()) return IngestPipeline.cleanPayee(shop).takeIf { it.length in 2..20 }
+
+        return listOfNotNull(
+            Regex("商户[：:]\s*(.{2,20}?)(?:\\s|，|,|$)").find(corpus)?.groupValues?.get(1),
+            Regex("付款给(.{2,20}?)(?:\\s|，|,|$|。|的)").find(corpus)?.groupValues?.get(1)
+        ).firstOrNull { it.isNotBlank() }?.let { IngestPipeline.cleanPayee(it) }
+            ?.takeIf { it.length in 2..20 }
+    }
 
     /**
      * @return 解析成功返回 Captured，失败返回 null。失败不抛异常、不猜。
