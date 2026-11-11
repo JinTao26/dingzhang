@@ -101,7 +101,16 @@ object PaymentAccessibilityParser {
     private val incomeCues = listOf(
         "收款到账", "已收款", "到账金额", "收入", "红包到账", "收到红包", "收到转账", "已收钱"
     )
-    private val transferCues = listOf("还款", "提现", "转账")
+    // 微信转账的收尾页上并不写「转账」二字，只写「待李梦达确认收款」，
+    // 以前这类页面会被当成普通消费，2 块钱被算进支出里
+    private val transferCues = listOf("还款", "提现", "转账", "确认收款", "待接收")
+    /** 「待李梦达确认收款」里的那个名字 */
+    private val transferPeerPatterns = listOf(
+        Regex("待\\s*(.{1,12}?)\\s*确认收款"),
+        Regex("转账给\\s*(.{1,12})"),
+        Regex("(.{1,12}?)\\s*已确认收款"),
+        Regex("(.{1,12}?)\\s*等待确认收款")
+    )
 
     /**
      * @param texts 页面上抓到的所有可见文本，按遍历顺序
@@ -133,9 +142,10 @@ object PaymentAccessibilityParser {
 
         // 有「商户全称：」标签就用标签；微信的支付结果页没这个标签，
         // 第一行往往就是店名，所以再逐行猜一次
-        val payee = findValue(texts, payeeLabels)
-            ?.let { IngestPipeline.cleanPayee(it) }
-            ?.takeIf { it.length >= 2 }
+        val payee = transferPeer(texts)
+            ?: findValue(texts, payeeLabels)
+                ?.let { IngestPipeline.cleanPayee(it) }
+                ?.takeIf { it.length >= 2 }
             ?: IngestPipeline.guessPayeeFromLines(texts)
             ?: defaultPayee(wallet)
 
@@ -162,7 +172,7 @@ object PaymentAccessibilityParser {
             // 金额带 + 号 = 钱进来了（收款、退款到零钱都在这条上）
             texts.any { amountPosSign.containsMatchIn(it.trim()) } ->
                 if (wallet == Wallet.WECHAT && flat.contains("转账")) TxnKind.TRANSFER else TxnKind.INCOME
-            transferCues.any { flat.contains(it) } && wallet == Wallet.WECHAT && flat.contains("转账") ->
+            transferCues.any { flat.contains(it) } && wallet == Wallet.WECHAT ->
                 TxnKind.TRANSFER
             incomeCues.any { flat.contains(it) } && !flat.contains("支付成功") ->
                 TxnKind.INCOME
@@ -243,6 +253,23 @@ object PaymentAccessibilityParser {
      * ["收款方", "小杨生煎", "付款方式", "零钱"]
      * 也兼容「收款方：小杨生煎」写在同一个节点里的情况。
      */
+    /**
+     * 转账页面上「对方是谁」。微信写「待李梦达确认收款」，支付宝写「转账给XXX」。
+     * 抓不到就返回 null，退回正常的商户名逻辑。
+     */
+    private fun transferPeer(texts: List<String>): String? {
+        for (t in texts) {
+            val line = t.trim()
+            if (line.length < 4) continue
+            for (re in transferPeerPatterns) {
+                val m = re.find(line) ?: continue
+                val name = m.groupValues[1].trim()
+                if (name.length in 1..12 && name.none { it.isDigit() }) return name
+            }
+        }
+        return null
+    }
+
     private fun findValue(texts: List<String>, labels: List<String>): String? {
         for (i in texts.indices) {
             val t = texts[i].trim()
