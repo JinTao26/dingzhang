@@ -898,25 +898,40 @@ private const val FEEDBACK_MAIL = "2462634730@qq.com"
 
 private fun submitFeedback(ctx: Context, text: String) {
     if (text.isBlank()) return
+    val subject = "叮账反馈：" + text.trim().take(24)
     val body = feedbackBody(ctx, text)
-    val mail = Intent(
-        Intent.ACTION_SENDTO,
-        Uri.parse("mailto:" + FEEDBACK_MAIL)
-    ).apply {
-        putExtra(Intent.EXTRA_SUBJECT, "叮账反馈：" + text.trim().take(24))
+
+    // 收件人写进 mailto 的 URI，同时也塞一份 EXTRA_EMAIL：
+    // 各家邮件 App 认的不一样，有的一看 URI 就把收件人带进去了，有的只读 EXTRA_，
+    // 以前只给 URI，碰上不认的那家打开就是个空草稿，收件人栏还得自己填。
+    val uri = Uri.parse(
+        "mailto:" + FEEDBACK_MAIL +
+            "?subject=" + Uri.encode(subject) +
+            "&body=" + Uri.encode(body)
+    )
+    val mail = Intent(Intent.ACTION_SENDTO, uri).apply {
+        putExtra(Intent.EXTRA_EMAIL, arrayOf(FEEDBACK_MAIL))
+        putExtra(Intent.EXTRA_SUBJECT, subject)
         putExtra(Intent.EXTRA_TEXT, body)
     }
     try {
         ctx.startActivity(mail.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     } catch (e: Exception) {
-        copyFeedback(ctx, body)
+        // 没装邮件 App，或者装了但没登录账号 —— 这时候跳过去也是个发不出去的草稿，
+        // 直接给可粘贴的整段（带收件人），随便找个地方发出去都能到
+        copyFeedback(ctx, withRecipient(text, subject, body))
         Toast.makeText(
             ctx,
-            "没找到邮件 App。内容已复制，装个邮件 App 再粘贴发出去就行",
+            "没有可用的邮件 App。收件地址和内容已一起复制，粘到任意邮箱或聊天窗口发出去就行",
             Toast.LENGTH_LONG
         ).show()
     }
 }
+
+/** 复制用：把收件人和主题写在最前面，粘出去以后一眼知道发给谁。 */
+private fun withRecipient(text: String, subject: String, body: String): String =
+    "收件人：" + FEEDBACK_MAIL + "\n主题：" + subject + "\n\n" + body
+
 
 private fun copyFeedback(ctx: Context, text: String) {
     if (text.isBlank()) return
@@ -1094,8 +1109,9 @@ private fun FeedbackPage(ctx: Context, onClose: () -> Unit) {
         var feedback by remember { mutableStateOf("") }
         DzCard {
             Text(
-                "哪个分类认错了、哪笔没记上、哪句文案别扭，都能从这儿直接发到作者邮箱。" +
-                    "会自动附上机型和开关状态，省得你再描述环境",
+                "哪个分类认错了、哪笔没记上、哪句文案别扭，都能从这儿发。" +
+                    "会自动附上机型和开关状态，省得你再描述环境。" +
+                    "手机上没登录邮箱的话点「复制」——收件地址和内容一起复制好了，粘到任意邮箱发出去就行",
                 style = MaterialTheme.typography.bodySmall,
                 color = Dz.InkFaint,
                 modifier = Modifier.padding(bottom = 10.dp)
@@ -1125,7 +1141,10 @@ private fun FeedbackPage(ctx: Context, onClose: () -> Unit) {
                     modifier = Modifier.padding(top = 10.dp)
                 ) { Text("发到邮箱") }
                 TextButton(
-                    onClick = { copyFeedback(ctx, feedbackBody(ctx, feedback)) },
+                    onClick = {
+                        val subject = "叮账反馈：" + feedback.trim().take(24)
+                        copyFeedback(ctx, withRecipient(feedback, subject, feedbackBody(ctx, feedback)))
+                    },
                     enabled = feedback.isNotBlank(),
                     modifier = Modifier.padding(top = 10.dp)
                 ) { Text("复制", color = Dz.InkSoft) }
