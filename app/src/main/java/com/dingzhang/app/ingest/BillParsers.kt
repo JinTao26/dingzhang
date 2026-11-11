@@ -7,7 +7,7 @@ import com.dingzhang.app.core.model.Source
 import com.dingzhang.app.core.model.TxnKind
 import com.dingzhang.app.core.model.Wallet
 
-enum class BillKind { WECHAT, ALIPAY, UNKNOWN }
+enum class BillKind { WECHAT, ALIPAY, GENERIC, UNKNOWN }
 
 data class ParseBatch(
     val kind: BillKind,
@@ -45,11 +45,23 @@ object BillParsers {
         return when {
             head.contains("收/付款方式") || head.contains("商品说明") || head.contains("支付宝交易记录") ->
                 BillKind.ALIPAY
-            head.contains("交易类型") && head.contains("支付方式") -> BillKind.WECHAT
             head.contains("微信支付") || head.contains("微信昵称") -> BillKind.WECHAT
+            head.contains("交易类型") && head.contains("支付方式") -> BillKind.WECHAT
             head.contains("支付宝") -> BillKind.ALIPAY
+            // 别家的表格（vivo 钱包、银行、平台自己导的）没有这些招牌字段，
+            // 只要表头同时有时间列和金额列，就按通用规则读，不再一律判「认不出」
+            looksLikeTable(head) -> BillKind.GENERIC
             else -> BillKind.UNKNOWN
         }
+    }
+
+    /** 表头看着像账单：有时间、有金额就算。具体是哪个平台交给列名去对。 */
+    private fun looksLikeTable(head: String): Boolean {
+        val flat = head.replace(" ", "")
+        val time = listOf("交易时间", "交易日期", "记账时间", "发生时间", "入账时间", "日期")
+            .any { flat.contains(it) }
+        val amount = listOf("金额", "发生额", "交易额").any { flat.contains(it) }
+        return time && amount
     }
 
     fun parse(text: String, forcedKind: BillKind = BillKind.UNKNOWN): ParseBatch {
@@ -63,15 +75,15 @@ object BillParsers {
         val kind = if (forcedKind != BillKind.UNKNOWN) forcedKind else detect(header.joinToString(","))
 
         // ---- 列映射 ----
-        val iTime = BillCsv.col(header, "交易时间", "交易日期", "时间")
-        val iPayee = BillCsv.col(header, "交易对方", "对方")
-        val iGoods = BillCsv.col(header, "商品说明", "商品", "备注")
-        val iDir = BillCsv.col(header, "收/支", "收支")
-        val iAmount = BillCsv.col(header, "金额(元)", "金额")
-        val iAccount = BillCsv.col(header, "收/付款方式", "支付方式", "付款方式")
-        val iState = BillCsv.col(header, "当前状态", "交易状态", "状态")
-        val iTradeNo = BillCsv.col(header, "交易单号", "交易订单号", "支付宝交易号")
-        val iCat = BillCsv.col(header, "交易分类")
+        val iTime = BillCsv.col(header, "交易时间", "交易日期", "记账时间", "发生时间", "入账时间", "时间", "日期")
+        val iPayee = BillCsv.col(header, "交易对方", "对方", "商户名称", "商户", "收款方", "交易对象", "对方户名")
+        val iGoods = BillCsv.col(header, "商品说明", "商品", "备注", "摘要", "交易说明", "用途")
+        val iDir = BillCsv.col(header, "收/支", "收支", "借贷标志", "资金方向", "收支方向", "方向")
+        val iAmount = BillCsv.col(header, "金额(元)", "交易金额", "发生金额", "收支金额", "金额", "发生额", "交易额")
+        val iAccount = BillCsv.col(header, "收/付款方式", "支付方式", "付款方式", "付款账户", "交易卡号", "账户")
+        val iState = BillCsv.col(header, "当前状态", "交易状态", "状态", "是否成功")
+        val iTradeNo = BillCsv.col(header, "交易单号", "交易订单号", "支付宝交易号", "订单号", "流水号", "交易流水号")
+        val iCat = BillCsv.col(header, "交易分类", "分类", "类别", "消费类型")
 
         if (iTime < 0 || iAmount < 0) {
             return ParseBatch(kind, emptyList(), 0, 0, listOf("表头缺少必需列（交易时间/金额）"))
@@ -93,7 +105,10 @@ object BillParsers {
             val occurredAt = Dates.parseBillTime(timeRaw)
             if (occurredAt == null) { skipped++; continue }
 
-            val amountRaw = BillCsv.value(row, iAmount).replace("-", "").trim()
+            val amountText = BillCsv.value(row, iAmount)
+            val negative = amountText.trim().startsWith("-") ||
+                (amountText.trim().startsWith("(") && amountText.trim().endsWith(")"))
+            val amountRaw = amountText.replace("-", "").replace("(", "").replace(")", "").trim()
             val amount = Money.parseToCents(amountRaw)
             if (amount == null || amount <= 0) { skipped++; continue }
 
@@ -105,13 +120,18 @@ object BillParsers {
 
             if (badStates.any { stateRaw.contains(it) }) { skipped++; continue }
 
+            val dir = dirRaw.trim()
             val kindHint = when {
-                dirRaw.contains("不计收支") || dirRaw.contains("中性") -> TxnKind.TRANSFER
+                dir.contains("不计收支") || dir.contains("中性") -> TxnKind.TRANSFER
                 // 退款在账单里方向是「收入」，但它不是赚到的钱，要冲抵原来那笔支出
-                !dirRaw.contains("支出") &&
+                !dir.contains("支出") &&
                     listOf("退款", "已退回", "退货", "退回").any { joined.contains(it) } -> TxnKind.REFUND
-                dirRaw.contains("收入") || dirRaw.contains("入账") -> TxnKind.INCOME
-                dirRaw.contains("支出") || dirRaw.contains("出账") -> TxnKind.EXPENSE
+                dir.contains("收入") || dir.contains("入账") || dir.contains("贷") ||
+                    dir == "收" || dir.contains("收款") -> TxnKind.INCOME
+                dir.contains("支出") || dir.contains("出账") || dir.contains("借") ||
+                    dir == "支" || dir.contains("付款") -> TxnKind.EXPENSE
+                // 方向列空着、但金额写了负号 —— 这就是支出
+                dir.isBlank() && negative -> TxnKind.EXPENSE
                 else -> null
             }
 
@@ -128,7 +148,12 @@ object BillParsers {
 
             // 商品说明里经常是「商户名-商品」，作为备注，比只记商户名更有信息量
             val note = goods.takeIf { it.length in 1..30 } ?: ""
-            val wallet = if (kind == BillKind.ALIPAY) Wallet.ALIPAY else Wallet.WECHAT
+            val wallet = when (kind) {
+                BillKind.ALIPAY -> Wallet.ALIPAY
+                BillKind.WECHAT -> Wallet.WECHAT
+                // 通用表格（vivo 钱包、银行、平台导出）不知道走的哪个钱包，不要瞎记成微信
+                else -> Wallet.UNKNOWN
+            }
 
             out.add(
                 Captured(

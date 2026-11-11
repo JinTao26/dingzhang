@@ -78,9 +78,16 @@ object BillCsv {
 
     /** 表头行：同时含「交易时间」和「金额」，两家都认。 */
     fun findHeaderRow(rows: List<List<String>>): Int {
+        // 以前只认「交易时间 + 金额」这个微信/支付宝的固定组合，别家的表头换个说法就整张表作废。
+        // 现在时间列和金额列各给一组候选，只要两样都在就算表头 —— vivo、银行这类导出也能进来。
+        val timeKeys = listOf("交易时间", "交易日期", "记账时间", "发生时间", "入账时间", "时间", "日期")
+        val amountKeys = listOf("金额", "发生额", "交易额", "收支金额")
         for (i in rows.indices.take(60)) {
-            val joined = rows[i].joinToString(",")
-            if (joined.contains("交易时间") && joined.contains("金额")) return i
+            val flat = rows[i].joinToString(",").replace(" ", "")
+            if (flat.isBlank()) continue
+            val hasTime = timeKeys.any { flat.contains(it) }
+            val hasAmount = amountKeys.any { flat.contains(it) }
+            if (hasTime && hasAmount) return i
         }
         return -1
     }

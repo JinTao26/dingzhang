@@ -59,13 +59,31 @@ object BillImporter {
 
         val text = toBillText(bytes)
         if (text == null) {
-            return@withContext ImportResult(fileName, Wallet.UNKNOWN, 0, 0, 0, 0,
-                message = "压缩包里没找到账单文件（csv 或 xlsx）")
+            // 以前这里一律报「压缩包里没找到账单文件」，用户根本不知道卡在哪。
+            // 分三种情况说清楚，每种给一句能自己动手的话。
+            val looked = BillCsv.decode(bytes).take(600)
+            val msg = when {
+                looked.contains("<table", true) || looked.contains("<tr", true) ->
+                    "这个文件其实是网页表格（HTML），不少国内系统的「导出 Excel」都是这么做的。" +
+                        "用电脑上的 Excel 打开，另存成 .csv 或真正的 .xlsx 再导进来就行"
+                BillCsv.isZip(bytes) -> {
+                    val brief = zipBrief(bytes)
+                    if (brief.contains("xl/") || brief.contains("sheet")) {
+                        "这个 Excel 能打开，但里面的表格读出来是空的。方便的话把这份原文件发给作者，照着补规则最快"
+                    } else {
+                        "这个压缩包里是「$brief」，没有 .csv 或 .xlsx。解压出来选里面的账单文件"
+                    }
+                }
+                else ->
+                    "读不出表格内容。可能不是标准的 Excel/CSV —— 用 Excel 打开另存一次再试"
+            }
+            return@withContext ImportResult(fileName, Wallet.UNKNOWN, 0, 0, 0, 0, message = msg)
         }
         val kind = BillParsers.detect(text)
         if (kind == BillKind.UNKNOWN) {
             return@withContext ImportResult(fileName, Wallet.UNKNOWN, 0, 0, 0, 0,
-                message = "认不出这是哪家的账单，请选微信或支付宝导出的原始文件")
+                message = "表头里没同时找到「时间」和「金额」两列，看着不像账单表格。" +
+                    "如果是别家（vivo 钱包、银行、平台）导的，把原文件发给作者加规则最快")
         }
 
         val batch = BillParsers.parse(text, kind)
@@ -158,6 +176,23 @@ object BillImporter {
 
         // 3) 普通 csv / txt
         return BillCsv.decode(bytes)
+    }
+
+    /** 把压缩包里的条目名列出来几个，报错时带上，用户一看就知道里面是什么。 */
+    private fun zipBrief(bytes: ByteArray): String {
+        val names = ArrayList<String>(6)
+        try {
+            ZipInputStream(ByteArrayInputStream(bytes)).use { zis ->
+                var e = zis.nextEntry
+                while (e != null && names.size < 6) {
+                    names.add(if (e.isDirectory) e.name else e.name)
+                    e = zis.nextEntry
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "列压缩包条目失败", e)
+        }
+        return names.joinToString("、").take(160)
     }
 
     private fun extractFirstBillEntry(bytes: ByteArray): ByteArray? {

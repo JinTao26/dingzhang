@@ -28,7 +28,7 @@ object XlsxReader {
     /** 返回 null 表示这不是 xlsx（交给 CSV 分支处理）。 */
     fun readRowsOrNull(bytes: ByteArray): List<List<String>>? {
         var sharedXml: ByteArray? = null
-        var sheetXml: ByteArray? = null
+        val sheets = ArrayList<Pair<String, ByteArray>>()
 
         try {
             ZipInputStream(ByteArrayInputStream(bytes)).use { zis ->
@@ -37,8 +37,8 @@ object XlsxReader {
                     val name = entry.name.lowercase()
                     when {
                         name == "xl/sharedstrings.xml" -> sharedXml = zis.readBytes()
-                        name.startsWith("xl/worksheets/") && name.endsWith(".xml") && sheetXml == null ->
-                            sheetXml = zis.readBytes()
+                        name.startsWith("xl/worksheets/") && name.endsWith(".xml") ->
+                            sheets.add(name to zis.readBytes())
                     }
                     entry = zis.nextEntry
                 }
@@ -48,9 +48,20 @@ object XlsxReader {
             return null
         }
 
-        val sheet = sheetXml ?: return null
+        if (sheets.isEmpty()) return null
         val shared = parseSharedStrings(sharedXml)
-        val rows = parseSheet(sheet, shared)
+
+        // 以前只读 zip 里的第一张表。导出方常把「说明」「汇总」放前面，
+        // 真正的流水在后面 —— 只读一张就会判成「这不是账单」。
+        // 现在每张都读，取行数最多的那张（行数最多基本就是流水表）。
+        var best: MutableList<List<String>>? = null
+        for ((name, xml) in sheets.sortedBy { it.first }) {
+            val rows = parseSheet(xml, shared)
+            Log.i(TAG, "$name 读出 ${rows.size} 行")
+            if (rows.size > (best?.size ?: 0)) best = rows
+        }
+
+        val rows = best ?: return null
         if (rows.isEmpty()) return null
         fixExcelDates(rows)
         return rows
@@ -156,11 +167,14 @@ object XlsxReader {
                                 val i = raw.trim().toIntOrNull() ?: -1
                                 shared.getOrElse(i) { "" }
                             } else raw
+                            val row = cur ?: ArrayList<String>(16).also { cur = it }
                             val idx = colIndex(cellRef)
                             if (idx >= 0) {
-                                val row = cur ?: ArrayList<String>(16).also { cur = it }
                                 while (row.size <= idx) row.add("")
                                 row[idx] = value
+                            } else if (value.isNotEmpty()) {
+                                // 少了 r 属性的导出（有的系统这么干）按顺序往后排
+                                row.add(value)
                             }
                             cellBuf = null
                         }
