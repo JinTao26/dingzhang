@@ -1275,7 +1275,10 @@ private fun PrinciplePage(onClose: () -> Unit) {
             LimitLine("红包、转账想自动记上，可靠的办法是导一次微信账单：账单里「微信红包」「转账」是独立交易类型，还标了收还是支。")
             LimitLine("微信和支付宝没有面向个人的开放流水接口，所以不存在「后台自动同步」这种东西。")
             LimitLine("淘宝页面被它自己屏蔽了无障碍，读不到；云闪付的支付页也不会主动弹出来。")
-            LimitLine("Android 13 以上侧载的 App，通知使用权和无障碍会被收进「受限设置」，要去系统设置里手动解除。")
+            LimitLine(
+                "从浏览器、聊天软件装进来的 App，安卓会把无障碍和通知使用权收进「受限设置」，" +
+                    "要去那个详情页的右上角点 ⋮ 手动放开，否则开关点不动。这不是叮账的问题，所有侧载的自动记账 App 都一样"
+            )
         }
         Spacer(Modifier.height(24.dp))
     }
@@ -1328,7 +1331,12 @@ private fun HelpPage(onClose: () -> Unit) {
             HelpStep("2", "无障碍：设置 → 无障碍（辅助功能）→ 已下载的服务 → 叮账 → 开启")
             HelpStep("3", "短信：首次弹窗点「允许」；之前拒过就去 设置 → 应用 → 叮账 → 权限 → 短信")
             HelpStep("4", "后台存活：设置 → 电池 → 应用耗电管理 → 叮账 → 允许后台活动")
-            HelpStep("5", "Android 13 以上侧载：设置 → 应用 → 叮账 → 右上角 ⋮ → 允许受限设置")
+            HelpStep(
+                "5",
+                "受限设置（安卓 11 起、13 以后更严）：从浏览器或聊天软件装的 App 不许直接开无障碍和通知使用权。" +
+                    "在「无障碍 → 叮账」这个详情页的右上角点 ⋮ → 允许受限制的设置；" +
+                    "通知使用权那页同理，各做一次"
+            )
         }
         Spacer(Modifier.height(10.dp))
 
@@ -1392,6 +1400,36 @@ private fun PermissionGuideCard(ctx: Context, a11yOn: Boolean, nlsOn: Boolean) {
                         maxLines = 1
                     )
                 }
+            }
+        }
+
+        // 安卓从 11 起就把侧载应用的这类高权限锁住了，13 以后更严：从浏览器、聊天软件
+        // 装进来的 App，主动去开无障碍或通知使用权会被系统拦下，表现是「点不动」或者
+        // 弹一句「受限设置」。这一步不放开，下面两步根本开不起来 —— 所以放在最前面。
+        if (android.os.Build.VERSION.SDK_INT >= 30) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = 10.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Dz.Warn.copy(alpha = 0.12f))
+                    .padding(horizontal = 11.dp, vertical = 9.dp)
+            ) {
+                Text(
+                    "点开关没反应？先把「受限设置」放开",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Dz.Warn
+                )
+                Text(
+                    "安卓不允许从浏览器、聊天软件装进来的 App 直接开这两个权限，" +
+                        "点开关会弹「受限设置」或者干脆没反应。就在同一个页面的右上角点三个点，" +
+                        "选「允许受限制的设置」，再回来点开关。①② 两步各要做一次",
+                    fontSize = 11.sp,
+                    color = Dz.InkSoft,
+                    lineHeight = 17.sp,
+                    modifier = Modifier.padding(top = 3.dp)
+                )
             }
         }
 
