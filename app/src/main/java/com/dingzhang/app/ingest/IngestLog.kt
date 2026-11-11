@@ -35,8 +35,26 @@ object IngestLog {
     fun add(source: String, result: String, detail: String = "") {
         val p = prefs ?: return
         val clean = detail.replace('\n', ' ').replace('|', '/').take(110)
-        val line = "${System.currentTimeMillis()}|$source|$result|$clean"
-        val old = p.getString(KEY, "").orEmpty().lines().filter { it.isNotBlank() }
+        val now = System.currentTimeMillis()
+        val line = "$now|$source|$result|$clean"
+        val old = p.getString(KEY, "").orEmpty().lines().filter { it.isNotBlank() }.toMutableList()
+
+        // 同一种「没记上」会连着刷几十条（比如连着好几次都读不到窗口），
+        // 把真正有用的那条挤掉了，用户截图里就是一整屏一样的字。
+        // 同类记录一分钟内只留一条，更新时间戳。
+        val last = old.lastOrNull()
+        if (last != null) {
+            val parts = last.split("|", limit = 4)
+            val lastResult = parts.getOrNull(2).orEmpty()
+            val lastDetail = parts.getOrNull(3).orEmpty()
+            val lastAt = parts.getOrNull(0)?.toLongOrNull() ?: 0L
+            if (lastResult == result && lastDetail == clean && now - lastAt < 60_000L) {
+                old[old.size - 1] = line
+                p.edit().putString(KEY, old.takeLast(MAX).joinToString("\n")).apply()
+                return
+            }
+        }
+
         val merged = (old + line).takeLast(MAX)
         p.edit().putString(KEY, merged.joinToString("\n")).apply()
     }
