@@ -57,14 +57,13 @@ class PaymentAccessibilityService : AccessibilityService() {
 
         // 等了 350ms，用户可能已经切到别的 App。窗口和事件包名对不上，
         // 就拿错页面去解析了（微信记的成了支付宝的页面），所以先对一次。
-        val root = rootInActiveWindow
-        if (root == null) {
-            IngestLog.add("无障碍", "拿到的是空窗口", pkg)
-            return
-        }
-        if (root.packageName?.toString() != pkg) {
-            Log.d(TAG, "窗口已切走，跳过本次解析")
-            IngestLog.add("无障碍", "窗口已经切走了", "${root.packageName} / 事件来自 $pkg")
+        val roots = rootsFor(pkg)
+        if (roots.isEmpty()) {
+            Log.d(TAG, "没有这个 App 的可读窗口")
+            IngestLog.add(
+                "无障碍", "没有可读的窗口",
+                "活动窗口是 ${rootInActiveWindow?.packageName}，事件来自 $pkg"
+            )
             return
         }
 
@@ -74,9 +73,12 @@ class PaymentAccessibilityService : AccessibilityService() {
         // 拿到可用窗口才算一次解析，别让空窗口白白吃掉冷却时间
         lastParseAt[pkg] = now
 
-        val texts = ArrayList<String>(64)
-        collectTexts(root, texts, 0)
-        if (texts.isEmpty()) return
+        val texts = ArrayList<String>(200)
+        roots.forEach { collectTexts(it, texts, 0) }
+        if (texts.isEmpty()) {
+            IngestLog.add("无障碍", "窗口里没有文字节点", "共 ${roots.size} 个窗口 / $pkg")
+            return
+        }
 
         val captured = PaymentAccessibilityParser.parse(pkg, texts, now)
         lastParseOk[pkg] = captured != null
@@ -129,6 +131,27 @@ class PaymentAccessibilityService : AccessibilityService() {
         }
     }
 
+    /**
+     * 取这个 App 当前所有可读窗口的根节点。
+     *
+     * 支付结果页常常是盖在聊天页上面的独立窗口（浮层）。只读 rootInActiveWindow
+     * 拿到的是下面那一层，上面那层写着「支付成功」「¥2.00」的窗口永远看不到 ——
+     * 这是之前「扫码付了、账单里没有」的原因之一。
+     */
+    private fun rootsFor(pkg: String): List<AccessibilityNodeInfo> {
+        val out = ArrayList<AccessibilityNodeInfo>(3)
+        rootInActiveWindow?.let { r ->
+            if (r.packageName?.toString() == pkg) out.add(r)
+        }
+        runCatching {
+            windows?.forEach { w ->
+                val r = w?.root ?: return@forEach
+                if (r.packageName?.toString() == pkg && out.none { it === r }) out.add(r)
+            }
+        }
+        return out
+    }
+
     /** 判断这页「像是在付钱」，只用于决定要不要留诊断日志。 */
     private fun looksLikePaymentPage(texts: List<String>): Boolean {
         val flat = texts.joinToString(" ")
@@ -139,7 +162,7 @@ class PaymentAccessibilityService : AccessibilityService() {
 
     /** 深度优先收集可见文本，限深 12 层、最多 120 条，防止超大页面拖慢主线程。 */
     private fun collectTexts(node: AccessibilityNodeInfo?, out: MutableList<String>, depth: Int) {
-        if (node == null || depth > 12 || out.size >= 120) return
+        if (node == null || depth > 16 || out.size >= 160) return
 
         node.text?.toString()?.trim()?.let { if (it.isNotEmpty() && it.length <= 60) out.add(it) }
         node.contentDescription?.toString()?.trim()?.let {
@@ -148,7 +171,7 @@ class PaymentAccessibilityService : AccessibilityService() {
 
         for (i in 0 until node.childCount) {
             collectTexts(node.getChild(i), out, depth + 1)
-            if (out.size >= 120) return
+            if (out.size >= 160) return
         }
     }
 
