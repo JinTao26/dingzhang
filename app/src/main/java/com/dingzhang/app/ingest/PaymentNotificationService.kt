@@ -45,6 +45,21 @@ class PaymentNotificationService : NotificationListenerService() {
         }
     }
 
+    /**
+     * 用户从最近任务里把 App 划掉。
+     * 一个 Activity 都没有了，进程随时可能被收走；趁现在还在，先把自己重新绑上，
+     * 免得划一下之后安静到用户以为「又不记了」。
+     */
+    override fun onTaskRemoved(rootIntent: android.content.Intent?) {
+        super.onTaskRemoved(rootIntent)
+        Log.i(TAG, "任务被划掉，重新绑定通知监听")
+        try {
+            requestRebind(android.content.ComponentName(this, PaymentNotificationService::class.java))
+        } catch (t: Throwable) {
+            Log.w(TAG, "划掉后重绑失败：${t.message}")
+        }
+    }
+
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         val sbn = sbn ?: return
         val pkg = sbn.packageName ?: return

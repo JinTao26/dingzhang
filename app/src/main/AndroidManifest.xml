@@ -89,6 +89,16 @@
             </intent-filter>
         </receiver>
 
+        <!-- 开机广播：把通知监听重新绑上，免得起飞后一条消息都收不到 -->
+        <receiver
+            android:name=".ingest.BootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
     </application>
 
 </manifest>

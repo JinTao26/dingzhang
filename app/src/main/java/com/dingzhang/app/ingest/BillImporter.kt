@@ -77,13 +77,18 @@ object BillImporter {
                 else ->
                     "读不出表格内容。可能不是标准的 Excel/CSV —— 用 Excel 打开另存一次再试"
             }
-            return@withContext ImportResult(fileName, Wallet.UNKNOWN, 0, 0, 0, 0, message = msg)
+            val header = peekHeader(bytes)
+            val msg2 = if (header != null) "$msg。\n读到的表头是：$header" else msg
+            return@withContext ImportResult(fileName, Wallet.UNKNOWN, 0, 0, 0, 0, message = msg2)
         }
         val kind = BillParsers.detect(text)
         if (kind == BillKind.UNKNOWN) {
             return@withContext ImportResult(fileName, Wallet.UNKNOWN, 0, 0, 0, 0,
-                message = "表头里没同时找到「时间」和「金额」两列，看着不像账单表格。" +
-                    "如果是别家（vivo 钱包、银行、平台）导的，把原文件发给作者加规则最快")
+                message = buildString {
+                    append("表头里没同时找到「时间」和「金额」两列，看着不像账单表格。")
+                    val header = headerLine(BillCsv.parseRows(text))
+                    if (header != null) append("\n读到的表头是：$header")
+                })
         }
 
         val batch = BillParsers.parse(text, kind)
@@ -176,6 +181,30 @@ object BillImporter {
 
         // 3) 普通 csv / txt
         return BillCsv.decode(bytes)
+    }
+
+    /**
+     * 只为了报错时能把「表头长什么样」告诉用户。
+     * 只取列名，不碰金额和商户 —— 用户截个图就能定位，文件不用外传。
+     */
+    private fun peekHeader(bytes: ByteArray): String? {
+        val rows = try {
+            XlsxReader.readRowsOrNull(bytes)
+        } catch (t: Throwable) {
+            Log.w(TAG, "探表头失败", t)
+            null
+        } ?: return null
+        return headerLine(rows)
+    }
+
+    private fun headerLine(rows: List<List<String>>): String? {
+        for (r in rows.take(30)) {
+            val cols = r.map { it.trim() }.filter { it.isNotEmpty() }
+            if (cols.size < 3) continue
+            if (cols.none { it.contains("时间") || it.contains("日期") }) continue
+            return cols.joinToString(" / ").take(140)
+        }
+        return null
     }
 
     /** 把压缩包里的条目名列出来几个，报错时带上，用户一看就知道里面是什么。 */

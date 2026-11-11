@@ -135,10 +135,18 @@ object BillParsers {
                 else -> null
             }
 
-            // 方向不明且状态也不像成功 -> 丢弃，避免把未完成的单记进去
-            if (kindHint == null && goodStateHints.none { stateRaw.contains(it) }) {
-                skipped++
-                continue
+            // 方向不明时：
+            // 状态列写着成功 -> 认；
+            // 状态列压根不存在（很多支付类 App 导出的账单没有这一列）—— 也认，按支出算。
+            // 账单里绝大多数就是花钱，全丢掉才是更糟的错。
+            var finalKind = kindHint
+            if (finalKind == null) {
+                if (stateRaw.isBlank() || goodStateHints.any { stateRaw.contains(it) }) {
+                    finalKind = TxnKind.EXPENSE
+                } else {
+                    skipped++
+                    continue
+                }
             }
 
             val payee = BillCsv.value(row, iPayee)
@@ -165,7 +173,7 @@ object BillParsers {
                     note = note,
                     raw = joined.take(300),
                     account = account,
-                    kindHint = kindHint,
+                    kindHint = finalKind,
                     billNo = tradeNo
                 )
             )
