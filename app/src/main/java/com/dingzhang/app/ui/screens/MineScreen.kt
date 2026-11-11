@@ -45,6 +45,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -214,6 +215,26 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
     var lastCheck by remember { mutableStateOf(settings?.lastUpdateCheckAt ?: 0L) }
     var skippedVer by remember { mutableStateOf(settings?.skipVersion.orEmpty()) }
     var updateResult by remember { mutableStateOf<UpdateChecker.Result?>(null) }
+    // 自动查出来的新版。不直接塞给 updateResult —— 那会一进页面就弹窗，
+    // 用户嫌烦。先只在版本号下面挂一行醒目文字，他自己点开看。
+    var autoNewer by remember { mutableStateOf<UpdateChecker.Result?>(null) }
+
+    // 进「我的」页就静默查一次。以前只有冷启动查，App 挂在后台几天不重开就一直不查，
+    // 用户看到的就是「从来没提醒过」。
+    LaunchedEffect(Unit) {
+        val lastAt = runCatching { settings?.lastUpdateCheckAt ?: 0L }.getOrDefault(0L)
+        if (System.currentTimeMillis() - lastAt < 10 * 60 * 1000L) return@LaunchedEffect
+        val r = runCatching { UpdateChecker.check(BuildConfig.VERSION_NAME) }.getOrNull()
+            ?: return@LaunchedEffect
+        if (r.ok) {
+            runCatching { settings?.lastUpdateCheckAt = System.currentTimeMillis() }
+            lastCheck = System.currentTimeMillis()
+        }
+        if (r.hasUpdate) {
+            val skip = runCatching { settings?.skipVersion.orEmpty() }.getOrDefault("")
+            if (r.latestVersion != skip) autoNewer = r
+        }
+    }
 
     // 导出走系统的「新建文档」，用户自己选存哪儿，不申请存储权限
     val csvSaver = rememberLauncherForActivityResult(
@@ -626,6 +647,19 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                         color = Dz.InkFaint,
                         modifier = Modifier.padding(top = 1.dp)
                     )
+                    autoNewer?.let { nr ->
+                        Text(
+                            "有新版本 ${nr.latestVersion}，点这里看改了什么",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Dz.SakuraDeep,
+                            modifier = Modifier
+                                .padding(top = 3.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { updateResult = nr }
+                                .padding(horizontal = 6.dp, vertical = 3.dp)
+                        )
+                    }
                     if (skippedVer.isNotBlank()) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
@@ -762,10 +796,15 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
             result = r,
             fromAuto = false,
             onDismiss = { updateResult = null },
-            onSkipVersion = { IngestPipeline.settings?.skipVersion = r.latestVersion.orEmpty() },
+            onSkipVersion = {
+                runCatching { IngestPipeline.settings?.skipVersion = r.latestVersion.orEmpty() }
+                skippedVer = r.latestVersion.orEmpty()
+                autoNewer = null
+            },
             onDownload = {
                 openUrl(ctx, r.apkUrl ?: r.pageUrl)
                 updateResult = null
+                autoNewer = null
             }
         )
     }

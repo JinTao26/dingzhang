@@ -32,6 +32,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -242,10 +243,21 @@ fun AppRoot() {
     // 开屏查一次新版。以前这段被删掉过，加上更新源又只打 api.github.com（手机上基本连不上），
     // 所以用户那边从来没收到过提醒。现在源换成了 CDN 上的清单，这里补回来。
     var autoUpdate by remember { mutableStateOf<UpdateChecker.Result?>(null) }
-    LaunchedEffect(Unit) {
+    // 每次回到前台都重新判一次，而不是只在整个进程起来时查一次。
+    // 这台手机上的 App 常常挂后台好几天不重开，只在冷启动查等于「永远不提醒」。
+    var resumeTick by remember { mutableStateOf(0) }
+    val lcOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+    DisposableEffect(lcOwner) {
+        val obs = androidx.lifecycle.LifecycleEventObserver { _, e ->
+            if (e == androidx.lifecycle.Lifecycle.Event.ON_RESUME) resumeTick++
+        }
+        lcOwner.lifecycle.addObserver(obs)
+        onDispose { lcOwner.lifecycle.removeObserver(obs) }
+    }
+    LaunchedEffect(resumeTick) {
         val last = runCatching { IngestPipeline.settings?.lastUpdateCheckAt ?: 0L }.getOrDefault(0L)
-        // 六小时内查过就不再查，省电也省流量；查失败不记时间，下次还会重试
-        if (System.currentTimeMillis() - last < 6 * 60 * 60 * 1000L) return@LaunchedEffect
+        // 一小时查一次就够了：清单只有 500 字节，查一次几乎没成本
+        if (System.currentTimeMillis() - last < 60 * 60 * 1000L) return@LaunchedEffect
         val r = runCatching {
             withContext(Dispatchers.IO) { UpdateChecker.check(BuildConfig.VERSION_NAME) }
         }.getOrNull()
