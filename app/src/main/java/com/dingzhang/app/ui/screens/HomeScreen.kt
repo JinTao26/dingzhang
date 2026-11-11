@@ -179,8 +179,9 @@ fun HomeScreen(
             }
             Text(
                 data.monthLabel,
-                style = MaterialTheme.typography.titleMedium,
                 color = Dz.Ink,
+                fontSize = 17.sp,
+                fontWeight = FontWeight.Bold,
                 modifier = Modifier
                     // 点标题直接跳年月，不用一个月一个月翻
                     .clickable { showPicker = true }

@@ -12,8 +12,8 @@ android {
         applicationId = "com.dingzhang.app"
         minSdk = 26          // Android 8.0，覆盖绝大多数在用机型
         targetSdk = 35
-        versionCode = 19
-        versionName = "0.5.16"
+        versionCode = 20
+        versionName = "0.5.17"
         // 只留中文资源，库自带的其他语言翻译全删掉（界面本来就只有中文）
         resourceConfigurations += listOf("zh")
     }

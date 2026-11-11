@@ -220,8 +220,9 @@ fun BillsScreen(
                         ) {
                             Text(
                                 data.monthLabel,
-                                style = MaterialTheme.typography.titleMedium,
-                                color = Dz.Ink
+                                color = Dz.Ink,
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.Bold
                             )
                             Icon(
                                 Icons.Rounded.ArrowDropDown, "选月份", tint = Dz.InkSoft,

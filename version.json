@@ -1,7 +1,7 @@
 {
-  "version": "0.5.16",
-  "notes": "「我的 → 自动记账原理与限制」里多了一块「最近采集记录」，自动记账没记上的时候，能看到卡在哪一步；微信转账给朋友能认出来了，商户名是对方的名字，转账不算进支出。",
-  "apk": "https://github.com/JinTao26/dingzhang/releases/download/v0.5.16/dingzhang.apk",
-  "page": "https://github.com/JinTao26/dingzhang/releases/tag/v0.5.16",
+  "version": "0.5.17",
+  "notes": "自动记账这一版动得最多：淘宝、闲鱼、京东、拼多多里直接在 App 里付掉的钱能认了，买京东用京东支付或银行卡也能认；付完不再弹任何提示，彻底静默；预算花到设定比例会提醒一次。界面也修了：首页预算还剩、月份字号放大，筛选面板底部的分类不再贴着屏幕点不到。",
+  "apk": "https://github.com/JinTao26/dingzhang/releases/download/v0.5.17/dingzhang.apk",
+  "page": "https://github.com/JinTao26/dingzhang/releases/tag/v0.5.17",
   "published_at": "2026-11-11T02:00:00Z"
 }
