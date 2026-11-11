@@ -215,6 +215,9 @@ fun AppRoot() {
     val data = rememberAppData(month)
     val ctx = LocalContext.current
 
+    // 记账后的检查负责「不打开 App 也能提醒」，这里补一次「打开 App 时兜底」
+    LaunchedEffect(Unit) { runCatching { com.dingzhang.app.core.BudgetAlert.check() } }
+
     if (showIntro) {
         IntroDialog {
             IngestPipeline.settings?.introSeen = true

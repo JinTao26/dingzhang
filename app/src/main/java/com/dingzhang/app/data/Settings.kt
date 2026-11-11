@@ -44,6 +44,24 @@ class Settings(context: Context) {
         get() = sp.getLong("budget_year", 0L)
         set(v) = sp.edit().putLong("budget_year", v).apply()
 
+    /**
+     * 月度预算花到这个比例就在通知栏提醒一次。0 = 关掉提醒，默认 80。
+     * 一个月最多两条：到设定比例一条，超预算再一条，不会反复弹。
+     */
+    var budgetAlertPercent: Int
+        get() = sp.getInt("budget_alert_percent", 80)
+        set(v) = sp.edit().putInt("budget_alert_percent", v.coerceIn(0, 100)).apply()
+
+    /** 上次提醒发生在哪个月（"2026-11"），换月就允许重新提醒。 */
+    var budgetAlertMonth: String
+        get() = sp.getString("budget_alert_month", "") ?: ""
+        set(v) = sp.edit().putString("budget_alert_month", v).apply()
+
+    /** 这个月已经提醒到哪一档：0 没提醒 / 1 到设定比例 / 2 超预算。 */
+    var budgetAlertLevel: Int
+        get() = sp.getInt("budget_alert_level", 0)
+        set(v) = sp.edit().putInt("budget_alert_level", v).apply()
+
     var lastBillImportAt: Long
         get() = sp.getLong("last_import", 0L)
         set(v) = sp.edit().putLong("last_import", v).apply()

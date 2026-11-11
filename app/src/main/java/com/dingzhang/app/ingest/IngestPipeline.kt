@@ -7,6 +7,7 @@ import com.dingzhang.app.classify.RuleLearning
 import com.dingzhang.app.core.model.Categories
 import com.dingzhang.app.core.model.Source
 import com.dingzhang.app.core.model.Txn
+import com.dingzhang.app.core.BudgetAlert
 import com.dingzhang.app.core.model.TxnKind
 import com.dingzhang.app.core.model.TxnStatus
 import com.dingzhang.app.core.model.Wallet
@@ -31,10 +32,12 @@ object IngestPipeline {
     @Volatile private var daoRef: TxnDao? = null
     @Volatile private var settingsRef: Settings? = null
     @Volatile private var ready = false
+    @Volatile private var ctxRef: android.content.Context? = null
 
     val dao: TxnDao? get() = daoRef
     val settings: Settings? get() = settingsRef
     val isReady: Boolean get() = ready
+    val appContext: android.content.Context? get() = ctxRef
 
     fun init(context: Context) {
         if (ready) return
@@ -43,6 +46,7 @@ object IngestPipeline {
             val helper = DbHelper(context.applicationContext)
             daoRef = TxnDao(helper)
             settingsRef = Settings(context.applicationContext)
+            ctxRef = context.applicationContext
             IngestLog.init(context.applicationContext)
             ready = true
         }
@@ -224,6 +228,8 @@ object IngestPipeline {
         val id = dao.insert(txn)
         return if (id > 0) {
             Log.i(TAG, "记账成功 #$id ${txn.payee} ${txn.amountCents / 100.0} -> ${cls.categoryId} (${cls.matched ?: "未命中"})")
+            // 记完顺手看眼预算：用户不用打开 App，超了会直接从通知栏提醒
+            BudgetAlert.check()
             Outcome(true, cls.matched?.let { "命中「$it」" } ?: "未命中词典，先归到其他", txn.copy(id = id))
         } else {
             Outcome(false, "写入失败")

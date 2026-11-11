@@ -108,7 +108,11 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                     .padding(18.dp)
             ) {
                 Text(
-                    if (budgetEdit == 1) "每月预算" else "每年预算",
+                    when (budgetEdit) {
+                        1 -> "每月预算"
+                        2 -> "每年预算"
+                        else -> "预算提醒"
+                    },
                     style = MaterialTheme.typography.titleLarge,
                     color = Dz.Ink
                 )
@@ -116,7 +120,7 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                 OutlinedTextField(
                     value = budgetInput,
                     onValueChange = { v ->
-                        budgetInput = v.filter { it.isDigit() }.take(7)
+                        budgetInput = v.filter { it.isDigit() }.take(if (budgetEdit == 3) 3 else 7)
                     },
                     label = { Text("整元，不用填小数") },
                     singleLine = true,
@@ -126,7 +130,11 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                 )
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    "填 0 就是不设。每月预算会出现在首页的「预算还剩」上",
+                    if (budgetEdit == 3) {
+                        "花到月预算的这个百分比就在通知栏提醒一次，0 就是关掉提醒。一个月最多提醒两次"
+                    } else {
+                        "填 0 就是不设。每月预算会出现在首页的「预算还剩」上"
+                    },
                     style = MaterialTheme.typography.labelSmall,
                     color = Dz.InkFaint
                 )
@@ -136,11 +144,16 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                         Text("取消", color = Dz.InkSoft)
                     }
                     TextButton(onClick = {
-                        val y = (budgetInput.toLongOrNull() ?: 0L) * 100
-                        if (budgetEdit == 1) {
-                            settings?.monthlyBudgetCents = y
+                        val n = budgetInput.toLongOrNull() ?: 0L
+                        if (budgetEdit == 3) {
+                            settings?.budgetAlertPercent = n.toInt().coerceIn(0, 100)
                         } else {
-                            settings?.yearBudgetCents = y
+                            val y = n * 100
+                            if (budgetEdit == 1) {
+                                settings?.monthlyBudgetCents = y
+                            } else {
+                                settings?.yearBudgetCents = y
+                            }
                         }
                         budgetEdit = 0
                         DingZhangApp.bumpDataVersion()
@@ -433,6 +446,36 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                     budgetEdit = 2
                 }
             )
+
+            Spacer(Modifier.height(16.dp))
+
+            val alertPct = settings?.budgetAlertPercent ?: 80
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("预算提醒", style = MaterialTheme.typography.bodyMedium, color = Dz.InkSoft)
+                Spacer(Modifier.weight(1f))
+                Text(
+                    if (alertPct > 0) "花到 $alertPct% 时提醒" else "已关闭",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (alertPct > 0) Dz.Ink else Dz.InkFaint
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(50, 80, 100).forEach { p ->
+                    SettingChip(label = "$p%", active = alertPct == p) {
+                        settings?.budgetAlertPercent = p
+                        DingZhangApp.bumpDataVersion()
+                    }
+                }
+                SettingChip(label = "自定义", active = alertPct !in listOf(0, 50, 80, 100)) {
+                    budgetInput = alertPct.toString()
+                    budgetEdit = 3
+                }
+                SettingChip(label = "关闭", active = alertPct == 0) {
+                    settings?.budgetAlertPercent = 0
+                    DingZhangApp.bumpDataVersion()
+                }
+            }
 
             if (data.ignoredPayees.isNotEmpty()) {
                 Spacer(Modifier.height(14.dp))
