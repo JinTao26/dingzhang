@@ -158,9 +158,10 @@ class PaymentAccessibilityService : AccessibilityService() {
             val windowCount = runCatching { windows?.size }.getOrNull() ?: -1
             // 光说「几个窗口」看不出问题。把窗口各自的包名列出来：
             // 全是叮账自己，说明用户已经切走了；有一个支付宝的，说明差点就能读到。
-            val pkgs = runCatching {
-                windows?.mapNotNull { w -> w?.root?.packageName?.toString() }.distinct()
-            }.getOrNull().orEmpty()
+            val pkgs: List<String> = runCatching {
+                val ws = windows ?: return@runCatching emptyList<String>()
+                ws.mapNotNull { w -> w.root?.packageName?.toString() }.distinct()
+            }.getOrElse { emptyList() }
             Log.d(TAG, "没有这个 App 的可读窗口")
             IngestLog.add(
                 "无障碍", "没有可读的窗口",
