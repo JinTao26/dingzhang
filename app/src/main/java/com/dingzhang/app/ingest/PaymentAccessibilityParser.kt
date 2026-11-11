@@ -214,7 +214,13 @@ object PaymentAccessibilityParser {
         "com.taobao.taobao" to "淘宝",
         "com.taobao.idlefish" to "闲鱼",
         "com.jingdong.app.mall" to "京东",
-        "com.xunmeng.pinduoduo" to "拼多多"
+        "com.xunmeng.pinduoduo" to "拼多多",
+        // 得物下单后常常直接在 App 内唤起支付宝 SDK 付款，
+        // 不把它的包名加进来，连事件都收不到（这次「付了得物没记上」就吃了这个亏）
+        "com.shizhuang.duapp" to "得物",
+        "com.sankuai.meituan" to "美团",
+        "com.xingin.xhs" to "小红书",
+        "com.ss.android.ugc.aweme" to "抖音"
     )
 
     fun hostDisplayName(pkg: String): String? = EMBEDDED_HOSTS[pkg]

@@ -29,6 +29,12 @@ class PaymentAccessibilityService : AccessibilityService() {
     private var probeStep = 0
     private var probeRun: Runnable? = null
 
+    /** 事件源爬到的那颗窗口根。getWindows() 读不到时拿它顶上。 */
+    private var pendingRoot: AccessibilityNodeInfo? = null
+
+    /** 事件到达那一刻抄下来的页面文字。 */
+    private var pendingTexts: List<String> = emptyList()
+
     override fun onServiceConnected() {
         super.onServiceConnected()
         IngestPipeline.init(applicationContext)
@@ -55,6 +61,18 @@ class PaymentAccessibilityService : AccessibilityService() {
 
         val settings = IngestPipeline.settings ?: return
         if (!settings.accessibilityChannel) return
+
+        // 事件刚到这一刻是唯一能百分之百拿到这一页的时机。
+        // 等 0.15s 之后再去 getWindows()，页面可能已经切走、或被系统权限弹窗盖住，
+        // 拿到就是一个空列表 —— 现场看到的一整屏「没有可读的窗口」就是这么来的。
+        rootFromEvent(pkg, e)?.let { r ->
+            pendingRoot = r
+            // 顺手把这一刻的文字抄一份。等到采样时页面可能已经关掉，
+            // 节点也可能失效，但抄下来的字符串一直在。
+            val t = ArrayList<String>(160)
+            collectTexts(r, t, 0)
+            if (t.isNotEmpty()) pendingTexts = t
+        }
 
         scheduleProbe(pkg)
     }
@@ -86,6 +104,8 @@ class PaymentAccessibilityService : AccessibilityService() {
                     handler.postDelayed(this, probeDelays[probeStep] - probeDelays[probeStep - 1])
                 } else {
                     probeRun = null
+                    pendingRoot = null
+                    pendingTexts = emptyList()
                 }
             }
         }
@@ -98,12 +118,20 @@ class PaymentAccessibilityService : AccessibilityService() {
 
         // 等了 350ms，用户可能已经切到别的 App。窗口和事件包名对不上，
         // 就拿错页面去解析了（微信记的成了支付宝的页面），所以先对一次。
-        val roots = rootsFor(pkg)
+        var roots = rootsFor(pkg)
         if (roots.isEmpty()) {
+            // 活动窗口读不到、getWindows() 也空（权限弹窗盖在上面时就是这样），
+            // 退回到事件到达那一刻从事件源爬出来的那颗根
+            pendingRoot?.let { r ->
+                if (r.packageName?.toString() == pkg) roots = listOf(r)
+            }
+        }
+        if (roots.isEmpty()) {
+            val windowCount = runCatching { windows?.size }.getOrNull() ?: -1
             Log.d(TAG, "没有这个 App 的可读窗口")
             IngestLog.add(
                 "无障碍", "没有可读的窗口",
-                "活动窗口是 ${rootInActiveWindow?.packageName}，事件来自 $pkg"
+                "活动窗口是 ${rootInActiveWindow?.packageName}，事件来自 $pkg，可读窗口 $windowCount 个"
             )
             return false
         }
@@ -119,6 +147,16 @@ class PaymentAccessibilityService : AccessibilityService() {
 
         val texts = ArrayList<String>(200)
         roots.forEach { collectTexts(it, texts, 0) }
+
+        // 现在这一页不像支付页，但事件刚发生时那一页像 —— 用当时抄的那份。
+        // 支付结果页停留一两秒就没了，晚一点读到的已经是别的页面了。
+        if ((texts.isEmpty() || !looksLikePaymentPage(texts)) &&
+            pendingTexts.isNotEmpty() && looksLikePaymentPage(pendingTexts)
+        ) {
+            texts.clear()
+            texts.addAll(pendingTexts)
+        }
+
         if (texts.isEmpty()) {
             IngestLog.add("无障碍", "窗口里没有文字节点", "共 ${roots.size} 个窗口 / $pkg")
             return false
@@ -188,6 +226,28 @@ class PaymentAccessibilityService : AccessibilityService() {
      * 拿到的是下面那一层，上面那层写着「支付成功」「¥2.00」的窗口永远看不到 ——
      * 这是之前「扫码付了、账单里没有」的原因之一。
      */
+    /**
+     * 从事件源节点往上爬到窗口根。
+     *
+     * 这条路不依赖 rootInActiveWindow，也不依赖 getWindows() ——
+     * 支付宝付款时会盖一层系统权限弹窗，活动窗口变成 com.android.permissioncontroller，
+     * 但事件的源节点还在支付宝那棵树里，顺着 parent 一路爬就能摸到整页。
+     */
+    private fun rootFromEvent(pkg: String, event: AccessibilityEvent?): AccessibilityNodeInfo? {
+        return runCatching {
+            val src = event?.source ?: return@runCatching null
+            if (src.packageName?.toString() != pkg) return@runCatching null
+            var cur = src
+            var guard = 0
+            while (guard < 80) {
+                val parent = cur.parent ?: break
+                cur = parent
+                guard++
+            }
+            if (cur.packageName?.toString() == pkg) cur else null
+        }.getOrNull()
+    }
+
     private fun rootsFor(pkg: String): List<AccessibilityNodeInfo> {
         val out = ArrayList<AccessibilityNodeInfo>(3)
         rootInActiveWindow?.let { r ->
