@@ -46,6 +46,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -92,6 +93,15 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     val settings = IngestPipeline.settings
+
+    // 「我的」页里这些设置只存在本地偏好里，不进 AppData。
+    // 点完之后 AppData 内容一模一样，Compose 判定「没变化」就不重组，
+    // 界面看着像点了没反应 —— 预算提醒那几个档位就是这么卡的。
+    // 这里直接订阅数据版本，版本一动就把设置重读一遍。
+    val version by DingZhangApp.dataVersion.collectAsState()
+    val monthlyBudgetCents = remember(version) { settings?.monthlyBudgetCents ?: 0L }
+    val yearBudgetCents = remember(version) { settings?.yearBudgetCents ?: 0L }
+    val alertPct = remember(version) { settings?.budgetAlertPercent ?: 80 }
 
     var importing by remember { mutableStateOf(false) }
     var result by remember { mutableStateOf<ImportResult?>(null) }
@@ -459,7 +469,7 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
 
             BudgetRow(
                 label = "每月预算",
-                cents = settings?.monthlyBudgetCents ?: 0L,
+                cents = monthlyBudgetCents,
                 quick = listOf(
                     1_000_00L to "1000", 3_000_00L to "3000",
                     5_000_00L to "5000", 10_000_00L to "1万"
@@ -479,7 +489,7 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
 
             BudgetRow(
                 label = "每年预算",
-                cents = settings?.yearBudgetCents ?: 0L,
+                cents = yearBudgetCents,
                 quick = listOf(
                     30_000_00L to "3万", 50_000_00L to "5万", 100_000_00L to "10万"
                 ),
@@ -496,7 +506,6 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
 
             Spacer(Modifier.height(16.dp))
 
-            val alertPct = settings?.budgetAlertPercent ?: 80
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("预算提醒", style = MaterialTheme.typography.bodyMedium, color = Dz.InkSoft)
                 Spacer(Modifier.weight(1f))
