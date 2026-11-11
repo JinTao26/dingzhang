@@ -1070,7 +1070,6 @@ private fun FeedbackPage(ctx: Context, onClose: () -> Unit) {
     }
 }
 
-@Composable
 /**
  * 最近采集记录。自动记账没记上的时候，这里能看到卡在哪一步：
  * 是无障碍事件没来、抓到了窗但认不出这页、还是被当成重复丢了。
@@ -1124,6 +1123,7 @@ private fun IngestLogCard() {
     }
 }
 
+@Composable
 private fun PrinciplePage(onClose: () -> Unit) {
     Column(
         Modifier
