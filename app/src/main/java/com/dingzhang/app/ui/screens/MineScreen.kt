@@ -928,6 +928,30 @@ private fun submitFeedback(ctx: Context, text: String) {
     }
 }
 
+/** 仓库地址，提 Issue 用。国内打不开时下面会兜底成复制。 */
+private const val ISSUES_NEW_URL = "https://github.com/JinTao26/dingzhang/issues/new"
+
+/**
+ * 去 GitHub 提一条。文字、环境信息都预填好，用户点开基本只要按一下提交。
+ * 需要 GitHub 账号 —— 这也是为什么邮件那条路必须留着。
+ */
+private fun openGitHubIssue(ctx: Context, text: String) {
+    if (text.isBlank()) return
+    val subject = "叮账反馈：" + text.trim().take(24)
+    // URL 有长度上限，太长了浏览器直接打不开，砍到 1600 字
+    val body = feedbackBody(ctx, text).take(1600)
+    val url = ISSUES_NEW_URL + "?title=" + Uri.encode(subject) + "&body=" + Uri.encode(body)
+    try {
+        ctx.startActivity(
+            Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
+    } catch (e: Exception) {
+        copyFeedback(ctx, withRecipient(text, subject, feedbackBody(ctx, text)))
+        Toast.makeText(ctx, "打不开浏览器。内容已复制", Toast.LENGTH_LONG).show()
+    }
+}
+
 /** 复制用：把收件人和主题写在最前面，粘出去以后一眼知道发给谁。 */
 private fun withRecipient(text: String, subject: String, body: String): String =
     "收件人：" + FEEDBACK_MAIL + "\n主题：" + subject + "\n\n" + body
@@ -1111,7 +1135,8 @@ private fun FeedbackPage(ctx: Context, onClose: () -> Unit) {
             Text(
                 "哪个分类认错了、哪笔没记上、哪句文案别扭，都能从这儿发。" +
                     "会自动附上机型和开关状态，省得你再描述环境。" +
-                    "手机上没登录邮箱的话点「复制」——收件地址和内容一起复制好了，粘到任意邮箱发出去就行",
+                    "手机上没登录邮箱的话点「复制」——收件地址和内容一起复制好了，粘到任意邮箱发出去就行。" +
+                    "有 GitHub 账号的可以直接去仓库提 Issue，环境和描述也会预填好",
                 style = MaterialTheme.typography.bodySmall,
                 color = Dz.InkFaint,
                 modifier = Modifier.padding(bottom = 10.dp)
@@ -1140,6 +1165,11 @@ private fun FeedbackPage(ctx: Context, onClose: () -> Unit) {
                     ),
                     modifier = Modifier.padding(top = 10.dp)
                 ) { Text("发到邮箱") }
+                TextButton(
+                    onClick = { openGitHubIssue(ctx, feedback) },
+                    enabled = feedback.isNotBlank(),
+                    modifier = Modifier.padding(top = 10.dp)
+                ) { Text("去 GitHub 提", color = Dz.InkSoft) }
                 TextButton(
                     onClick = {
                         val subject = "叮账反馈：" + feedback.trim().take(24)

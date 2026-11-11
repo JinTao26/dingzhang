@@ -1,7 +1,7 @@
 {
-  "version": "0.5.17",
-  "notes": "自动记账这一版动得最多：淘宝、闲鱼、京东、拼多多里直接在 App 里付掉的钱能认了，买京东用京东支付或银行卡也能认；付完不再弹任何提示，彻底静默；预算花到设定比例会提醒一次。界面也修了：首页预算还剩、月份字号放大，筛选面板底部的分类不再贴着屏幕点不到。",
-  "apk": "https://github.com/JinTao26/dingzhang/releases/download/v0.5.17/dingzhang.apk",
-  "page": "https://github.com/JinTao26/dingzhang/releases/tag/v0.5.17",
+  "version": "0.5.18",
+  "notes": "意见反馈修好了：点发送会自动填好收件人，不再是个空草稿；也可以直接去 GitHub 提 Issue。自动记账这版支持了淘宝、闲鱼、京东、拼多多里直接付掉的钱，付完不再弹任何提示，预算花到设定比例会提醒一次。",
+  "apk": "https://github.com/JinTao26/dingzhang/releases/download/v0.5.18/dingzhang.apk",
+  "page": "https://github.com/JinTao26/dingzhang/releases/tag/v0.5.18",
   "published_at": "2026-11-11T02:00:00Z"
 }
