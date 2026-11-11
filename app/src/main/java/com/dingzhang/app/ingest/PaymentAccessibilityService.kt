@@ -57,9 +57,14 @@ class PaymentAccessibilityService : AccessibilityService() {
 
         // 等了 350ms，用户可能已经切到别的 App。窗口和事件包名对不上，
         // 就拿错页面去解析了（微信记的成了支付宝的页面），所以先对一次。
-        val root = rootInActiveWindow ?: return
+        val root = rootInActiveWindow
+        if (root == null) {
+            IngestLog.add("无障碍", "拿到的是空窗口", pkg)
+            return
+        }
         if (root.packageName?.toString() != pkg) {
             Log.d(TAG, "窗口已切走，跳过本次解析")
+            IngestLog.add("无障碍", "窗口已经切走了", "${root.packageName} / 事件来自 $pkg")
             return
         }
 
@@ -80,6 +85,12 @@ class PaymentAccessibilityService : AccessibilityService() {
             // 明显是支付/账单页却没认出来，记一行现场，方便照着补规则
             if (looksLikePaymentPage(texts)) {
                 Log.d(TAG, "未命中规则 $pkg: " + texts.take(8).joinToString(" / ").take(160))
+                IngestLog.add(
+                    "无障碍", "认不出这页",
+                    texts.take(6).joinToString(" / ")
+                )
+            } else {
+                IngestLog.add("无障碍", "不是支付页", texts.take(4).joinToString(" / "))
             }
             return
         }
@@ -89,12 +100,20 @@ class PaymentAccessibilityService : AccessibilityService() {
         // 分钟级指纹会把同一分钟内同店同金额的两笔真实消费当成同一页，第二笔直接被挡掉。
         val pageKey = captured.externalId?.let { "no|$it" }
             ?: "${captured.wallet.db}|${captured.amountCents}|${captured.payee}|${now / 1000}"
-        if (recentPages.contains(pageKey)) return
+        if (recentPages.contains(pageKey)) {
+            IngestLog.add("无障碍", "同一页刚处理过", pageKey)
+            return
+        }
         recentPages.addLast(pageKey)
         if (recentPages.size > 30) recentPages.removeFirst()
 
         val outcome = IngestPipeline.submit(captured)
         Log.i(TAG, "无障碍记账: accepted=${outcome.accepted} ${outcome.reason}")
+        IngestLog.add(
+            "无障碍",
+            if (outcome.accepted) "记上了" else "没记上",
+            "${captured.payee} ${captured.amountCents / 100.0} 元 · ${outcome.reason}"
+        )
 
         if (outcome.accepted) {
             NotificationHelper.notifyAutoCaptured(

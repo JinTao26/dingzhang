@@ -71,6 +71,7 @@ import com.dingzhang.app.core.model.Money
 import com.dingzhang.app.data.Exporter
 import com.dingzhang.app.ingest.BillImporter
 import com.dingzhang.app.ingest.ImportResult
+import com.dingzhang.app.ingest.IngestLog
 import com.dingzhang.app.ingest.IngestPipeline
 import com.dingzhang.app.share.ShareKit
 import com.dingzhang.app.ui.AppData
@@ -1070,6 +1071,59 @@ private fun FeedbackPage(ctx: Context, onClose: () -> Unit) {
 }
 
 @Composable
+/**
+ * 最近采集记录。自动记账没记上的时候，这里能看到卡在哪一步：
+ * 是无障碍事件没来、抓到了窗但认不出这页、还是被当成重复丢了。
+ */
+@Composable
+private fun IngestLogCard() {
+    var show by remember { mutableStateOf(false) }
+    val lines = if (show) IngestLog.read() else emptyList()
+
+    DzCard {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { show = !show },
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("最近采集记录", style = MaterialTheme.typography.titleMedium, color = Dz.Ink)
+            Spacer(Modifier.weight(1f))
+            Text(
+                if (show) "收起" else "展开",
+                style = MaterialTheme.typography.labelMedium,
+                color = Dz.InkSoft
+            )
+        }
+        if (show) {
+            Spacer(Modifier.height(10.dp))
+            if (lines.isEmpty()) {
+                Text(
+                    "还没有记录。开着无障碍付一笔钱，这里就会出现一行，写着记上了还是没认出来。",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Dz.InkSoft
+                )
+            } else {
+                lines.take(12).forEach { line ->
+                    Text(
+                        IngestLog.pretty(line),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Dz.InkSoft
+                    )
+                    Spacer(Modifier.height(8.dp))
+                }
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    "清空记录",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Dz.Sakura,
+                    modifier = Modifier.clickable { IngestLog.clear() }
+                )
+            }
+        }
+    }
+}
+
 private fun PrinciplePage(onClose: () -> Unit) {
     Column(
         Modifier
@@ -1089,6 +1143,10 @@ private fun PrinciplePage(onClose: () -> Unit) {
             ExplainLine("④", "账单", "你导出的官方流水，最权威，用来补历史和核对")
             ExplainLine("⑤", "手记", "兜底，记不起的账自己补一笔")
         }
+
+        Spacer(Modifier.height(12.dp))
+
+        IngestLogCard()
 
         Spacer(Modifier.height(12.dp))
 

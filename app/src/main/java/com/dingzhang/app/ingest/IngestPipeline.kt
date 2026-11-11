@@ -43,6 +43,7 @@ object IngestPipeline {
             val helper = DbHelper(context.applicationContext)
             daoRef = TxnDao(helper)
             settingsRef = Settings(context.applicationContext)
+            IngestLog.init(context.applicationContext)
             ready = true
         }
     }
