@@ -31,6 +31,15 @@ object UpdateChecker {
 
     private const val API_URL = "https://api.github.com/repos/$OWNER/$REPO/releases/latest"
 
+    /**
+     * 国内能通的清单源：仓库根目录的 version.json，每次发版同步更新。
+     *
+     * **这才是「从来没弹过更新」的真正原因**：api.github.com 在手机上十次有九次连不上，
+     * 检查静默失败，用户那边看到的就是「一直没提醒」。换成 CDN 上的静态清单后，
+     * 一次请求几十 KB，全国都能拿到。
+     */
+    private const val MANIFEST_URL = "https://cdn.jsdelivr.net/gh/$OWNER/$REPO@main/version.json"
+
     data class Result(
         val currentVersion: String,
         val latestVersion: String? = null,
@@ -45,17 +54,56 @@ object UpdateChecker {
     )
 
     suspend fun check(current: String): Result = withContext(Dispatchers.IO) {
+        // 先打 CDN 清单；不通再退回 GitHub API（海外、挂了梯子的时候才用得上）
+        manifest(current)?.let { return@withContext it }
+
         val release = httpText(API_URL)?.let {
             runCatching { parseRelease(current, it) }.getOrNull()
         }
         if (release != null) return@withContext release
 
-        Log.w(TAG, "更新源没连上")
+        Log.w(TAG, "两个更新源都没连上")
         Result(
             current, ok = false,
             message = "连不上 GitHub。有网的话可以打开镜像页看看有没有新版：" +
                 "${MIRROR_PREFIX}${RELEASE_PAGE}"
         )
+    }
+
+    // ------------------------------------------------------------------ 清单源
+
+    private fun manifest(current: String): Result? {
+        // jsDelivr 的边缘节点会缓存 @main 的内容，所以带一个按小时变的参数：
+        // 最多晚一小时看到新版，不加这个参数的话发版当天可能还拿到旧那份。
+        val url = MANIFEST_URL + "?_=" + (System.currentTimeMillis() / 3_600_000L)
+        val text = httpText(url) ?: return null
+        return try {
+            val j = JSONObject(text)
+            val v = j.optString("version").trim()
+            if (v.isBlank()) return null
+            val apk = j.optString("apk").trim()
+            // 清单里的版本号和下载链接必须对得上。改漏一处就当这份清单不能用 ——
+            // 宁可这次不提示更新，也不要让人点进去下到旧包。
+            if (apk.isNotBlank() && !apk.contains(v)) {
+                Log.w(TAG, "清单版本 $v 与下载链对不上，跳过")
+                return null
+            }
+            val has = isNewer(v, current)
+            Log.i(TAG, "清单源：当前 $current / 最新 $v / 有更新=$has")
+            Result(
+                currentVersion = current,
+                latestVersion = v,
+                notes = j.optString("notes").trim().take(1200),
+                pageUrl = j.optString("page").trim().ifBlank { RELEASE_PAGE },
+                apkUrl = apk.takeIf { it.startsWith("http") }?.let { mirrorOf(it) },
+                publishedAt = j.optString("published_at").trim(),
+                hasUpdate = has,
+                message = if (has) "发现新版本 $v" else "已经是最新版本"
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "清单解析失败：${e.message}")
+            null
+        }
     }
 
     // ------------------------------------------------------------------ 解析

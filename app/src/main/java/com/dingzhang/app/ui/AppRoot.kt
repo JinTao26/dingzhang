@@ -201,6 +201,23 @@ private fun loadAppData(month: String): AppData {
     )
 }
 
+/** 直接给 apk 直链，点开就能下；浏览器都没法用就提示页面地址。 */
+private fun openRelease(ctx: android.content.Context, r: UpdateChecker.Result) {
+    val url = r.apkUrl ?: r.pageUrl
+    try {
+        ctx.startActivity(
+            Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
+    } catch (e: Exception) {
+        android.widget.Toast.makeText(
+            ctx,
+            "打不开浏览器。可以手动打开这个地址下载：${r.pageUrl}",
+            android.widget.Toast.LENGTH_LONG
+        ).show()
+    }
+}
+
 @Composable
 fun AppRoot() {
     // 星空物语要多铺一层背景，其它主题走原来的纯色底
@@ -222,11 +239,47 @@ fun AppRoot() {
         runCatching { com.dingzhang.app.ingest.ChannelHealth.ensureNotificationListening(ctx) }
     }
 
+    // 开屏查一次新版。以前这段被删掉过，加上更新源又只打 api.github.com（手机上基本连不上），
+    // 所以用户那边从来没收到过提醒。现在源换成了 CDN 上的清单，这里补回来。
+    var autoUpdate by remember { mutableStateOf<UpdateChecker.Result?>(null) }
+    LaunchedEffect(Unit) {
+        val last = runCatching { IngestPipeline.settings?.lastUpdateCheckAt ?: 0L }.getOrDefault(0L)
+        // 六小时内查过就不再查，省电也省流量；查失败不记时间，下次还会重试
+        if (System.currentTimeMillis() - last < 6 * 60 * 60 * 1000L) return@LaunchedEffect
+        val r = runCatching {
+            withContext(Dispatchers.IO) { UpdateChecker.check(BuildConfig.VERSION_NAME) }
+        }.getOrNull()
+        if (r != null && r.ok) {
+            runCatching { IngestPipeline.settings?.lastUpdateCheckAt = System.currentTimeMillis() }
+        }
+        if (r != null && r.hasUpdate) {
+            // 用户点过「暂不更新」就安静待着，等下一版再来问
+            val skipped = runCatching { IngestPipeline.settings?.skipVersion ?: "" }.getOrDefault("")
+            if (r.latestVersion != skipped) autoUpdate = r
+        }
+    }
+
     if (showIntro) {
         IntroDialog {
             IngestPipeline.settings?.introSeen = true
             showIntro = false
         }
+    }
+
+    autoUpdate?.let { r ->
+        UpdateDialog(
+            result = r,
+            fromAuto = true,
+            onDismiss = { autoUpdate = null },
+            onSkipVersion = {
+                runCatching { IngestPipeline.settings?.skipVersion = r.latestVersion.orEmpty() }
+                autoUpdate = null
+            },
+            onDownload = {
+                openRelease(ctx, r)
+                autoUpdate = null
+            }
+        )
     }
 
     if (showAdd) {
