@@ -32,12 +32,12 @@ object PaymentNotifierParser {
         pkg.contains("jingdong") || pkg.contains("jd.jr") || pkg.contains("jdlite")
 
     private val shoppingExpensePatterns = listOf(
-        Regex("使用【(.+?)】支付([0-9]+(?:\.[0-9]{1,2})?)"),
-        Regex("(?:支付|付款)成功[，,：:]?[¥￥]?([0-9]+(?:\.[0-9]{1,2})?)"),
-        Regex("成功支付[¥￥]?([0-9]+(?:\.[0-9]{1,2})?)"),
-        Regex("(?:支付|付款)完成[，,：:]?[¥￥]?([0-9]+(?:\.[0-9]{1,2})?)"),
-        Regex("已支付[¥￥]([0-9]+(?:\.[0-9]{1,2})?)"),
-        Regex("实付[¥￥]([0-9]+(?:\.[0-9]{1,2})?)")
+        Regex("使用【(.+?)】支付([0-9]+(?:\\.[0-9]{1,2})?)"),
+        Regex("(?:支付|付款)成功[，,：:]?[¥￥]?([0-9]+(?:\\.[0-9]{1,2})?)"),
+        Regex("成功支付[¥￥]?([0-9]+(?:\\.[0-9]{1,2})?)"),
+        Regex("(?:支付|付款)完成[，,：:]?[¥￥]?([0-9]+(?:\\.[0-9]{1,2})?)"),
+        Regex("已支付[¥￥]([0-9]+(?:\\.[0-9]{1,2})?)"),
+        Regex("实付[¥￥]([0-9]+(?:\\.[0-9]{1,2})?)")
         // 刻意没有「支付([0-9.]+)」和「[¥￥]([0-9.]+)」：
         // 后者会把「省钱金额已达648.13元」记成一笔支出
     )
@@ -144,7 +144,7 @@ object PaymentNotifierParser {
             amountCents = amount,
             wallet = wallet,
             payee = payee,
-            source = Source.NOTIFY,
+            source = Source.NOTIFICATION,
             occurredAt = postedAt,
             account = account,
             raw = corpus.take(300),
@@ -166,7 +166,7 @@ object PaymentNotifierParser {
         if (!shop.isNullOrBlank()) return IngestPipeline.cleanPayee(shop).takeIf { it.length in 2..20 }
 
         return listOfNotNull(
-            Regex("商户[：:]\s*(.{2,20}?)(?:\\s|，|,|$)").find(corpus)?.groupValues?.get(1),
+            Regex("商户[：:]\\s*(.{2,20}?)(?:\\s|，|,|$)").find(corpus)?.groupValues?.get(1),
             Regex("付款给(.{2,20}?)(?:\\s|，|,|$|。|的)").find(corpus)?.groupValues?.get(1)
         ).firstOrNull { it.isNotBlank() }?.let { IngestPipeline.cleanPayee(it) }
             ?.takeIf { it.length in 2..20 }
