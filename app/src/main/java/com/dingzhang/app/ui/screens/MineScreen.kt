@@ -288,7 +288,7 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
 
             ChannelRow(
                 title = "无障碍读取",
-                desc = "读微信 / 支付宝的支付结果页和账单详情页，能拿到商户、金额和单号",
+                desc = "读微信 / 支付宝的支付结果页和账单详情页；淘宝、闲鱼、京东、拼多多里直接付掉的钱也能认出来。能拿到商户、金额和单号",
                 systemGranted = a11yOn,
                 appEnabled = settings?.accessibilityChannel ?: true,
                 onToggle = { v ->

@@ -3,7 +3,7 @@
     <string name="app_name">叮账</string>
     <string name="nls_label">叮账 · 通知识别</string>
     <string name="a11y_label">叮账 · 自动记账</string>
-    <string name="a11y_desc">用于在支付宝、微信的支付结果页和账单详情页读取金额、商户、时间，自动生成一笔账。仅在支付相关页面工作，不读取聊天内容。</string>
+    <string name="a11y_desc">用于在微信、支付宝的支付结果页和账单详情页，以及淘宝、闲鱼、京东、拼多多里直接付款成功的那一页，读取金额、商户、时间，自动生成一笔账。只在支付完成时读一次，挣钱、聊天、刷商品页都不读。</string>
     <string name="shortcut_share_short">分享</string>
     <string name="shortcut_share_long">分享给朋友</string>
 </resources>

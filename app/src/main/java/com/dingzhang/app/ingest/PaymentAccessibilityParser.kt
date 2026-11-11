@@ -195,6 +195,118 @@ object PaymentAccessibilityParser {
         )
     }
 
+    // ═══════════════════════════════════════════════════════
+    // 内嵌收银台
+    // ═══════════════════════════════════════════════════════
+    /**
+     * 在购物 App 里面直接把钱付掉的情况。
+     *
+     * 淘宝下单选支付宝付款时，收银台是支付宝的 SDK **弹在淘宝进程里**的，
+     * 既不会跳到支付宝 App，支付宝也不会为此推一条通知 ——
+     * 所以包名是 com.taobao.taobao 的这笔钱，只订阅微信/支付宝的通道永远看不到。
+     * 京东、拼多多、闲鱼同理。
+     *
+     * 代价是这些 App 的页面不能当支付页来读，误记风险高（商品页上到处是价格），
+     * 所以这里的规则比微信支付宝那套**严得多**：必须同时出现
+     * 「已经付完的字」+「金额」，只要出现一个「还没付/付失败了」的字就整页丢弃。
+     */
+    val EMBEDDED_HOSTS = mapOf(
+        "com.taobao.taobao" to "淘宝",
+        "com.taobao.idlefish" to "闲鱼",
+        "com.jingdong.app.mall" to "京东",
+        "com.xunmeng.pinduoduo" to "拼多多"
+    )
+
+    fun hostDisplayName(pkg: String): String? = EMBEDDED_HOSTS[pkg]
+
+    /** 已经付完。必须命中最少一个，而且一个反例都不能有。 */
+    private val embeddedDoneCues = listOf(
+        "支付成功", "付款成功", "交易成功", "支付完成", "付款完成", "交易完成",
+        "支付已成功", "付款已成功", "返回商家"
+        // 刻意不认裸「已支付」：订单列表里每一笔历史订单都挂着这个状态
+    )
+
+    /** 还没付 / 付失败 / 跟付款无关的状态。出现任何一个，整页丢掉。 */
+    private val embeddedNotDoneCues = listOf(
+        "支付失败", "付款失败", "交易失败", "支付超时", "已取消", "交易关闭",
+        "待付款", "待支付", "去支付", "立即支付", "立即付款", "确认付款",
+        "收银台", "请确认", "正在支付", "支付中", "去结算", "提交订单",
+        "确认订单", "加入购物车", "再买一单", "先去逛逛", "待收货",
+        "我的订单", "全部订单", "待发货", "确认收货", "查看物流", "申请退款"
+    )
+
+    private val shopSuffixes = listOf(
+        "旗舰店", "专营店", "专卖店", "官方店", "小店", "商行", "超市", "便利店", "药店", "书店"
+    )
+
+    /**
+     * 内嵌收银台的成交页。
+     * @return 认不出来返回 null —— 商品页、订单列表、店铺页绝大多数都会走到这里
+     */
+    fun parseEmbedded(pkg: String, texts: List<String>, now: Long): Captured? {
+        val hostName = EMBEDDED_HOSTS[pkg] ?: return null
+        if (texts.isEmpty()) return null
+
+        val flat = texts.joinToString(" ").replace(Regex("\\s+"), " ").trim()
+        if (flat.length < 4) return null
+
+        // 闸一：出现任何「没付成」的字，整页不算
+        if (embeddedNotDoneCues.any { flat.contains(it) }) return null
+        // 闸二：必须有明确的「付完了」
+        if (embeddedDoneCues.none { flat.contains(it) }) return null
+
+        // 闸三：一页上冒出好几个价格，这是订单列表 / 商品列表，不是某一笔的成交页。
+        // 这一条挡住的是最坏的情况：从列表页里随手抓一个金额，记成一笔不存在的消费。
+        val priceCount = texts.count { amountWithSymbol.containsMatchIn(it) || it.contains("¥") }
+        if (priceCount >= 3) return null
+
+        // 闸四：必须有金额。过了前三闸，这里抓到的金额才可信
+        val amount = extractAmount(texts) ?: return null
+        if (amount <= 0 || amount > 10_000_000_00L) return null
+
+        val kind = if (refundCues.any { flat.contains(it) }) TxnKind.REFUND else TxnKind.EXPENSE
+
+        // 钱包：App 里写了哪个就用哪个。都没写（京东支付之类）就记未知，
+        // 宁可不知道走的哪张卡，也别猜
+        val wallet = when {
+            flat.contains("支付宝") || flat.contains("花呗") || flat.contains("余额宝") ->
+                Wallet.ALIPAY
+            flat.contains("微信") || flat.contains("零钱") -> Wallet.WECHAT
+            else -> Wallet.UNKNOWN
+        }
+
+        // 商户名：先找店铺（「XX旗舰店」这种），找不到就记平台本身「淘宝」
+        val shop = texts.firstOrNull { t ->
+            t.length in 3..24 && shopSuffixes.any { t.endsWith(it) }
+        }?.let { IngestPipeline.cleanPayee(it) }?.takeIf { it.length in 2..24 }
+
+        val payee = shop ?: hostName
+
+        val occurredAt = findValue(texts, timeLabels)
+            ?.let { Dates.parseBillTime(it) }
+            ?: now
+
+        val tradeNo = findValue(texts, tradeNoLabels)
+            ?.filter { it.isDigit() }
+            ?.takeIf { it.length >= 10 }
+
+        Log.d("A11y", "内嵌收银台 $hostName: $payee $amount")
+
+        return Captured(
+            amountCents = amount,
+            wallet = wallet,
+            payee = payee,
+            source = Source.ACCESSIBILITY,
+            occurredAt = occurredAt,
+            account = "",
+            raw = flat.take(300),
+            externalId = tradeNo,
+            kindHint = kind,
+            // 平台名直接给分类用：「淘宝」会映射到购物，不用再猜
+            platformCategory = hostName
+        )
+    }
+
     private fun defaultPayee(wallet: Wallet): String = when (wallet) {
         Wallet.WECHAT -> "微信支付"
         Wallet.ALIPAY -> "支付宝"

@@ -38,11 +38,20 @@ class PaymentAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val e = event ?: return
         val pkg = e.packageName?.toString() ?: return
-        if (pkg != PaymentNotifierParser.PKG_WECHAT && pkg != PaymentNotifierParser.PKG_ALIPAY) return
+        val isDirect = pkg == PaymentNotifierParser.PKG_WECHAT || pkg == PaymentNotifierParser.PKG_ALIPAY
+        val isHost = PaymentAccessibilityParser.hostDisplayName(pkg) != null
+        if (!isDirect && !isHost) return
 
-        if (e.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
+        // 购物 App 的页面变化极其密集（商品页、列表页一直在刷新），
+        // 而且那些页面根本不是付款页。只在「换了一个窗口」时看一眼：
+        // 收银台和支付结果页都是独立窗口，一个都不会漏。
+        if (isHost) {
+            if (e.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
+        } else if (e.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
             e.eventType != AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
-        ) return
+        ) {
+            return
+        }
 
         val settings = IngestPipeline.settings ?: return
         if (!settings.accessibilityChannel) return
@@ -115,7 +124,11 @@ class PaymentAccessibilityService : AccessibilityService() {
             return false
         }
 
-        val captured = PaymentAccessibilityParser.parse(pkg, texts, now)
+        val captured = if (PaymentAccessibilityParser.hostDisplayName(pkg) != null) {
+            PaymentAccessibilityParser.parseEmbedded(pkg, texts, now)
+        } else {
+            PaymentAccessibilityParser.parse(pkg, texts, now)
+        }
         lastParseOk[pkg] = captured != null
 
         if (captured == null) {
@@ -126,6 +139,11 @@ class PaymentAccessibilityService : AccessibilityService() {
                     "无障碍", "认不出这页",
                     texts.take(6).joinToString(" / ")
                 )
+            } else if (PaymentAccessibilityParser.hostDisplayName(pkg) != null) {
+                // 购物 App 里绝大多数页面都不是支付页，只留一行最简的，免得把记录刷爆
+                if (looksLikePaymentPage(texts)) {
+                    IngestLog.add("无障碍", "购物 App 里有付款字样但没认出来", texts.take(5).joinToString(" / "))
+                }
             } else {
                 IngestLog.add("无障碍", "不是支付页", texts.take(4).joinToString(" / "))
             }
