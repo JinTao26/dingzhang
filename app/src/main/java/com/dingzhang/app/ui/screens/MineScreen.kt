@@ -1106,14 +1106,8 @@ private fun submitFeedback(ctx: Context, text: String) {
     val subject = "叮账反馈：" + text.trim().take(24)
     val body = feedbackBody(ctx, text)
 
-    // 先把「收件人 + 主题 + 正文」整段放进剪贴板。
-    // 这是主路径，不是备胎：不管手机有没有邮件 App、不管用户在弹出的列表里
-    // 点了哪一个、不管那个 App 认不认 EXTRA_EMAIL，东西都已经在手上，粘出去一定到。
-    // 以前主路径是 ACTION_SEND + message/rfc822 —— 系统会把它当成「把一段文字交给谁」，
-    // 于是列表里混进微信、备忘录、网盘这些根本不认收件人的 App。
-    // 用户随手点第一个，草稿里收件人就是空的，还得自己回想地址；点了「总是」更麻烦，
-    // 之后每次都直接跳那个 App，看着就像「改不回来了」。
-    copyFeedbackSilently(ctx, withRecipient(text, subject, body))
+    // 剪贴板留给兜底，能直接唤起邮件 App 就不碰 ——
+    // 用户剪贴板里常有自己的东西，为发一条反馈把它顶掉很不礼貌。
 
     // 再试着直接唤起邮件客户端。这里只认 mailto：声明处理 mailto 的只有邮件 App，
     // 系统不会再往里塞微信和备忘录。URI 里自带收件人，绝大多数客户端会照着填。
@@ -1139,19 +1133,27 @@ private fun submitFeedback(ctx: Context, text: String) {
     // 而「保存到记事本」只是把内容存下来，收件人字段根本不读，点了等于白点。
     // 所以按显示名挑：带「邮件」「发送」的那个才是在写邮件。
     val picked = pickMailActivity(ctx, mailto)
-    val started =
+    val direct =
         (picked != null && runCatching {
             ctx.startActivity(Intent(mailto).setComponent(picked))
         }.isSuccess) ||
-            runCatching { ctx.startActivity(Intent(mailto).setPackage(QQ_MAIL_PKG)) }.isSuccess ||
-            runCatching {
-                ctx.startActivity(Intent.createChooser(mailto, "发到作者的邮箱，选一个"))
-            }.isSuccess
+            runCatching { ctx.startActivity(Intent(mailto).setPackage(QQ_MAIL_PKG)) }.isSuccess
 
+    if (direct) {
+        Toast.makeText(ctx, "收件人和内容都填好了，确认一下直接发就行", Toast.LENGTH_SHORT).show()
+        return
+    }
+
+    // 挑不出明确的邮件入口，才退一步：先把内容放进剪贴板，再让用户自己选。
+    // 这一步会占掉剪贴板，所以放在最后，话也说明白。
+    copyFeedbackSilently(ctx, withRecipient(text, subject, body))
+    val chooser = runCatching {
+        ctx.startActivity(Intent.createChooser(mailto, "发到作者的邮箱，选一个"))
+    }.isSuccess
     Toast.makeText(
         ctx,
-        if (started) {
-            "收件人和内容已复制。要是打开后收件人是空的，长按粘贴一下就有了"
+        if (chooser) {
+            "内容已复制。收件人要是空的，长按粘一下"
         } else {
             "手机上没有能用的邮箱 App。整段（含收件地址）已复制，粘到任意地方发出去就行"
         },
@@ -1371,15 +1373,12 @@ private fun FeedbackPage(ctx: Context, onClose: () -> Unit) {
         var feedback by remember { mutableStateOf("") }
         DzCard {
             Text(
-                "反馈直接发到作者的邮箱。",
+                "反馈直接发到作者的邮箱，收件人和机型信息自动填好。",
                 style = MaterialTheme.typography.bodySmall,
                 color = Dz.InkFaint
             )
             Text(
-                "点「发到邮箱」会先把收件人和正文整段复制好，再帮你打开邮箱 —— " +
-                    "就算中间打开的是别的 App，或者收件人没自动填上，粘一下就有了，不会丢。" +
-                    "手机上没装邮箱 App 也没关系 —— 收件人地址就在复制出来的那段里，粘到哪儿发都行。" +
-                    "有 GitHub 账号的可以点「去 GitHub 提」，环境和描述一样预填好。",
+                "只在找不到邮箱 App 时，才会把内容复制一份到剪贴板 —— 平时不会动你的剪贴板。",
                 style = MaterialTheme.typography.bodySmall,
                 color = Dz.InkFaint,
                 modifier = Modifier.padding(top = 4.dp, bottom = 6.dp)
