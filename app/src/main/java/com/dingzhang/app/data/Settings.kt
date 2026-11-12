@@ -100,12 +100,25 @@ class Settings(context: Context) {
         set(v) = sp.edit().putBoolean("channel_sms", v).apply()
 
     /**
-     * 银行提醒（App 推送 + 公众号）走通知监听，不需要额外权限，默认开。
-     * 短信收费以后，这条比短信更划算。
+     * 银行 App 自己的动账推送，走通知监听，不需要额外权限，默认开。
+     *
+     * 这条覆盖的是微信支付宝都看不见的钱：POS 直接刷卡、云闪付、银行代扣。
+     * 噪音低、价值高，所以默认开。
      */
     var bankPushChannel: Boolean
         get() = sp.getBoolean("channel_bank_push", true)
         set(v) = sp.edit().putBoolean("channel_bank_push", v).apply()
+
+    /**
+     * 银行公众号（在微信里）的动账提醒。默认关。
+     *
+     * 以前和上面那条捆在同一个开关里 —— 想关公众号就得连 App 推送一起关，
+     * 等于为了躲噪音把唯一能看见 POS 刷卡的路也堵了。现在拆开单独管。
+     * 关掉不影响银行 App 推送：银行自己的推送包名是银行 App，公众号走的是微信。
+     */
+    var bankWechatChannel: Boolean
+        get() = sp.getBoolean("channel_bank_wechat", false)
+        set(v) = sp.edit().putBoolean("channel_bank_wechat", v).apply()
 
     /** 开 App 时顺带查一次更新。默认开，嫌烦可以在「我的」里关掉。 */
     var autoCheckUpdate: Boolean

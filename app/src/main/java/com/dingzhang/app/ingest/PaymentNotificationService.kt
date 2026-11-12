@@ -83,7 +83,7 @@ class PaymentNotificationService : NotificationListenerService() {
         val isShopping = PaymentNotifierParser.isShoppingApp(pkg)
 
         // 微信/支付宝/购物 App 之外的包，只在「银行提醒」开着时才看
-        if (!isPaymentApp && !isShopping && !settings.bankPushChannel) return
+        if (!isPaymentApp && !isShopping && !settings.bankPushChannel && !settings.bankWechatChannel) return
         if ((isPaymentApp || isShopping) && !settings.notificationChannel && !settings.bankPushChannel) return
 
         // 绝大部分通知和钱无关，先用「元」粗筛，省下每条都跑正则的开销
@@ -110,7 +110,15 @@ class PaymentNotificationService : NotificationListenerService() {
         if (captured == null && isShopping && settings.notificationChannel) {
             captured = PaymentNotifierParser.parseShoppingApp(pkg, title, text, bigText, postedAt)
         }
-        if (captured == null && settings.bankPushChannel && pkg != PaymentNotifierParser.PKG_ALIPAY &&
+        // 银行这两条拆开管：银行 App 自己的推送看 bankPushChannel，
+        // 微信里的银行公众号看 bankWechatChannel（默认关）。
+        // 想躲公众号的噪音，不该把 POS 刷卡那条路一起堵掉。
+        val bankWanted = if (pkg == PaymentNotifierParser.PKG_WECHAT) {
+            settings.bankWechatChannel
+        } else {
+            settings.bankPushChannel
+        }
+        if (captured == null && bankWanted && pkg != PaymentNotifierParser.PKG_ALIPAY &&
             !isShopping
         ) {
             captured = parseBankAlert(pkg, title, text, bigText, postedAt)

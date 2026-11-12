@@ -188,6 +188,9 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
     val a11yDead = com.dingzhang.app.ingest.ChannelHealth.a11yLooksDead(ctx)
     val a11yIdleMs = com.dingzhang.app.ingest.ChannelHealth.a11yIdleMs()
 
+    // 银行那几条用得少，收起来压在下面；主界面只留无障碍和通知两条
+    var moreOpen by remember { mutableStateOf(false) }
+
     // 银行短信要一条运行时权限；部分机型（小米/华为等）需要用户自己去系统设置里放开
     var smsGranted by remember {
         mutableStateOf(
@@ -361,34 +364,81 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                 },
                 onGrant = { openSystem(ctx, android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS) }
             )
-            Spacer(Modifier.height(6.dp))
-            ChannelRow(
-                title = "银行推送 / 公众号",
-                desc = "手机银行 App 的动账推送、银行公众号的微信提醒。短信开始收费以后，走这条更省",
-                systemGranted = nlsOn,
-                appEnabled = settings?.bankPushChannel ?: true,
-                onToggle = { v ->
-                    settings?.bankPushChannel = v
-                    DingZhangApp.bumpDataVersion()
-                },
-                onGrant = { openSystem(ctx, android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS) }
-            )
-            Spacer(Modifier.height(6.dp))
-            ChannelRow(
-                title = "银行短信",
-                desc = "工资到账、线下刷卡这类不经过微信支付宝的钱，从银行动账短信里读。只收实时广播，不读历史短信箱，余额和完整卡号不入库",
-                systemGranted = smsGranted,
-                appEnabled = settings?.smsChannel ?: false,
-                onToggle = { v ->
-                    if (v && !smsGranted) {
-                        smsPermission.launch(Manifest.permission.RECEIVE_SMS)
-                    } else {
-                        settings?.smsChannel = v
+            // 下面这三条管的都是「钱不经过微信支付宝」的情况，用得比上面少得多。
+            // 收起来，别让它们把主界面撑满；要用的时候点开就行。
+            val bankPushOn = settings?.bankPushChannel ?: true
+            val bankWechatOn = settings?.bankWechatChannel ?: false
+            val smsOn = settings?.smsChannel ?: false
+            val otherOn = listOf(bankPushOn, bankWechatOn, smsOn).count { it }
+
+            Spacer(Modifier.height(12.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { moreOpen = !moreOpen },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "其他来源",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = Dz.InkSoft
+                    )
+                    Text(
+                        "钱不经过微信支付宝的：银行 App 推送、银行公众号、银行短信 · 已开 " +
+                            otherOn + " 条",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Dz.InkFaint
+                    )
+                }
+                Text(
+                    if (moreOpen) "收起" else "展开",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Dz.Sakura
+                )
+            }
+            if (moreOpen) {
+                Spacer(Modifier.height(8.dp))
+                ChannelRow(
+                    title = "银行 App 推送",
+                    desc = "POS 直接刷卡、云闪付、银行自动代扣 —— 这些微信支付宝看不见，只有银行会告诉你",
+                    systemGranted = nlsOn,
+                    appEnabled = bankPushOn,
+                    onToggle = { v ->
+                        settings?.bankPushChannel = v
                         DingZhangApp.bumpDataVersion()
-                    }
-                },
-                onGrant = { smsPermission.launch(Manifest.permission.RECEIVE_SMS) }
-            )
+                    },
+                    onGrant = { openSystem(ctx, android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS) }
+                )
+                Spacer(Modifier.height(6.dp))
+                ChannelRow(
+                    title = "银行公众号",
+                    desc = "微信里银行公众号发的动账提醒。消息常被折叠，也容易和微信支付本身的记录重复，默认关",
+                    systemGranted = nlsOn,
+                    appEnabled = bankWechatOn,
+                    onToggle = { v ->
+                        settings?.bankWechatChannel = v
+                        DingZhangApp.bumpDataVersion()
+                    },
+                    onGrant = { openSystem(ctx, android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS) }
+                )
+                Spacer(Modifier.height(6.dp))
+                ChannelRow(
+                    title = "银行短信",
+                    desc = "工资到账、线下刷卡这类不经过微信支付宝的钱，从银行动账短信里读。只收实时广播，不读历史短信箱，余额和完整卡号不入库",
+                    systemGranted = smsGranted,
+                    appEnabled = smsOn,
+                    onToggle = { v ->
+                        if (v && !smsGranted) {
+                            smsPermission.launch(Manifest.permission.RECEIVE_SMS)
+                        } else {
+                            settings?.smsChannel = v
+                            DingZhangApp.bumpDataVersion()
+                        }
+                    },
+                    onGrant = { smsPermission.launch(Manifest.permission.RECEIVE_SMS) }
+                )
+            }
         }
 
         Spacer(Modifier.height(12.dp))
@@ -954,7 +1004,8 @@ private fun feedbackBody(ctx: Context, text: String): String {
         appendLine("设备：${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL} · Android ${android.os.Build.VERSION.SDK_INT}")
         appendLine(
             "通道：无障碍 ${on(s?.accessibilityChannel)} / 通知 ${on(s?.notificationChannel)}" +
-                " / 银行推送 ${on(s?.bankPushChannel)} / 短信 ${on(s?.smsChannel)}"
+                " / 银行推送 ${on(s?.bankPushChannel)} / 银行公众号 ${on(s?.bankWechatChannel)}" +
+                " / 短信 ${on(s?.smsChannel)}"
         )
     }
 }
@@ -1557,7 +1608,7 @@ private fun PrinciplePage(onClose: () -> Unit) {
         DzCard {
             ExplainLine("①", "无障碍", "读支付结果页，最准，实时")
             ExplainLine("②", "通知", "读支付通知，最快，但有的机型不带金额")
-            ExplainLine("③", "银行提醒", "手机银行推送、公众号、短信，管不经过微信支付宝的钱")
+            ExplainLine("③", "银行提醒", "手机银行推送默认开；公众号和短信默认关，要用再开")
             ExplainLine("④", "账单", "你导出的官方流水，最权威，用来补历史和核对")
             ExplainLine("⑤", "手记", "兜底，记不起的账自己补一笔")
         }
