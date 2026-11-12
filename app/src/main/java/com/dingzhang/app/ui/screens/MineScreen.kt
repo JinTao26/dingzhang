@@ -364,6 +364,14 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                 },
                 onGrant = { openSystem(ctx, android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS) }
             )
+            // 通知这条最容易「看着开着、其实收不到」：权限给了，但微信的通知被系统折叠掉
+            Text(
+                "微信、支付宝的通知在系统里要开着。MIUI、OriginOS 会把不常用的通知折叠到「其他通知」，" +
+                    "折进去就等于没发 —— 收付款、碰一碰这类没有支付页的付款，全靠这一条。",
+                style = MaterialTheme.typography.labelSmall,
+                color = Dz.InkFaint,
+                modifier = Modifier.padding(top = 4.dp, start = 2.dp)
+            )
             // 下面这三条管的都是「钱不经过微信支付宝」的情况，用得比上面少得多。
             // 收起来，别让它们把主界面撑满；要用的时候点开就行。
             val bankPushOn = settings?.bankPushChannel ?: true
@@ -410,6 +418,15 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                     },
                     onGrant = { openSystem(ctx, android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS) }
                 )
+                SetupHints(
+                    steps = listOf(
+                        "在这个银行 App 里打开「动账提醒」或「消息通知」",
+                        "系统设置 → 通知 → 找到该银行 App，允许它发通知",
+                        "别把它的通知折叠或静音（MIUI、OriginOS 会把不常用的单独折叠）",
+                        "注意：银行代扣、POS 刷卡走这条，微信支付宝看不到"
+                    ),
+                    selfTest = "自测：去超市刷卡一次，回来看看采集记录里有没有「记上了」"
+                )
                 Spacer(Modifier.height(6.dp))
                 ChannelRow(
                     title = "银行公众号",
@@ -421,6 +438,15 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                         DingZhangApp.bumpDataVersion()
                     },
                     onGrant = { openSystem(ctx, android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS) }
+                )
+                SetupHints(
+                    steps = listOf(
+                        "先在微信里关注该行的公众号（没关注就什么都收不到）",
+                        "这个公众号的消息不要设「消息免打扰」",
+                        "系统设置 → 通知 → 微信，通知要开着，别折叠",
+                        "和微信支付本身的记录会重复，重复的自己会合并"
+                    ),
+                    selfTest = "自测：用微信付 0.01 元，回来看看采集记录里有没有相关一条"
                 )
                 Spacer(Modifier.height(6.dp))
                 ChannelRow(
@@ -437,6 +463,22 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                         }
                     },
                     onGrant = { smsPermission.launch(Manifest.permission.RECEIVE_SMS) }
+                )
+                SetupHints(
+                    steps = listOf(
+                        "先在银行开通「短信动账提醒」——有的行收费、有的免费，没开就收不到",
+                        "给叮账「短信」权限，上面那个开关会申请",
+                        "只认动账短信，账单提醒、验证码、余额提醒都会被跳过"
+                    ),
+                    selfTest = "自测：转 0.01 元到另一个账户，回来看采集记录"
+                )
+
+                Text(
+                    "这三条都还没有在你手机上验证过。第一次用建议照着上面的自测走一遍；" +
+                        "不成的话，把「采集记录」整段复制发过来。",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Dz.InkFaint,
+                    modifier = Modifier.padding(top = 10.dp, start = 2.dp)
                 )
             }
         }
@@ -1383,6 +1425,30 @@ private fun FeedbackPage(ctx: Context, onClose: () -> Unit) {
             }
         }
         Spacer(Modifier.height(24.dp))
+    }
+}
+
+/**
+ * 「要用这条通道，你还得先去开这些」。
+ * 只写「它干什么」没用 —— 权限只是其中一步，前面还有好几步在别的 App 里。
+ */
+@Composable
+private fun SetupHints(steps: List<String>, selfTest: String) {
+    Column(Modifier.padding(start = 4.dp, top = 4.dp, bottom = 2.dp)) {
+        steps.forEach { step ->
+            Text(
+                "· " + step,
+                style = MaterialTheme.typography.labelSmall,
+                color = Dz.InkFaint,
+                modifier = Modifier.padding(bottom = 2.dp)
+            )
+        }
+        Text(
+            selfTest,
+            style = MaterialTheme.typography.labelSmall,
+            color = Dz.Sakura,
+            modifier = Modifier.padding(top = 3.dp)
+        )
     }
 }
 
