@@ -247,7 +247,7 @@ class TxnDao(private val helper: DbHelper) {
             WHERE payee LIKE ? OR note LIKE ? OR raw_text LIKE ? OR external_id LIKE ?$catClause
             ORDER BY occurred_at DESC LIMIT $limit
             """.trimIndent(),
-            args.map { it.toString() }
+            args.map { it.toString() }.toTypedArray()
         ).use { return it.toList() }
     }
 

@@ -138,17 +138,11 @@ fun BillsScreen(
         delay(250)
         hits = withContext(Dispatchers.IO) {
             val dao = IngestPipeline.dao ?: return@withContext emptyList<Txn>()
-            // 搜「餐饮」「交通」这类词时，把对应分类的账也捞出来
-            val catIds = Categories.all
-                .filter { it.name.contains(q.trim()) }
-                .map { it.id }
-            val text = dao.search(q, catIds)
-            // 分类中文名也能搜：「餐饮」「工资」这类词不在 payee/note 里
-            val catIds = Categories.all.filter { it.name.contains(q) }.map { it.id }.toSet()
-            if (catIds.isEmpty()) text
-            else (text + dao.listAll().filter { it.categoryId in catIds })
-                .distinctBy { it.id }
-                .sortedByDescending { it.occurredAt }
+            // 分类中文名也能搜：「餐饮」「交通」这类词不在商户名里，只在分类上。
+            // 以前是先 listAll() 拉全表再在内存里筛，账一多搜索就卡；
+            // 现在把命中的分类 id 一起交给 SQL，一次查完。
+            val catIds = Categories.all.filter { it.name.contains(q.trim()) }.map { it.id }
+            dao.search(q, catIds)
         }
     }
 
