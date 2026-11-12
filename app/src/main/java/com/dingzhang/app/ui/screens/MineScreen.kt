@@ -906,17 +906,21 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
             },
             onDownload = {
                 val apk = r.apkUrl
-                val id = if (apk != null) {
-                    UpdateDownloader.start(ctx, r.latestVersion.orEmpty(), apk)
-                } else null
-                if (id != null) {
-                    Toast.makeText(
-                        ctx,
-                        "正在下载，进度看通知栏，下完点那条通知就能装",
-                        Toast.LENGTH_LONG
-                    ).show()
+                if (apk != null) {
+                    // 下载器会先测哪条线路快再入队，和开屏弹窗那边走同一套
+                    UpdateDownloader.startAsync(ctx, r.latestVersion.orEmpty(), apk) { ok ->
+                        if (ok) {
+                            Toast.makeText(
+                                ctx,
+                                "正在下载，进度看通知栏，下完点那条通知就能装",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        } else {
+                            openUrl(ctx, apk)
+                        }
+                    }
                 } else {
-                    openUrl(ctx, apk ?: r.pageUrl)
+                    openUrl(ctx, r.pageUrl)
                 }
                 updateResult = null
                 autoNewer = null

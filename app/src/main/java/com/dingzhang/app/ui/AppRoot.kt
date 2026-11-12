@@ -212,17 +212,25 @@ private fun loadAppData(month: String): AppData {
 private fun openRelease(ctx: android.content.Context, r: UpdateChecker.Result) {
     val apk = r.apkUrl
     if (apk != null) {
-        val id = UpdateDownloader.start(ctx, r.latestVersion.orEmpty(), apk)
-        if (id != null) {
-            android.widget.Toast.makeText(
-                ctx,
-                "正在下载，进度看通知栏，下完点那条通知就能装",
-                android.widget.Toast.LENGTH_LONG
-            ).show()
-            return
+        // 先让下载器在后台测一测哪条线路快，再入队。写死一条的话，
+        // 赶上那条正好慢，用户就得干等到想摔手机（实测镜像能慢到 16 KB/s）。
+        UpdateDownloader.startAsync(ctx, r.latestVersion.orEmpty(), apk) { ok ->
+            if (ok) {
+                android.widget.Toast.makeText(
+                    ctx,
+                    "正在下载，进度看通知栏，下完点那条通知就能装",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+            } else {
+                openInBrowser(ctx, apk, r.pageUrl)
+            }
         }
+        return
     }
-    val url = r.apkUrl ?: r.pageUrl
+    openInBrowser(ctx, r.pageUrl, r.pageUrl)
+}
+
+private fun openInBrowser(ctx: android.content.Context, url: String, pageForHint: String) {
     try {
         ctx.startActivity(
             Intent(Intent.ACTION_VIEW, Uri.parse(url))
@@ -231,7 +239,7 @@ private fun openRelease(ctx: android.content.Context, r: UpdateChecker.Result) {
     } catch (e: Exception) {
         android.widget.Toast.makeText(
             ctx,
-            "打不开浏览器。可以手动打开这个地址下载：${r.pageUrl}",
+            "打不开浏览器。可以手动打开这个地址下载：" + pageForHint,
             android.widget.Toast.LENGTH_LONG
         ).show()
     }
