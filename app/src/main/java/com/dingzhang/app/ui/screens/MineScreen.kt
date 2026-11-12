@@ -616,7 +616,7 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
             Spacer(Modifier.height(6.dp))
             ActionRow("帮助", "微信和支付宝怎么导账单、各项权限怎么开") { subPage = 3 }
             Spacer(Modifier.height(6.dp))
-            ActionRow("意见反馈", "发到 " + FEEDBACK_MAIL + "，收件人自动填好，带上机型和通道开关") { subPage = 1 }
+            ActionRow("意见反馈", "发到 " + FEEDBACK_MAIL + "，收件人和机型信息自动带上") { subPage = 1 }
             Spacer(Modifier.height(6.dp))
             ActionRow("自动记账原理与限制", "五条通道各管什么、哪些做不到") { subPage = 2 }
         }
@@ -967,21 +967,24 @@ private fun submitFeedback(ctx: Context, text: String) {
     val subject = "叮账反馈：" + text.trim().take(24)
     val body = feedbackBody(ctx, text)
 
-    // 主路：ACTION_SEND + message/rfc822 + EXTRA_EMAIL。
-    // 这是「带着收件人去写信」最通用的组合 —— QQ 邮箱、网易邮箱大师、各家自带邮件都认。
-    // 以前主路走的是 mailto 的 ACTION_SENDTO：有的客户端只把它当成「打开写信页」，
-    // URI 里的收件人直接丢了，用户打开就是一张空草稿，还得自己把地址填进去。
-    val send = Intent(Intent.ACTION_SEND).apply {
-        type = "message/rfc822"
-        putExtra(Intent.EXTRA_EMAIL, arrayOf(FEEDBACK_MAIL))
-        putExtra(Intent.EXTRA_SUBJECT, subject)
-        putExtra(Intent.EXTRA_TEXT, body)
-        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    }
-    // 备路：mailto。碰上只认这一种的客户端还能用
+    // 先把「收件人 + 主题 + 正文」整段放进剪贴板。
+    // 这是主路径，不是备胎：不管手机有没有邮件 App、不管用户在弹出的列表里
+    // 点了哪一个、不管那个 App 认不认 EXTRA_EMAIL，东西都已经在手上，粘出去一定到。
+    // 以前主路径是 ACTION_SEND + message/rfc822 —— 系统会把它当成「把一段文字交给谁」，
+    // 于是列表里混进微信、备忘录、网盘这些根本不认收件人的 App。
+    // 用户随手点第一个，草稿里收件人就是空的，还得自己回想地址；点了「总是」更麻烦，
+    // 之后每次都直接跳那个 App，看着就像「改不回来了」。
+    copyFeedbackSilently(ctx, withRecipient(text, subject, body))
+
+    // 再试着直接唤起邮件客户端。这里只认 mailto：声明处理 mailto 的只有邮件 App，
+    // 系统不会再往里塞微信和备忘录。URI 里自带收件人，绝大多数客户端会照着填。
     val mailto = Intent(
         Intent.ACTION_SENDTO,
-        Uri.parse("mailto:" + FEEDBACK_MAIL + "?subject=" + Uri.encode(subject) + "&body=" + Uri.encode(body))
+        Uri.parse(
+            "mailto:" + FEEDBACK_MAIL +
+                "?subject=" + Uri.encode(subject) +
+                "&body=" + Uri.encode(body)
+        )
     ).apply {
         putExtra(Intent.EXTRA_EMAIL, arrayOf(FEEDBACK_MAIL))
         putExtra(Intent.EXTRA_SUBJECT, subject)
@@ -989,18 +992,20 @@ private fun submitFeedback(ctx: Context, text: String) {
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
 
-    val started = runCatching { ctx.startActivity(send) }.isSuccess ||
-        runCatching { ctx.startActivity(mailto) }.isSuccess
-    if (!started) {
-        // 没装邮件 App，或者装了但没登录账号 —— 这时候跳过去也是个发不出去的草稿，
-        // 直接给可粘贴的整段（带收件人），随便找个地方发出去都能到
-        copyFeedback(ctx, withRecipient(text, subject, body))
-        Toast.makeText(
-            ctx,
-            "没有可用的邮件 App。收件地址和内容已一起复制，粘到任意邮箱或聊天窗口发出去就行",
-            Toast.LENGTH_LONG
-        ).show()
-    }
+    // 多个邮箱并排时让用户自己挑，标题写清楚这是发给谁的，别点岔了
+    val started = runCatching {
+        ctx.startActivity(Intent.createChooser(mailto, "选一个邮箱发出去"))
+    }.isSuccess
+
+    Toast.makeText(
+        ctx,
+        if (started) {
+            "收件人和内容已复制。万一打开后收件人是空的，长按粘贴一下就有了"
+        } else {
+            "手机上没有能用的邮箱 App。整段（含收件地址）已复制，粘到任意地方发出去就行"
+        },
+        Toast.LENGTH_LONG
+    ).show()
 }
 
 /** 仓库地址，提 Issue 用。国内打不开时下面会兜底成复制。 */
@@ -1031,6 +1036,13 @@ private fun openGitHubIssue(ctx: Context, text: String) {
 private fun withRecipient(text: String, subject: String, body: String): String =
     "收件人：" + FEEDBACK_MAIL + "\n主题：" + subject + "\n\n" + body
 
+
+/** 复制但不弹提示 —— 调用方自己会说一句更完整的话，别叠两个 Toast */
+private fun copyFeedbackSilently(ctx: Context, text: String) {
+    if (text.isBlank()) return
+    val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+    cm.setPrimaryClip(android.content.ClipData.newPlainText("叮账反馈", text))
+}
 
 private fun copyFeedback(ctx: Context, text: String) {
     if (text.isBlank()) return
@@ -1213,13 +1225,20 @@ private fun FeedbackPage(ctx: Context, onClose: () -> Unit) {
                 color = Dz.InkFaint
             )
             Text(
-                "点「发到邮箱」会把收件人、主题、机型、各通道开关全都填好，" +
-                    "你只管点发送。邮箱 App 没登录、或者手机上没有邮箱 App，" +
-                    "点「复制」——整段连收件地址一起进剪贴板，粘到任意邮箱发出去就行。" +
-                    "有 GitHub 账号的也可以去仓库提 Issue，环境和描述一样预填好。",
+                "点「发到邮箱」会先把收件人和正文整段复制好，再帮你打开邮箱 —— " +
+                    "就算中间打开的是别的 App，或者收件人没自动填上，粘一下就有了，不会丢。" +
+                    "手机上没装邮箱 App 也没关系，复制出来的那段直接发给这个邮箱就行。" +
+                    "有 GitHub 账号的可以点「去 GitHub 提」，环境和描述一样预填好。",
                 style = MaterialTheme.typography.bodySmall,
                 color = Dz.InkFaint,
-                modifier = Modifier.padding(top = 4.dp, bottom = 10.dp)
+                modifier = Modifier.padding(top = 4.dp, bottom = 6.dp)
+            )
+            // 「总是」是系统记住的默认应用，App 改不了它，但得让用户知道去哪儿改
+            Text(
+                "如果每次都直接跳到同一个 App、想换一个：手机设置 → 应用 → 默认应用 → 邮件，清掉默认值再试。",
+                style = MaterialTheme.typography.labelSmall,
+                color = Dz.InkFaint,
+                modifier = Modifier.padding(bottom = 10.dp)
             )
             OutlinedTextField(
                 value = feedback,
