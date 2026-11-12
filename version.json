@@ -1,7 +1,7 @@
 {
-  "version": "0.5.19",
-  "notes": "桌面图标换成新的了。这版重点修自动记账：得物、美团、小红书、抖音里付的钱能认了；连买两杯同价咖啡不会再吞掉第二杯；别家导出的账单（vivo 钱包、银行）也能导入。另外「我的」页新加了按手机品牌给的开权限路径。",
-  "apk": "https://github.com/JinTao26/dingzhang/releases/download/v0.5.19/dingzhang.apk",
-  "page": "https://github.com/JinTao26/dingzhang/releases/tag/v0.5.19",
-  "published_at": "2026-11-11T16:00:00Z"
+  "version": "0.5.20",
+  "notes": "这版修的是自动记账本身：得物、美团这类 App 里付的钱以前一条都收不到（它们是在自己页面里弹收银台的，窗口没换，我们只认换窗口）；支付结果页一闪而过时，抄下来的文字以前会被直接丢掉。另外删账能撤销了，详情里能改金额，搜索能搜「餐饮」这种分类名。",
+  "apk": "https://github.com/JinTao26/dingzhang/releases/download/v0.5.20/dingzhang.apk",
+  "page": "https://github.com/JinTao26/dingzhang/releases/tag/v0.5.20",
+  "published_at": "2026-11-12T02:00:00Z"
 }
