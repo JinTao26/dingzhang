@@ -366,8 +366,9 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
             )
             // 通知这条最容易「看着开着、其实收不到」：权限给了，但微信的通知被系统折叠掉
             Text(
-                "微信、支付宝的通知在系统里要开着。MIUI、OriginOS 会把不常用的通知折叠到「其他通知」，" +
-                    "折进去就等于没发 —— 收付款、碰一碰这类没有支付页的付款，全靠这一条。",
+                "只要系统里微信的通知是「允许」的，叮账就收得到 —— 哪怕它被折叠进「其他通知」、" +
+                    "被静音、没声音没横幅，都不影响。真正会断的是两种：微信里把这条消息设了免打扰，" +
+                    "或者系统里把微信通知整个关掉。收付款、碰一碰这类没有支付页的付款，全靠这一条。",
                 style = MaterialTheme.typography.labelSmall,
                 color = Dz.InkFaint,
                 modifier = Modifier.padding(top = 4.dp, start = 2.dp)
@@ -442,8 +443,8 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                 SetupHints(
                     steps = listOf(
                         "先在微信里关注该行的公众号（没关注就什么都收不到）",
-                        "这个公众号的消息不要设「消息免打扰」",
-                        "系统设置 → 通知 → 微信，通知要开着，别折叠",
+                        "这个公众号的消息不要设「消息免打扰」——设了微信就不发通知，叮账什么都收不到",
+                        "系统设置里微信的通知要允许（折叠、静音都没关系，别整个关掉）",
                         "和微信支付本身的记录会重复，重复的自己会合并"
                     ),
                     selfTest = "自测：用微信付 0.01 元，回来看看采集记录里有没有相关一条"
