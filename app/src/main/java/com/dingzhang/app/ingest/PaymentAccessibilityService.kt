@@ -54,7 +54,8 @@ class PaymentAccessibilityService : AccessibilityService() {
         // 赌错了：得物这类是在同一个 Activity 里弹出支付宝 SDK 的，
         // 窗口没换，就只有内容变化事件，只认状态变化等于一条都收不到。
         if (e.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
-            e.eventType != AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
+            e.eventType != AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED &&
+            e.eventType != AccessibilityEvent.TYPE_WINDOWS_CHANGED
         ) {
             return
         }
@@ -82,7 +83,8 @@ class PaymentAccessibilityService : AccessibilityService() {
             e.contentDescription?.toString()?.trim()
                 ?.takeIf { it.isNotEmpty() && it.length <= 60 }?.let { t.add(it) }
 
-            val snap = rootFromEvent(pkg, e)
+            val snap = rootFromWindowId(pkg, e)
+                ?: rootFromEvent(pkg, e)
                 ?: rootInActiveWindow?.takeIf { it.packageName?.toString() == pkg }
             if (snap != null) {
                 pendingRoot = snap
@@ -154,7 +156,7 @@ class PaymentAccessibilityService : AccessibilityService() {
                 if (r.packageName?.toString() in accept) roots = listOf(r)
             }
         }
-        if (roots.isEmpty()) {
+        if (roots.isEmpty() && pendingTexts.isEmpty()) {
             val windowCount = runCatching { windows?.size }.getOrNull() ?: -1
             // 光说「几个窗口」看不出问题。把窗口各自的包名列出来：
             // 全是叮账自己，说明用户已经切走了；有一个支付宝的，说明差点就能读到。
@@ -186,11 +188,17 @@ class PaymentAccessibilityService : AccessibilityService() {
 
         // 现在这一页不像支付页，但事件刚发生时那一页像 —— 用当时抄的那份。
         // 支付结果页停留一两秒就没了，晚一点读到的已经是别的页面了。
-        if ((texts.isEmpty() || !looksLikePaymentPage(texts)) &&
-            pendingTexts.isNotEmpty() && looksLikePaymentPage(pendingTexts)
-        ) {
-            texts.clear()
-            texts.addAll(pendingTexts)
+        //
+        // 窗口完全读不到的时候还要更干脆：这时手上只有快照这一份东西，
+        // 没有「像不像」可挑，拿它去解析就是了。漏掉这一步的后果就是——
+        // 文字明明已经抄到手，却在前面按「没有可读的窗口」直接放弃了。
+        val onlySnapshot = roots.isEmpty()
+        if (pendingTexts.isNotEmpty()) {
+            val snapshotLooksLikePay = looksLikePaymentPage(pendingTexts)
+            if (onlySnapshot || ((texts.isEmpty() || !looksLikePaymentPage(texts)) && snapshotLooksLikePay)) {
+                texts.clear()
+                texts.addAll(pendingTexts)
+            }
         }
 
         if (texts.isEmpty()) {
@@ -276,6 +284,22 @@ class PaymentAccessibilityService : AccessibilityService() {
                 guard++
             }
             if (cur.packageName?.toString() == pkg) cur else null
+        }.getOrNull()
+    }
+
+    /**
+     * 按事件自带的窗口 ID 去取那棵树。
+     *
+     * 比按包名翻窗口可靠：事件说「窗口 37 变了」，那就直接取 37 号窗，
+     * 哪怕它已经不是活动窗口（支付宝付完会立刻把前台交回给商家 App）。
+     * 支付结果页往往只活几百毫秒，等 150 毫秒后再按包名找，它早就不在窗口列表里了。
+     */
+    private fun rootFromWindowId(pkg: String, event: AccessibilityEvent?): AccessibilityNodeInfo? {
+        val wid = event?.windowId ?: return null
+        if (wid < 0) return null
+        return runCatching {
+            windows?.firstOrNull { it.id == wid }?.root
+                ?.takeIf { r -> r.packageName?.toString() == pkg }
         }.getOrNull()
     }
 
