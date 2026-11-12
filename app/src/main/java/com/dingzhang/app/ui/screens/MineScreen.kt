@@ -1335,12 +1335,38 @@ private fun FeedbackPage(ctx: Context, onClose: () -> Unit) {
     }
 }
 
+/** 把两份记录连机型版本一起拼好进剪贴板，用户直接发过来 */
+private fun copyIngestLog(ctx: Context) {
+    val ok = IngestLog.readOk()
+    val diag = IngestLog.readDiag()
+    if (ok.isEmpty() && diag.isEmpty()) {
+        Toast.makeText(ctx, "还没有记录", Toast.LENGTH_SHORT).show()
+        return
+    }
+    val ver = runCatching {
+        ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName
+    }.getOrNull().orEmpty()
+    val sb = StringBuilder()
+    sb.append("叮账 ").append(ver).append(" 采集记录\n")
+    sb.append("机型 ").append(android.os.Build.MANUFACTURER).append(" ")
+        .append(android.os.Build.MODEL).append(" | Android ")
+        .append(android.os.Build.VERSION.RELEASE).append("\n\n")
+    sb.append("【记上的账 ").append(ok.size).append(" 条】\n")
+    ok.forEach { sb.append(IngestLog.pretty(it)).append("\n") }
+    sb.append("\n【为什么没记上 ").append(diag.size).append(" 条】\n")
+    diag.forEach { sb.append(IngestLog.pretty(it)).append("\n") }
+    val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+    cm.setPrimaryClip(android.content.ClipData.newPlainText("叮账采集记录", sb.toString()))
+    Toast.makeText(ctx, "整段已复制，直接发给我就行", Toast.LENGTH_LONG).show()
+}
+
 /**
  * 最近采集记录。自动记账没记上的时候，这里能看到卡在哪一步：
  * 是无障碍事件没来、抓到了窗但认不出这页、还是被当成重复丢了。
  */
 @Composable
 private fun IngestLogCard() {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
     var show by remember { mutableStateOf(false) }
     var diagOpen by remember { mutableStateOf(false) }
     // 点「清空」要立刻变空。以前 clear() 只删了存储，界面不重组，
@@ -1435,16 +1461,30 @@ private fun IngestLogCard() {
 
             if (oks.isNotEmpty() || diags.isNotEmpty()) {
                 Spacer(Modifier.height(4.dp))
-                Text(
-                    "清空记录",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = Dz.Sakura,
-                    modifier = Modifier.clickable {
-                        IngestLog.clear()
-                        diagOpen = false
-                        tick++
-                    }
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // 反馈「没记上」时，截图只能说现象。这里把两段记录连机型、版本一起
+                    // 复制成一段话，直接发过来就能照着查。
+                    Text(
+                        "复制全部",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Dz.Sakura,
+                        modifier = Modifier.clickable {
+                            copyIngestLog(ctx)
+                            diagOpen = false
+                        }
+                    )
+                    Spacer(Modifier.weight(1f))
+                    Text(
+                        "清空记录",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Dz.Sakura,
+                        modifier = Modifier.clickable {
+                            IngestLog.clear()
+                            diagOpen = false
+                            tick++
+                        }
+                    )
+                }
             }
         }
     }

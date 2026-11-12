@@ -159,12 +159,30 @@ class PaymentNotificationService : NotificationListenerService() {
         bigText: String,
         at: Long
     ): Captured? {
-        if (pkg == PaymentNotifierParser.PKG_WECHAT && !title.contains("银行")) return null
+        // 以前只认标题里的「银行」两个字。但微信里银行公众号的显示名很随意：
+        // 「招商银行信用卡」有银行、「工行信用卡」「交行微银行」没有标准写法，
+        // 一律要求「银行」会把它们全挡在外面。这里放宽成「银行 / 常见行名 / 卡种」，
+        // 后面还有金额 + 动账动词两道校验兜着，误判率不会变高。
+        if (pkg == PaymentNotifierParser.PKG_WECHAT && !looksLikeBankAccount(title)) return null
         val body = listOf(title, text, bigText).filter { it.isNotBlank() }.joinToString(" ")
         return BankAlertParser.parse(body, at, Source.NOTIFICATION)
     }
 
+    /** 微信里这个公众号是不是银行自己的（标题太随意的，靠这几个词认） */
+    private fun looksLikeBankAccount(title: String): Boolean {
+        if (title.contains("银行") || title.contains("信用卡") || title.contains("储蓄卡") ||
+            title.contains("借记卡")
+        ) return true
+        return BANK_SHORT_NAMES.any { title.contains(it) }
+    }
+
     companion object {
         private const val TAG = "NLS"
+        /** 银行简称。公众号叫「工行信用卡」「交行微银行」时，标题里并没有「银行」二字 */
+        private val BANK_SHORT_NAMES = listOf(
+            "工行", "建行", "农行", "中行", "交行", "招行", "浦发", "民生", "兴业",
+            "光大", "中信", "平安", "华夏", "广发", "邮储", "邮政储蓄", "浙商", "恒丰",
+            "渤海", "北京银行", "上海银行", "宁波银行", "江苏银行", "南京银行", "杭州银行"
+        )
     }
 }

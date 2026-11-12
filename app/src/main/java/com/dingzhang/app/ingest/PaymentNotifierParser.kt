@@ -51,6 +51,8 @@ object PaymentNotifierParser {
 
     private val AMOUNT_WITH_SYMBOL = Regex("[¥￥]\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)")
     private val AMOUNT_WITH_YUAN = Regex("([0-9][0-9,]*(?:\\.[0-9]{1,2})?)\\s*元")
+    /** 少数银行 App / 境外卡通知写成 CNY32.00、RMB 32 */
+    private val AMOUNT_WITH_CODE = Regex("(?:CNY|RMB)\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)")
 
     private val incomeCues = listOf(
         "收款到账", "收款成功", "已收款", "到账", "入账", "退款到账", "已退回", "收入到账",
@@ -254,6 +256,9 @@ object PaymentNotifierParser {
             Money.parseToCents(m.groupValues[1])?.let { if (it > 0) return it }
         }
         AMOUNT_WITH_YUAN.find(sanitized)?.let { m ->
+            Money.parseToCents(m.groupValues[1])?.let { if (it > 0) return it }
+        }
+        AMOUNT_WITH_CODE.find(sanitized)?.let { m ->
             Money.parseToCents(m.groupValues[1])?.let { if (it > 0) return it }
         }
         return null
