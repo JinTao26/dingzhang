@@ -616,7 +616,7 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
             Spacer(Modifier.height(6.dp))
             ActionRow("帮助", "微信和支付宝怎么导账单、各项权限怎么开") { subPage = 3 }
             Spacer(Modifier.height(6.dp))
-            ActionRow("意见反馈", "发到作者邮箱，自动带上机型和各通道开关") { subPage = 1 }
+            ActionRow("意见反馈", "发到 " + FEEDBACK_MAIL + "，收件人自动填好，带上机型和通道开关") { subPage = 1 }
             Spacer(Modifier.height(6.dp))
             ActionRow("自动记账原理与限制", "五条通道各管什么、哪些做不到") { subPage = 2 }
         }
@@ -967,22 +967,31 @@ private fun submitFeedback(ctx: Context, text: String) {
     val subject = "叮账反馈：" + text.trim().take(24)
     val body = feedbackBody(ctx, text)
 
-    // 收件人写进 mailto 的 URI，同时也塞一份 EXTRA_EMAIL：
-    // 各家邮件 App 认的不一样，有的一看 URI 就把收件人带进去了，有的只读 EXTRA_，
-    // 以前只给 URI，碰上不认的那家打开就是个空草稿，收件人栏还得自己填。
-    val uri = Uri.parse(
-        "mailto:" + FEEDBACK_MAIL +
-            "?subject=" + Uri.encode(subject) +
-            "&body=" + Uri.encode(body)
-    )
-    val mail = Intent(Intent.ACTION_SENDTO, uri).apply {
+    // 主路：ACTION_SEND + message/rfc822 + EXTRA_EMAIL。
+    // 这是「带着收件人去写信」最通用的组合 —— QQ 邮箱、网易邮箱大师、各家自带邮件都认。
+    // 以前主路走的是 mailto 的 ACTION_SENDTO：有的客户端只把它当成「打开写信页」，
+    // URI 里的收件人直接丢了，用户打开就是一张空草稿，还得自己把地址填进去。
+    val send = Intent(Intent.ACTION_SEND).apply {
+        type = "message/rfc822"
         putExtra(Intent.EXTRA_EMAIL, arrayOf(FEEDBACK_MAIL))
         putExtra(Intent.EXTRA_SUBJECT, subject)
         putExtra(Intent.EXTRA_TEXT, body)
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
-    try {
-        ctx.startActivity(mail.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-    } catch (e: Exception) {
+    // 备路：mailto。碰上只认这一种的客户端还能用
+    val mailto = Intent(
+        Intent.ACTION_SENDTO,
+        Uri.parse("mailto:" + FEEDBACK_MAIL + "?subject=" + Uri.encode(subject) + "&body=" + Uri.encode(body))
+    ).apply {
+        putExtra(Intent.EXTRA_EMAIL, arrayOf(FEEDBACK_MAIL))
+        putExtra(Intent.EXTRA_SUBJECT, subject)
+        putExtra(Intent.EXTRA_TEXT, body)
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+
+    val started = runCatching { ctx.startActivity(send) }.isSuccess ||
+        runCatching { ctx.startActivity(mailto) }.isSuccess
+    if (!started) {
         // 没装邮件 App，或者装了但没登录账号 —— 这时候跳过去也是个发不出去的草稿，
         // 直接给可粘贴的整段（带收件人），随便找个地方发出去都能到
         copyFeedback(ctx, withRecipient(text, subject, body))
@@ -1199,13 +1208,18 @@ private fun FeedbackPage(ctx: Context, onClose: () -> Unit) {
         var feedback by remember { mutableStateOf("") }
         DzCard {
             Text(
-                "哪个分类认错了、哪笔没记上、哪句文案别扭，都能从这儿发。" +
-                    "会自动附上机型和开关状态，省得你再描述环境。" +
-                    "手机上没登录邮箱的话点「复制」——收件地址和内容一起复制好了，粘到任意邮箱发出去就行。" +
-                    "有 GitHub 账号的可以直接去仓库提 Issue，环境和描述也会预填好",
+                "反馈直接发到作者的邮箱 " + FEEDBACK_MAIL + "。",
+                style = MaterialTheme.typography.bodySmall,
+                color = Dz.InkFaint
+            )
+            Text(
+                "点「发到邮箱」会把收件人、主题、机型、各通道开关全都填好，" +
+                    "你只管点发送。邮箱 App 没登录、或者手机上没有邮箱 App，" +
+                    "点「复制」——整段连收件地址一起进剪贴板，粘到任意邮箱发出去就行。" +
+                    "有 GitHub 账号的也可以去仓库提 Issue，环境和描述一样预填好。",
                 style = MaterialTheme.typography.bodySmall,
                 color = Dz.InkFaint,
-                modifier = Modifier.padding(bottom = 10.dp)
+                modifier = Modifier.padding(top = 4.dp, bottom = 10.dp)
             )
             OutlinedTextField(
                 value = feedback,
