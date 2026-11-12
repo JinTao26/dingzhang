@@ -18,6 +18,12 @@
     <queries>
         <package android:name="com.tencent.mm" />
         <package android:name="com.eg.android.AlipayGphone" />
+        <!-- 提意见要判断手机上有哪些「能写邮件」的客户端。
+             安卓 11 起不声明这一条，就看不见别的 App 注册的 mailto 处理者 -->
+        <intent>
+            <action android:name="android.intent.action.SENDTO" />
+            <data android:scheme="mailto" />
+        </intent>
     </queries>
 
     <application

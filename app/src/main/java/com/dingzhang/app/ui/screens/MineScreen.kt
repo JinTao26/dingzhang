@@ -965,6 +965,43 @@ private const val FEEDBACK_MAIL = "2462634730@qq.com"
 /** QQ 邮箱。装了就直接点名进它，不让系统出一道「三个选项挑一个」的题。 */
 private const val QQ_MAIL_PKG = "com.tencent.androidqqmail"
 
+/**
+ * 在一堆 mailto 处理者里挑出真正「在写邮件」的那一个。
+ *
+ * 选择器上显示的文字就是这里的 label：QQ 邮箱会同时挂出
+ * 「通过邮件发送」和「保存到记事本」，记事本那个只存东西不读收件人。
+ * 先剔掉记事/便签/笔记这类，再优先 label 带「邮件」「发送」的，并且先看 QQ 邮箱包里。
+ * 挑不出来就返回 null，交给后面的通用列表兜底 —— 宁可多问一次，不硬猜错一个。
+ */
+private fun pickMailActivity(
+    ctx: Context,
+    probe: Intent
+): android.content.ComponentName? {
+    val pm = ctx.packageManager
+    val all = runCatching { pm.queryIntentActivities(probe, 0) }.getOrNull() ?: return null
+    if (all.isEmpty()) return null
+    val bad = listOf("记事", "便签", "笔记", "备忘录", "保存", "存到", "note", "memo", "save")
+    val good = listOf("邮件", "发送", "写信", "邮箱", "mail", "email")
+
+    fun labelOf(ri: android.content.pm.ResolveInfo): String =
+        runCatching { ri.loadLabel(pm).toString() }.getOrDefault("")
+
+    val usable = all.filter { ri ->
+        val label = labelOf(ri)
+        val cls = ri.activityInfo.name.lowercase()
+        !bad.any { label.contains(it) || cls.contains(it) }
+    }
+    // QQ 邮箱排前面：用户的邮箱账号多半就在这儿
+    val ordered = usable.filter { it.activityInfo.packageName == QQ_MAIL_PKG } + usable
+    val hit = ordered.firstOrNull { ri ->
+        val label = labelOf(ri).lowercase()
+        good.any { label.contains(it) }
+    } ?: ordered.firstOrNull()
+    return hit?.let {
+        android.content.ComponentName(it.activityInfo.packageName, it.activityInfo.name)
+    }
+}
+
 private fun submitFeedback(ctx: Context, text: String) {
     if (text.isBlank()) return
     val subject = "叮账反馈：" + text.trim().take(24)
@@ -998,11 +1035,19 @@ private fun submitFeedback(ctx: Context, text: String) {
     // 系统为 mailto 拉出来的列表是「谁声明了就能进」，同一个邮箱自己也可能挂好几个入口
     // （QQ 邮箱就有这种情况：一个能带收件人，一个只是打开写信页）。用户没义务知道点哪个。
     // 这里改为点名：装了 QQ 邮箱就直接进它，收件人由 URI 带过去；没装或进不去才退回通用列表。
-    val toQq = Intent(mailto).setPackage(QQ_MAIL_PKG)
-    val started = runCatching { ctx.startActivity(toQq) }.isSuccess ||
-        runCatching {
-            ctx.startActivity(Intent.createChooser(mailto, "选一个邮箱发出去"))
-        }.isSuccess
+    // 点名到包还不够：QQ 邮箱一个包里就挂了三个 mailto 入口
+    // （「通过邮件发送」「保存到记事本」…），系统照样再弹一次让用户挑，
+    // 而「保存到记事本」只是把内容存下来，收件人字段根本不读，点了等于白点。
+    // 所以按显示名挑：带「邮件」「发送」的那个才是在写邮件。
+    val picked = pickMailActivity(ctx, mailto)
+    val started =
+        (picked != null && runCatching {
+            ctx.startActivity(Intent(mailto).setComponent(picked))
+        }.isSuccess) ||
+            runCatching { ctx.startActivity(Intent(mailto).setPackage(QQ_MAIL_PKG)) }.isSuccess ||
+            runCatching {
+                ctx.startActivity(Intent.createChooser(mailto, "发到作者的邮箱，选一个"))
+            }.isSuccess
 
     Toast.makeText(
         ctx,
