@@ -28,6 +28,11 @@ object UpdateDownloader {
     private const val TAG = "Download"
     /** 测速读这么多就停，不为此把整个包下一遍 */
     private const val PROBE_BYTES = 64 * 1024
+    /**
+     * 直链到这个速度就算够用，不再测镜像。
+     * 150 B/ms ≈ 150 KB/s，1.4MB 的包十来秒下完，等得起。
+     */
+    private const val FAST_ENOUGH = 150.0
 
     /**
      * 在后台测速选线路再入队，结果回主线程。
@@ -55,11 +60,16 @@ object UpdateDownloader {
     }
 
     private fun pickFastest(urls: List<String>): String {
+        if (urls.isEmpty()) return ""
+        // 直链优先，而且先测它、够快就直接用，不等镜像那边。
+        // 镜像要是卡住，测速本身就得干等 6 秒超时 —— 点完按钮没反应，比慢更糟。
         var best = urls.first()
-        var bestSpeed = -1.0
-        for (u in urls) {
+        var bestSpeed = runCatching { speedOf(best) }.getOrDefault(-1.0)
+        Log.i(TAG, "测速 " + best + " = " + bestSpeed + " B/ms")
+        if (bestSpeed >= FAST_ENOUGH) return best
+        for (u in urls.drop(1)) {
             val speed = runCatching { speedOf(u) }.getOrDefault(-1.0)
-            Log.i(TAG, "测速 $u = " + speed + " KB/ms")
+            Log.i(TAG, "测速 " + u + " = " + speed + " B/ms")
             if (speed > bestSpeed) {
                 bestSpeed = speed
                 best = u

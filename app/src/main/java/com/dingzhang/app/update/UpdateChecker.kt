@@ -146,7 +146,10 @@ object UpdateChecker {
                 notes = j.optString("notes").trim().take(1200),
                 highlights = readHighlights(j),
                 pageUrl = j.optString("page").trim().ifBlank { RELEASE_PAGE },
-                apkUrl = apk.takeIf { it.startsWith("http") }?.let { mirrorOf(it) },
+                // 用原始直链。以前这里套了个 ghproxy 镜像，结果实测镜像只有
+                // 16 KB/s，而直链 1.28 MB/s —— 替用户「选好」的那条反而是慢的。
+                // 镜像现在只在直链连不上时兜底，由 UpdateDownloader 自己决定。
+                apkUrl = apk.takeIf { it.startsWith("http") },
                 publishedAt = j.optString("published_at").trim(),
                 hasUpdate = has,
                 message = if (has) "发现新版本 $v" else "已经是最新版本"
@@ -189,16 +192,12 @@ object UpdateChecker {
                 .filter { it.isNotEmpty() && it.length <= 80 }
                 .take(6),
             pageUrl = j.optString("html_url").ifBlank { RELEASE_PAGE },
-            apkUrl = apkUrl?.let { mirrorOf(it) },
+            apkUrl = apkUrl,
             publishedAt = j.optString("published_at"),
             hasUpdate = has,
             message = if (has) "发现新版本 $tag" else "已经是最新版本"
         )
     }
-
-    /** GitHub 直链换成镜像；已经是镜像原样返回。 */
-    private fun mirrorOf(url: String): String =
-        if (url.contains("ghproxy.net/")) url else MIRROR_PREFIX + url
 
     private fun httpText(url: String): String? {
         var conn: HttpURLConnection? = null
