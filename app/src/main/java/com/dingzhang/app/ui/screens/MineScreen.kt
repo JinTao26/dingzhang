@@ -709,7 +709,8 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
             Spacer(Modifier.height(6.dp))
             ActionRow("帮助", "微信和支付宝怎么导账单、各项权限怎么开") { subPage = 3 }
             Spacer(Modifier.height(6.dp))
-            ActionRow("意见反馈", "发到 " + FEEDBACK_MAIL + "，收件人和机型信息自动带上") { subPage = 1 }
+            // 不在这里亮邮箱地址：地址进了邮件客户端用户自然就看到了，摆在外面对谁都没好处
+            ActionRow("意见反馈", "直接发到作者邮箱，收件人和机型信息自动填好") { subPage = 1 }
             Spacer(Modifier.height(6.dp))
             ActionRow("自动记账原理与限制", "五条通道各管什么、哪些做不到") { subPage = 2 }
         }
@@ -1370,14 +1371,14 @@ private fun FeedbackPage(ctx: Context, onClose: () -> Unit) {
         var feedback by remember { mutableStateOf("") }
         DzCard {
             Text(
-                "反馈直接发到作者的邮箱 " + FEEDBACK_MAIL + "。",
+                "反馈直接发到作者的邮箱。",
                 style = MaterialTheme.typography.bodySmall,
                 color = Dz.InkFaint
             )
             Text(
                 "点「发到邮箱」会先把收件人和正文整段复制好，再帮你打开邮箱 —— " +
                     "就算中间打开的是别的 App，或者收件人没自动填上，粘一下就有了，不会丢。" +
-                    "手机上没装邮箱 App 也没关系，复制出来的那段直接发给这个邮箱就行。" +
+                    "手机上没装邮箱 App 也没关系 —— 收件人地址就在复制出来的那段里，粘到哪儿发都行。" +
                     "有 GitHub 账号的可以点「去 GitHub 提」，环境和描述一样预填好。",
                 style = MaterialTheme.typography.bodySmall,
                 color = Dz.InkFaint,
