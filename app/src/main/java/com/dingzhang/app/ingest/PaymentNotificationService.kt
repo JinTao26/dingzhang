@@ -69,11 +69,14 @@ class PaymentNotificationService : NotificationListenerService() {
         ChannelHealth.markAlive("nls")
         val settings = IngestPipeline.settings ?: return
 
-        val extras = sbn.notification?.extras ?: return
-        val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
-        val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString().orEmpty()
-        val bigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString().orEmpty()
-        if (title.isBlank() && text.isBlank() && bigText.isBlank()) return
+        if (sbn.notification?.extras == null) return
+        // 一次把所有可能带字的地方都读出来（含 InboxStyle 的行数组、聊天式消息列表），
+        // 不再只看 TITLE / TEXT / BIG_TEXT 三个字段 —— 微信支付凭证的金额经常不在那三个里
+        val snap = NotificationText.read(sbn.notification)
+        val title = snap.title
+        val text = snap.body
+        val bigText = ""
+        if (title.isBlank() && text.isBlank()) return
 
         val isPaymentApp = pkg == PaymentNotifierParser.PKG_WECHAT || pkg == PaymentNotifierParser.PKG_ALIPAY
         // 京东这类购物 App 自己的支付成功通知：只认严格成交句，见 parseShoppingApp
@@ -124,7 +127,8 @@ class PaymentNotificationService : NotificationListenerService() {
                     IngestLog.add(
                         "通知", if (hasMoney) "有金额但没认出" else "付款通知没带金额",
                         "${if (pkg == PaymentNotifierParser.PKG_WECHAT) "微信" else "支付宝"}" +
-                            " · 标题「${title.take(10)}」· 正文 ${text.length} 字"
+                            " · 标题「${title.take(10)}」· 读到 ${snap.fields.ifBlank { "空" }}" +
+                            " · 正文 ${text.length} 字"
                     )
                 }
             }
