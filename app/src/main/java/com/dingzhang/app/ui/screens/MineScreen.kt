@@ -1335,6 +1335,41 @@ private fun FeedbackPage(ctx: Context, onClose: () -> Unit) {
     }
 }
 
+/** 一行通道状态 */
+@Composable
+private fun ChannelStatusLine(name: String, enabled: Boolean, idleMs: Long) {
+    Row(
+        modifier = Modifier.padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            name,
+            style = MaterialTheme.typography.labelSmall,
+            color = Dz.InkFaint,
+            modifier = Modifier.width(44.dp)
+        )
+        Text(
+            when {
+                !enabled -> "没授权，这个通道不工作"
+                idleMs < 0L -> "已开启，还没收到过东西"
+                else -> "已连接 · " + idleText(idleMs) + "收到过"
+            },
+            style = MaterialTheme.typography.labelSmall,
+            color = if (enabled) Dz.InkSoft else Dz.Sakura
+        )
+    }
+}
+
+private fun idleText(ms: Long): String {
+    val min = ms / 60_000L
+    return when {
+        min < 1L -> "刚刚"
+        min < 60L -> min.toString() + " 分钟前"
+        min < 1440L -> (min / 60L).toString() + " 小时前"
+        else -> (min / 1440L).toString() + " 天前"
+    }
+}
+
 /** 把两份记录连机型版本一起拼好进剪贴板，用户直接发过来 */
 private fun copyIngestLog(ctx: Context) {
     val ok = IngestLog.readOk()
@@ -1394,6 +1429,22 @@ private fun IngestLogCard() {
             )
         }
         if (show) {
+            Spacer(Modifier.height(10.dp))
+
+            // 两个通道各自「活着没活着」。
+            // 通知使用权在系统设置里是勾着的，但绑可能根本没连上 —— 一条都收不到，
+            // 界面却毫无异常。付一笔之后看这里的「几分钟前收到过」有没有往前走，
+            // 就能分清是通知没来、还是来了但没认出来。
+            ChannelStatusLine(
+                "无障碍",
+                com.dingzhang.app.ingest.ChannelHealth.a11yEnabled(ctx),
+                com.dingzhang.app.ingest.ChannelHealth.a11yIdleMs()
+            )
+            ChannelStatusLine(
+                "通知",
+                com.dingzhang.app.ingest.ChannelHealth.nlsEnabled(ctx),
+                com.dingzhang.app.ingest.ChannelHealth.nlsIdleMs()
+            )
             Spacer(Modifier.height(10.dp))
 
             // 先给记上的账。这部分单独存，不会被诊断信息挤掉。

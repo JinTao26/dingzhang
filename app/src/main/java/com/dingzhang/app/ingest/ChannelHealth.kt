@@ -98,6 +98,18 @@ object ChannelHealth {
     }
 
     /**
+     * 最近一次收到通知距今多久（没有记录返回 -1）。
+     *
+     * 这是给用户自证用的：通知使用权看着是开着的，但绑根本没连上，
+     * 一条通知都收不到，界面上却毫无异常。付一笔之后看这个数字
+     * 有没有往前走，就能区分「通知没来」和「通知来了但没认出」。
+     */
+    fun nlsIdleMs(): Long {
+        val last = lastAt(NLS)
+        return if (last <= 0L) -1L else System.currentTimeMillis() - last
+    }
+
+    /**
      * 通知监听的 binder 掉了可以自己拉回来。这是唯一能「无需用户操作」自愈的通道，
      * 所以每次打开 App 都顺手检查一次。
      */
