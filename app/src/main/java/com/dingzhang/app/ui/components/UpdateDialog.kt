@@ -40,7 +40,8 @@ fun UpdateDialog(
     fromAuto: Boolean,
     onDismiss: () -> Unit,
     onSkipVersion: () -> Unit,
-    onDownload: () -> Unit
+    onDownload: () -> Unit,
+    onOpenPage: (() -> Unit)? = null
 ) {
     Dialog(
         onDismissRequest = onDismiss,
@@ -71,26 +72,78 @@ fun UpdateDialog(
 
             // 更新说明：不管有没有更新都显示，这样「检查更新」本身就是一个看说明的入口
             val notes = plainNotes(result.notes)
-            if (notes.isNotBlank()) {
+            val points = result.highlights.map { plainNotes(it) }.filter { it.isNotBlank() }
+            if (points.isNotEmpty() || notes.isNotBlank()) {
                 Spacer(Modifier.height(12.dp))
-                Text(
-                    "更新说明",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = Dz.InkSoft,
-                    modifier = Modifier.padding(bottom = 6.dp)
-                )
-                Text(
-                    notes,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Dz.InkSoft,
-                    modifier = Modifier
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "更新说明",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Dz.InkSoft
+                    )
+                    if (result.publishedAt.isNotBlank()) {
+                        Spacer(Modifier.weight(1f))
+                        Text(
+                            dateLabel(result.publishedAt),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Dz.InkFaint
+                        )
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
+
+                Column(
+                    Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 240.dp)
+                        .heightIn(max = 260.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .background(Dz.Cream)
                         .verticalScroll(rememberScrollState())
                         .padding(12.dp)
-                )
+                ) {
+                    // 有分点就一条一条列；一条一行比一整段密不透风的字好读太多
+                    if (points.isNotEmpty()) {
+                        points.forEach { p ->
+                            Row(Modifier.padding(bottom = 7.dp)) {
+                                Text(
+                                    "·",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Dz.Sakura
+                                )
+                                Text(
+                                    p,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Dz.InkSoft,
+                                    modifier = Modifier.padding(start = 6.dp)
+                                )
+                            }
+                        }
+                        if (notes.isNotBlank() && !notes.contains(points.first().take(12))) {
+                            Text(
+                                "更详细的变化可以点下面的「完整说明」看",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Dz.InkFaint
+                            )
+                        }
+                    } else {
+                        Text(
+                            notes,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Dz.InkSoft
+                        )
+                    }
+                }
+
+                if (onOpenPage != null) {
+                    Text(
+                        "在浏览器里看完整说明",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Dz.Sakura,
+                        modifier = Modifier
+                            .padding(top = 8.dp)
+                            .clickable { onOpenPage() }
+                    )
+                }
             }
 
             if (result.hasUpdate && result.apkUrl == null) {
@@ -154,4 +207,14 @@ internal fun plainNotes(raw: String): String {
     s = s.replace(Regex("""^[-*]\s+""", RegexOption.MULTILINE), "· ")
     s = s.replace(Regex("""\n{3,}"""), "\n\n")
     return s.trim()
+}
+
+/** 清单里的时间可能是 2026-11-12T02:00:00Z，只取日期给人看 */
+private fun dateLabel(raw: String): String {
+    val d = raw.trim().take(10)
+    if (d.length < 10) return ""
+    val y = d.substring(0, 4)
+    val m = d.substring(5, 7).trimStart('0')
+    val day = d.substring(8, 10).trimStart('0')
+    return y + " 年 " + m + " 月 " + day + " 日发布"
 }

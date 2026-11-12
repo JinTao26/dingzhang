@@ -57,6 +57,8 @@ object UpdateChecker {
         val currentVersion: String,
         val latestVersion: String? = null,
         val notes: String = "",
+        /** 分条的更新要点。有它就用它渲染列表，比一整段文字好读得多。 */
+        val highlights: List<String> = emptyList(),
         val pageUrl: String = RELEASE_PAGE,
         val apkUrl: String? = null,
         val publishedAt: String = "",
@@ -100,6 +102,18 @@ object UpdateChecker {
         return results.maxByOrNull { rank(it.latestVersion) }
     }
 
+    /** version.json 里的 highlights：[\"一句话一条\", ...]，最多取 6 条、每条不超过 80 字 */
+    private fun readHighlights(j: JSONObject): List<String> {
+        val arr = j.optJSONArray("highlights") ?: return emptyList()
+        val out = ArrayList<String>(6)
+        for (i in 0 until arr.length()) {
+            val t = arr.optString(i).trim()
+            if (t.isNotEmpty()) out.add(t.take(80))
+            if (out.size >= 6) break
+        }
+        return out
+    }
+
     /** 把版本号拆成可比较的数，用来在两个源之间挑更新的那份。 */
     private fun rank(v: String?): Long {
         val parts = (v ?: "").trim().removePrefix("v").split(".")
@@ -130,6 +144,7 @@ object UpdateChecker {
                 currentVersion = current,
                 latestVersion = v,
                 notes = j.optString("notes").trim().take(1200),
+                highlights = readHighlights(j),
                 pageUrl = j.optString("page").trim().ifBlank { RELEASE_PAGE },
                 apkUrl = apk.takeIf { it.startsWith("http") }?.let { mirrorOf(it) },
                 publishedAt = j.optString("published_at").trim(),
@@ -166,6 +181,13 @@ object UpdateChecker {
             currentVersion = current,
             latestVersion = tag,
             notes = j.optString("body").trim().take(1200),
+            highlights = j.optString("body").lines()
+                .map { it.trim() }
+                .filter { it.startsWith("·") || it.startsWith("- ") || it.startsWith("* ") }
+                .map { it.removePrefix("·").removePrefix("- ").removePrefix("* ")
+                    .replace("**", "").trim() }
+                .filter { it.isNotEmpty() && it.length <= 80 }
+                .take(6),
             pageUrl = j.optString("html_url").ifBlank { RELEASE_PAGE },
             apkUrl = apkUrl?.let { mirrorOf(it) },
             publishedAt = j.optString("published_at"),

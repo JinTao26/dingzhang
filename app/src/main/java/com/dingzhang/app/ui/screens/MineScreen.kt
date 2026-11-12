@@ -86,6 +86,7 @@ import com.dingzhang.app.ui.theme.ThemeController
 import com.dingzhang.app.ui.theme.ThemePack
 import com.dingzhang.app.ui.theme.ThemePacks
 import com.dingzhang.app.update.UpdateChecker
+import com.dingzhang.app.update.UpdateDownloader
 import kotlinx.coroutines.launch
 
 @Composable
@@ -811,10 +812,23 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                 autoNewer = null
             },
             onDownload = {
-                openUrl(ctx, r.apkUrl ?: r.pageUrl)
+                val apk = r.apkUrl
+                val id = if (apk != null) {
+                    UpdateDownloader.start(ctx, r.latestVersion.orEmpty(), apk)
+                } else null
+                if (id != null) {
+                    Toast.makeText(
+                        ctx,
+                        "正在下载，进度看通知栏，下完点那条通知就能装",
+                        Toast.LENGTH_LONG
+                    ).show()
+                } else {
+                    openUrl(ctx, apk ?: r.pageUrl)
+                }
                 updateResult = null
                 autoNewer = null
-            }
+            },
+            onOpenPage = { openUrl(ctx, r.pageUrl) }
         )
     }
 }

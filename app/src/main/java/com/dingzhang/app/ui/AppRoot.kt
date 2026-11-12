@@ -237,6 +237,18 @@ private fun openRelease(ctx: android.content.Context, r: UpdateChecker.Result) {
     }
 }
 
+/** 只开浏览器看页面（不下载），给「完整说明」用 */
+private fun openPageOnly(ctx: android.content.Context, url: String) {
+    runCatching {
+        ctx.startActivity(
+            Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
+    }.onFailure {
+        android.widget.Toast.makeText(ctx, "打不开浏览器，地址是：" + url, android.widget.Toast.LENGTH_LONG).show()
+    }
+}
+
 @Composable
 fun AppRoot() {
     // 星空物语要多铺一层背景，其它主题走原来的纯色底
@@ -308,7 +320,8 @@ fun AppRoot() {
             onDownload = {
                 openRelease(ctx, r)
                 autoUpdate = null
-            }
+            },
+            onOpenPage = { openPageOnly(ctx, r.pageUrl) }
         )
     }
 
