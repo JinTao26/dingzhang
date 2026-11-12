@@ -1243,7 +1243,15 @@ private fun FeedbackPage(ctx: Context, onClose: () -> Unit) {
 @Composable
 private fun IngestLogCard() {
     var show by remember { mutableStateOf(false) }
-    val lines = if (show) IngestLog.read() else emptyList()
+    var diagOpen by remember { mutableStateOf(false) }
+    // 点「清空」要立刻变空。以前 clear() 只删了存储，界面不重组，
+    // 看着就是「按了没反应」—— 得靠这个计数把列表重新读一遍。
+    var tick by remember { mutableStateOf(0) }
+
+    val oks = remember(show, tick) { if (show) IngestLog.readOk() else emptyList() }
+    val diags = remember(show, diagOpen, tick) {
+        if (show && diagOpen) IngestLog.readDiag() else emptyList()
+    }
 
     DzCard {
         Row(
@@ -1262,27 +1270,81 @@ private fun IngestLogCard() {
         }
         if (show) {
             Spacer(Modifier.height(10.dp))
-            if (lines.isEmpty()) {
+
+            // 先给记上的账。这部分单独存，不会被诊断信息挤掉。
+            Text(
+                "记上的账",
+                style = MaterialTheme.typography.labelMedium,
+                color = Dz.Sakura
+            )
+            Spacer(Modifier.height(6.dp))
+            if (oks.isEmpty()) {
                 Text(
-                    "还没有记录。开着无障碍付一笔钱，这里就会出现一行，写着记上了还是没认出来。",
+                    "还没有记上的。开着无障碍付一笔，成功的话这里会出现一行，写着商户和金额。",
                     style = MaterialTheme.typography.labelMedium,
                     color = Dz.InkSoft
                 )
             } else {
-                lines.take(12).forEach { line ->
+                oks.take(10).forEach { line ->
                     Text(
                         IngestLog.pretty(line),
                         style = MaterialTheme.typography.labelSmall,
+                        color = Dz.Ink
+                    )
+                    Spacer(Modifier.height(7.dp))
+                }
+            }
+
+            Spacer(Modifier.height(6.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { diagOpen = !diagOpen },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "为什么没记上",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Dz.InkSoft
+                )
+                Spacer(Modifier.weight(1f))
+                Text(
+                    if (diagOpen) "收起" else "展开",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Dz.InkSoft
+                )
+            }
+            if (diagOpen) {
+                Spacer(Modifier.height(6.dp))
+                if (diags.isEmpty()) {
+                    Text(
+                        "没有诊断记录。",
+                        style = MaterialTheme.typography.labelSmall,
                         color = Dz.InkSoft
                     )
-                    Spacer(Modifier.height(8.dp))
+                } else {
+                    diags.take(10).forEach { line ->
+                        Text(
+                            IngestLog.pretty(line),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Dz.InkSoft
+                        )
+                        Spacer(Modifier.height(7.dp))
+                    }
                 }
-                Spacer(Modifier.height(2.dp))
+            }
+
+            if (oks.isNotEmpty() || diags.isNotEmpty()) {
+                Spacer(Modifier.height(4.dp))
                 Text(
                     "清空记录",
                     style = MaterialTheme.typography.labelMedium,
                     color = Dz.Sakura,
-                    modifier = Modifier.clickable { IngestLog.clear() }
+                    modifier = Modifier.clickable {
+                        IngestLog.clear()
+                        diagOpen = false
+                        tick++
+                    }
                 )
             }
         }

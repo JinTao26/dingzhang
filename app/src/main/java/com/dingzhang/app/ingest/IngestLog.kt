@@ -20,28 +20,52 @@ import java.util.Locale
 object IngestLog {
 
     private const val PREF_NAME = "dingzhang_ingest_log"
-    private const val KEY = "lines"
-    private const val MAX = 30
+
+    /** 记上的账。这一段单独存，永远不会被「为什么没记上」的诊断挤掉。 */
+    private const val KEY_OK = "ok_lines"
+
+    /** 没记上的现场、通道存活状态。 */
+    private const val KEY_DIAG = "diag_lines"
+
+    private const val MAX_OK = 25
+    private const val MAX_DIAG = 12
+
+    /** 旧版本只有一个 key，第一次启动时搬过来，别把用户手上的现场弄丢。 */
+    private const val KEY_OLD = "lines"
 
     private var prefs: SharedPreferences? = null
     private val fmt = SimpleDateFormat("MM-dd HH:mm:ss", Locale.CHINA)
 
     fun init(c: Context) {
         if (prefs == null) {
-            prefs = c.applicationContext.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+            val p = c.applicationContext.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+            prefs = p
+            // 老数据搬到诊断段
+            val legacy = p.getString(KEY_OLD, "").orEmpty()
+            if (legacy.isNotBlank()) {
+                val merged = (p.getString(KEY_DIAG, "").orEmpty().lines() + legacy.lines())
+                    .filter { it.isNotBlank() }
+                    .distinct()
+                    .takeLast(MAX_DIAG)
+                p.edit().putString(KEY_DIAG, merged.joinToString("\n")).remove(KEY_OLD).apply()
+            }
         }
     }
 
     fun add(source: String, result: String, detail: String = "") {
         val p = prefs ?: return
+        // 「记上了」和诊断分两段存。以前挤在一个 30 条的队列里，
+        // 连着几次读不到窗口就能把刚记上的那笔顶掉 —— 用户打开一看全是废话。
+        val isOk = result == "记上了"
+        val key = if (isOk) KEY_OK else KEY_DIAG
+        val max = if (isOk) MAX_OK else MAX_DIAG
+
         val clean = detail.replace('\n', ' ').replace('|', '/').take(110)
         val now = System.currentTimeMillis()
         val line = "$now|$source|$result|$clean"
-        val old = p.getString(KEY, "").orEmpty().lines().filter { it.isNotBlank() }.toMutableList()
+        val old = p.getString(key, "").orEmpty().lines().filter { it.isNotBlank() }.toMutableList()
 
-        // 同一种「没记上」会连着刷几十条（比如连着好几次都读不到窗口），
-        // 把真正有用的那条挤掉了，用户截图里就是一整屏一样的字。
-        // 同类记录一分钟内只留一条，更新时间戳。
+        // 同一种情况一分钟内连着出现，只留一条、更新时间戳
         val last = old.lastOrNull()
         if (last != null) {
             val parts = last.split("|", limit = 4)
@@ -50,19 +74,21 @@ object IngestLog {
             val lastAt = parts.getOrNull(0)?.toLongOrNull() ?: 0L
             if (lastResult == result && lastDetail == clean && now - lastAt < 60_000L) {
                 old[old.size - 1] = line
-                p.edit().putString(KEY, old.takeLast(MAX).joinToString("\n")).apply()
+                p.edit().putString(key, old.takeLast(max).joinToString("\n")).apply()
                 return
             }
         }
 
-        val merged = (old + line).takeLast(MAX)
-        p.edit().putString(KEY, merged.joinToString("\n")).apply()
+        p.edit().putString(key, (old + line).takeLast(max).joinToString("\n")).apply()
     }
 
-    /** 最新的在前 */
-    fun read(): List<String> =
-        prefs?.getString(KEY, "").orEmpty()
-            .lines().filter { it.isNotBlank() }.reversed()
+    /** 记上的账，最新的在前 */
+    fun readOk(): List<String> =
+        prefs?.getString(KEY_OK, "").orEmpty().lines().filter { it.isNotBlank() }.reversed()
+
+    /** 没记上的现场，最新的在前 */
+    fun readDiag(): List<String> =
+        prefs?.getString(KEY_DIAG, "").orEmpty().lines().filter { it.isNotBlank() }.reversed()
 
     fun pretty(line: String): String {
         val parts = line.split("|", limit = 4)
@@ -76,6 +102,6 @@ object IngestLog {
     }
 
     fun clear() {
-        prefs?.edit()?.remove(KEY)?.apply()
+        prefs?.edit()?.remove(KEY_OK)?.remove(KEY_DIAG)?.apply()
     }
 }

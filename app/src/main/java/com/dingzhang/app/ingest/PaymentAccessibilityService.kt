@@ -230,7 +230,8 @@ class PaymentAccessibilityService : AccessibilityService() {
                     IngestLog.add("无障碍", "购物 App 里有付款字样但没认出来", texts.take(5).joinToString(" / "))
                 }
             } else {
-                IngestLog.add("无障碍", "不是支付页", texts.take(4).joinToString(" / "))
+                // 「不是支付页」不记了：用户不关心刚才瞟过一个商品页，
+                // 这种记录一多就把真记上的账全挤掉。
             }
             return false
         }
@@ -241,7 +242,7 @@ class PaymentAccessibilityService : AccessibilityService() {
         val pageKey = captured.externalId?.let { "no|$it" }
             ?: "${captured.wallet.db}|${captured.amountCents}|${captured.payee}|${now / 1000}"
         if (recentPages.contains(pageKey)) {
-            IngestLog.add("无障碍", "同一页刚处理过", pageKey)
+            Log.d(TAG, "同一页刚处理过，跳过")
             return true
         }
         recentPages.addLast(pageKey)
