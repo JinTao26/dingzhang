@@ -31,6 +31,7 @@ class PaymentNotificationService : NotificationListenerService() {
     override fun onListenerConnected() {
         super.onListenerConnected()
         Log.i(TAG, "通知监听已连接")
+        IngestLog.add("通知", "监听已连接", "开始接收支付通知")
         ChannelHealth.markAlive("nls")
     }
 
@@ -111,7 +112,24 @@ class PaymentNotificationService : NotificationListenerService() {
         ) {
             captured = parseBankAlert(pkg, title, text, bigText, postedAt)
         }
-        if (captured == null) return
+        // 没认出来就一声不吭，用户那边只能看到「一条通知记录都没有」，
+        // 分不清是通知压根没来、还是来了但没认出来。付款类 App 的通知留一行现场。
+        // 只写判断结果，不写正文原文 —— 微信通知里可能夹着聊天内容。
+        if (captured == null) {
+            if (isPaymentApp) {
+                val body = title + " " + text + " " + bigText
+                val looksPay = listOf("支付", "付款", "转账", "收款", "¥", "元").any { body.contains(it) }
+                if (looksPay) {
+                    val hasMoney = Regex("[¥￥]\\s*[0-9]|[0-9]\\s*元|[0-9]+\\.[0-9]{2}").containsMatchIn(body)
+                    IngestLog.add(
+                        "通知", if (hasMoney) "有金额但没认出" else "付款通知没带金额",
+                        "${if (pkg == PaymentNotifierParser.PKG_WECHAT) "微信" else "支付宝"}" +
+                            " · 标题「${title.take(10)}」· 正文 ${text.length} 字"
+                    )
+                }
+            }
+            return
+        }
 
         // 静默入账：不弹「记上了」的提示，付完钱不该被打扰。
         // 入库走后台队列，通知回调在主线程，不能拿来跑 SQL。

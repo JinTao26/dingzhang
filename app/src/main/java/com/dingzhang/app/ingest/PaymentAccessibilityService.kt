@@ -41,6 +41,9 @@ class PaymentAccessibilityService : AccessibilityService() {
         super.onServiceConnected()
         IngestPipeline.init(applicationContext)
         Log.i(TAG, "无障碍服务已连接，开始守支付页面")
+        // 也写进采集记录。开关看着是开的、服务其实早就被系统收了，
+        // 这两种情况在设置里长得一模一样，只有这条记录能分开。
+        IngestLog.add("无障碍", "服务已连接", "开始守支付页面")
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
