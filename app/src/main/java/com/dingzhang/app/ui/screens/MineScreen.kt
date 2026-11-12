@@ -962,6 +962,9 @@ private fun feedbackBody(ctx: Context, text: String): String {
 /** 反馈直发作者邮箱。不走 GitHub —— 国内不一定连得上。 */
 private const val FEEDBACK_MAIL = "2462634730@qq.com"
 
+/** QQ 邮箱。装了就直接点名进它，不让系统出一道「三个选项挑一个」的题。 */
+private const val QQ_MAIL_PKG = "com.tencent.androidqqmail"
+
 private fun submitFeedback(ctx: Context, text: String) {
     if (text.isBlank()) return
     val subject = "叮账反馈：" + text.trim().take(24)
@@ -992,15 +995,19 @@ private fun submitFeedback(ctx: Context, text: String) {
         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
 
-    // 多个邮箱并排时让用户自己挑，标题写清楚这是发给谁的，别点岔了
-    val started = runCatching {
-        ctx.startActivity(Intent.createChooser(mailto, "选一个邮箱发出去"))
-    }.isSuccess
+    // 系统为 mailto 拉出来的列表是「谁声明了就能进」，同一个邮箱自己也可能挂好几个入口
+    // （QQ 邮箱就有这种情况：一个能带收件人，一个只是打开写信页）。用户没义务知道点哪个。
+    // 这里改为点名：装了 QQ 邮箱就直接进它，收件人由 URI 带过去；没装或进不去才退回通用列表。
+    val toQq = Intent(mailto).setPackage(QQ_MAIL_PKG)
+    val started = runCatching { ctx.startActivity(toQq) }.isSuccess ||
+        runCatching {
+            ctx.startActivity(Intent.createChooser(mailto, "选一个邮箱发出去"))
+        }.isSuccess
 
     Toast.makeText(
         ctx,
         if (started) {
-            "收件人和内容已复制。万一打开后收件人是空的，长按粘贴一下就有了"
+            "收件人和内容已复制。要是打开后收件人是空的，长按粘贴一下就有了"
         } else {
             "手机上没有能用的邮箱 App。整段（含收件地址）已复制，粘到任意地方发出去就行"
         },
