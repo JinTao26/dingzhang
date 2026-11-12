@@ -131,7 +131,7 @@ fun UpdateDialog(
                             .padding(vertical = 11.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("去下载", style = MaterialTheme.typography.labelLarge, color = Color.White)
+                        Text("下载更新", style = MaterialTheme.typography.labelLarge, color = Color.White)
                     }
                 }
             }

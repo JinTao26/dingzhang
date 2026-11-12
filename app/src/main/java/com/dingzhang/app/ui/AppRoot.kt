@@ -71,6 +71,7 @@ import com.dingzhang.app.ui.components.UpdateDialog
 import com.dingzhang.app.ui.theme.Dz
 import com.dingzhang.app.ui.theme.ThemeController
 import com.dingzhang.app.update.UpdateChecker
+import com.dingzhang.app.update.UpdateDownloader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -203,8 +204,24 @@ private fun loadAppData(month: String): AppData {
     )
 }
 
-/** 直接给 apk 直链，点开就能下；浏览器都没法用就提示页面地址。 */
+/**
+ * 点「去下载」走两条路：
+ * 优先交给系统下载管理器 —— 通知栏有一条带进度的通知，下完点一下直接装；
+ * 入队失败（没有下载管理器、被系统禁用）才退回浏览器打开直链。
+ */
 private fun openRelease(ctx: android.content.Context, r: UpdateChecker.Result) {
+    val apk = r.apkUrl
+    if (apk != null) {
+        val id = UpdateDownloader.start(ctx, r.latestVersion.orEmpty(), apk)
+        if (id != null) {
+            android.widget.Toast.makeText(
+                ctx,
+                "正在下载，进度看通知栏，下完点那条通知就能装",
+                android.widget.Toast.LENGTH_LONG
+            ).show()
+            return
+        }
+    }
     val url = r.apkUrl ?: r.pageUrl
     try {
         ctx.startActivity(
