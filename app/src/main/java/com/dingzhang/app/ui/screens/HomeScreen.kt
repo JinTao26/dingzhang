@@ -48,6 +48,7 @@ import com.dingzhang.app.core.model.Dates
 import com.dingzhang.app.core.model.Money
 import com.dingzhang.app.core.model.Source
 import com.dingzhang.app.core.model.Txn
+import com.dingzhang.app.ui.UndoBuffer
 import com.dingzhang.app.core.model.TxnKind
 import com.dingzhang.app.DingZhangApp
 import com.dingzhang.app.data.RecurringDetector
@@ -108,7 +109,12 @@ fun HomeScreen(
                 IngestPipeline.dao?.delete(txn.id)
                 DingZhangApp.bumpDataVersion()
                 pickTxn = null
-                Toast.makeText(ctx, "已删除", Toast.LENGTH_SHORT).show()
+                UndoBuffer.put(txn)
+            },
+            onSetAmount = { cents ->
+                IngestPipeline.dao?.updateAmount(txn.id, cents)
+                DingZhangApp.bumpDataVersion()
+                pickTxn = txn.copy(amountCents = cents)
             },
             onSetKind = { k ->
                 IngestPipeline.dao?.setKind(txn.id, k)

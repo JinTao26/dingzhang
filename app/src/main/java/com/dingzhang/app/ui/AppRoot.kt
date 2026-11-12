@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -344,6 +345,20 @@ fun AppRoot() {
             }
         }
     }
+
+        // 删掉的账能撤销。删一笔要滑到底、点确认，手滑一下就没了：
+        // 分类、商户名、发生时间全跟着丢，只能重新记一遍。
+        UndoBuffer.lastDeleted?.let { gone ->
+            UndoBar(
+                txn = gone,
+                onUndo = {
+                    IngestPipeline.dao?.restore(gone)
+                    DingZhangApp.bumpDataVersion()
+                    UndoBuffer.consume()
+                },
+                onExpire = { UndoBuffer.consume() }
+            )
+        }
     }
 }
 
@@ -467,5 +482,59 @@ private fun DzBottomBar(current: Int, onSelect: (Int) -> Unit) {
                 )
             }
         }
+    }
+}
+
+/**
+ * 刚删掉的那一笔。三个屏（首页、明细、统计）共用一份，所以放在这里而不是各自的 state。
+ * 8 秒后自动作废 —— 够长到能反应过来，又不会一直挂着挡视线。
+ */
+object UndoBuffer {
+    var lastDeleted by mutableStateOf<Txn?>(null)
+        private set
+    private var at = 0L
+
+    fun put(t: Txn) {
+        lastDeleted = t
+        at = System.currentTimeMillis()
+    }
+
+    fun consume() {
+        lastDeleted = null
+        at = 0L
+    }
+
+    fun expired(now: Long = System.currentTimeMillis()): Boolean =
+        lastDeleted == null || now - at > 8000L
+}
+
+@Composable
+private fun BoxScope.UndoBar(txn: Txn, onUndo: () -> Unit, onExpire: () -> Unit) {
+    LaunchedEffect(txn.id) {
+        kotlinx.coroutines.delay(8000)
+        if (UndoBuffer.lastDeleted === txn) onExpire()
+    }
+    Row(
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .padding(bottom = 96.dp, start = 20.dp, end = 20.dp)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(Dz.Ink.copy(alpha = 0.92f))
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            "已删除「${txn.payee.take(12)}」",
+            style = MaterialTheme.typography.bodySmall,
+            color = Color.White,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            "撤销",
+            style = MaterialTheme.typography.titleMedium,
+            color = Dz.Sakura,
+            modifier = Modifier.clickable { onUndo() }
+        )
     }
 }

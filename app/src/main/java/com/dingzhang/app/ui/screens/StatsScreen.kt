@@ -56,6 +56,7 @@ import com.dingzhang.app.core.model.Dates
 import com.dingzhang.app.core.model.Money
 import com.dingzhang.app.core.model.Source
 import com.dingzhang.app.core.model.Txn
+import com.dingzhang.app.ui.UndoBuffer
 import com.dingzhang.app.core.model.TxnKind
 import com.dingzhang.app.ui.AppData
 import com.dingzhang.app.ui.components.CategoryBadge
@@ -235,6 +236,12 @@ fun StatsScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                 IngestPipeline.dao?.delete(t.id)
                 DingZhangApp.bumpDataVersion()
                 detailTxn = null
+                UndoBuffer.put(t)
+            },
+            onSetAmount = { cents ->
+                IngestPipeline.dao?.updateAmount(t.id, cents)
+                DingZhangApp.bumpDataVersion()
+                detailTxn = t.copy(amountCents = cents)
             },
             onSetKind = { k ->
                 IngestPipeline.dao?.setKind(t.id, k)
@@ -729,6 +736,20 @@ private fun RankCard(
                 )
             }
             CategoryBar(c, total) { onCategoryClick(c.categoryId) }
+        }
+
+        // 「其他」占比高 = 分类没认出来，这是用户最在意的一个信号。
+        // 以前只能自己看图琢磨，现在直接告诉他一嘴，点进去就能改。
+        val otherCents = cats.firstOrNull { it.categoryId == Categories.other.id }?.cents ?: 0L
+        if (total > 0 && otherCents > 0 && otherCents * 100 / total >= 15) {
+            val pct = (otherCents * 100 / total).toInt()
+            Text(
+                "「其他」占了 $pct%，多半是商户名没认出来。点它进去改一笔，" +
+                    "同一个商户以后的都会跟着改过来。",
+                style = MaterialTheme.typography.labelSmall,
+                color = Dz.InkFaint,
+                modifier = Modifier.padding(top = 8.dp)
+            )
         }
     }
 }

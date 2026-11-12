@@ -67,6 +67,7 @@ import com.dingzhang.app.core.model.Categories
 import com.dingzhang.app.core.model.Dates
 import com.dingzhang.app.core.model.Money
 import com.dingzhang.app.core.model.Txn
+import com.dingzhang.app.ui.UndoBuffer
 import com.dingzhang.app.core.model.TxnKind
 import com.dingzhang.app.core.model.TxnStatus
 import com.dingzhang.app.ingest.IngestPipeline
@@ -137,7 +138,11 @@ fun BillsScreen(
         delay(250)
         hits = withContext(Dispatchers.IO) {
             val dao = IngestPipeline.dao ?: return@withContext emptyList<Txn>()
-            val text = dao.search(q)
+            // 搜「餐饮」「交通」这类词时，把对应分类的账也捞出来
+            val catIds = Categories.all
+                .filter { it.name.contains(q.trim()) }
+                .map { it.id }
+            val text = dao.search(q, catIds)
             // 分类中文名也能搜：「餐饮」「工资」这类词不在 payee/note 里
             val catIds = Categories.all.filter { it.name.contains(q) }.map { it.id }.toSet()
             if (catIds.isEmpty()) text
@@ -530,7 +535,12 @@ fun BillsScreen(
                 IngestPipeline.dao?.delete(txn.id)
                 DingZhangApp.bumpDataVersion()
                 selected = null
-                Toast.makeText(ctx, "已删除", Toast.LENGTH_SHORT).show()
+                UndoBuffer.put(txn)
+            },
+            onSetAmount = { cents ->
+                IngestPipeline.dao?.updateAmount(txn.id, cents)
+                DingZhangApp.bumpDataVersion()
+                selected = txn.copy(amountCents = cents)
             },
             onSetKind = { k ->
                 IngestPipeline.dao?.setKind(txn.id, k)
@@ -674,9 +684,12 @@ fun TxnDetailDialog(
     onRenamePayee: (String) -> Unit,
     onDelete: () -> Unit,
     onSetKind: (TxnKind) -> Unit,
-    onSetBig: (Int) -> Unit = {}
+    onSetBig: (Int) -> Unit = {},
+    onSetAmount: ((Long) -> Unit)? = null
 ) {
     var renameOpen by remember { mutableStateOf(false) }
+    var amountOpen by remember { mutableStateOf(false) }
+    var amountInput by remember(txn.id, txn.amountCents) { mutableStateOf(yuanEdit(txn.amountCents)) }
     var confirmDelete by remember { mutableStateOf(false) }
     var nameInput by remember(txn.id, txn.payee) { mutableStateOf(txn.payee) }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
@@ -726,8 +739,50 @@ fun TxnDetailDialog(
                     Money.signed(txn.amountCents, txn.kind),
                     fontWeight = FontWeight.Bold,
                     fontSize = 20.sp,
-                    color = if (txn.kind == TxnKind.INCOME || txn.kind == TxnKind.REFUND) Dz.Income else Dz.Ink
+                    color = if (txn.kind == TxnKind.INCOME || txn.kind == TxnKind.REFUND) Dz.Income else Dz.Ink,
+                    // 金额本身就能点，跟商户名一样，不加「改」这种多余按钮
+                    modifier = if (onSetAmount != null) {
+                        Modifier.clickable {
+                            amountInput = yuanEdit(txn.amountCents)
+                            amountOpen = true
+                            renameOpen = false
+                        }
+                    } else Modifier
                 )
+            }
+
+            if (amountOpen && onSetAmount != null) {
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = amountInput,
+                    onValueChange = { amountInput = it.filter { ch -> ch.isDigit() || ch == '.' } },
+                    singleLine = true,
+                    label = { Text("金额（元）", color = Dz.InkFaint, fontSize = 12.sp) },
+                    textStyle = TextStyle(fontSize = 14.sp),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(onClick = { amountOpen = false }) {
+                        Text("取消", color = Dz.InkSoft)
+                    }
+                    val cents = yuanToCents(amountInput)
+                    Button(
+                        onClick = {
+                            if (cents != null && cents > 0) {
+                                onSetAmount(cents)
+                                amountOpen = false
+                            }
+                        },
+                        enabled = cents != null && cents > 0,
+                        colors = ButtonDefaults.buttonColors(containerColor = Dz.Sakura)
+                    ) { Text("保存") }
+                }
             }
 
             if (renameOpen) {
@@ -1350,4 +1405,17 @@ private fun RowScope.CatChip(name: String, active: Boolean, onClick: () -> Unit)
             color = if (active) Dz.SakuraDeep else Dz.InkSoft
         )
     }
+}
+
+/** 金额转成输入框里的文字：整元不补 .00 */
+private fun yuanEdit(cents: Long): String =
+    if (cents % 100 == 0L) (cents / 100).toString() else String.format(java.util.Locale.US, "%.2f", cents / 100.0)
+
+/** 输入框里的金额转成分。解析不出来返回 null，别让人存进一个奇怪的数 */
+private fun yuanToCents(text: String): Long? {
+    val t = text.trim()
+    if (t.isEmpty()) return null
+    val d = t.toDoubleOrNull() ?: return null
+    if (d <= 0.0 || d > 100_000_000.0) return null
+    return Math.round(d * 100)
 }

@@ -151,6 +151,22 @@ class TxnDao(private val helper: DbHelper) {
         )
     }
 
+    /**
+     * 改金额。自动记账偶尔会读错一个数字，以前只能删了重记 —— 删了就丢了原来的
+     * 分类、商户名和发生时间。
+     */
+    fun updateAmount(id: Long, cents: Long) {
+        helper.writableDatabase.update(
+            "txn", ContentValues().apply { put("amount_cents", cents.coerceAtLeast(0)) },
+            "id = ?", arrayOf(id.toString())
+        )
+    }
+
+    /** 撤销删除用：把刚才删掉的那条原样塞回去。内容全保留，id 重新分配。 */
+    fun restore(txn: Txn) {
+        runCatching { insert(txn.copy(id = 0)) }
+    }
+
     fun delete(id: Long) {
         helper.writableDatabase.delete("txn", "id = ?", arrayOf(id.toString()))
     }
@@ -212,15 +228,26 @@ class TxnDao(private val helper: DbHelper) {
         cursor.use { return it.toList() }
     }
 
-    fun search(q: String, limit: Int = 500): List<Txn> {
+    fun search(q: String, categoryIds: List<String> = emptyList(), limit: Int = 500): List<Txn> {
         val needle = "%" + q.trim() + "%"
+        // 分类名也参与搜索：搜「餐饮」「交通」不该一条都搜不到。
+        // 分类是 UI 层显示的名字，库里只有 category_id，所以由调用方把命中的 id 传进来。
+        val catClause = if (categoryIds.isEmpty()) {
+            ""
+        } else {
+            " OR category_id IN (" + categoryIds.joinToString(",") { "?" } + ")"
+        }
+        val args = buildList<Any> {
+            add(needle); add(needle); add(needle); add(needle)
+            addAll(categoryIds)
+        }.toTypedArray()
         helper.readableDatabase.rawQuery(
             """
             SELECT * FROM txn
-            WHERE payee LIKE ? OR note LIKE ? OR raw_text LIKE ? OR external_id LIKE ?
+            WHERE payee LIKE ? OR note LIKE ? OR raw_text LIKE ? OR external_id LIKE ?$catClause
             ORDER BY occurred_at DESC LIMIT $limit
             """.trimIndent(),
-            arrayOf(needle, needle, needle, needle)
+            args.map { it.toString() }
         ).use { return it.toList() }
     }
 
