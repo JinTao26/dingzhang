@@ -383,6 +383,29 @@ object IngestPipeline {
         return changed
     }
 
+    /**
+     * 把历史上被误记成支出的「还款」改成资金转移。
+     *
+     * 月付、花呗、白条、信用卡都是先花钱、后还钱：花钱那笔是支出没错，
+     * 还钱那笔再记一次支出，同一笔钱就把支出翻了一倍。
+     * 以前只有微信走还款判定，美团月付这类顶到支出里去了。
+     *
+     * 只跑一次，且只碰还挂着「待还 / 应还 / 还款提醒」以外字样的记录 ——
+     * 那种是提醒页，本来也不该进库。
+     */
+    fun fixRepaymentIfNeeded(): Int {
+        val dao = daoRef ?: return 0
+        val settings = settingsRef ?: return 0
+        if (settings.repayFixed) return 0
+        var changed = 0
+        runCatching {
+            changed = dao.reclassifyRepaymentAsTransfer()
+        }.onFailure { Log.w(TAG, "修正还款记录失败：" + it.message) }
+        settings.repayFixed = true
+        if (changed > 0) Log.d(TAG, "还款修正：$changed 笔从支出改成转账")
+        return changed
+    }
+
     fun confirm(txnId: Long) {
         daoRef?.setStatus(txnId, TxnStatus.CONFIRMED)
     }

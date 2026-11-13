@@ -104,6 +104,17 @@ object PaymentAccessibilityParser {
     // 微信转账的收尾页上并不写「转账」二字，只写「待李梦达确认收款」，
     // 以前这类页面会被当成普通消费，2 块钱被算进支出里
     private val transferCues = listOf("还款", "提现", "转账", "确认收款", "待接收")
+    /**
+     * 「钱只是换了个口袋」：还款、提现、账单结清。这类**不分哪个钱包**都成立 ——
+     * 花呗、美团月付、京东白条、信用卡还款，同一个道理。
+     * 以前这条判定挂在 wallet == WECHAT 上，结果美团月付的还款被记成支出，
+     * 加上消费那一笔，同一笔钱在流水里出现两次，支出凭空翻倍。
+     */
+    private val vaultCues = listOf("还款", "已还清", "还清了", "结清", "提现")
+    /** 提醒/入口类，看到就别记 —— 「待还 20 元」不是已经还了 */
+    private val vaultNotDone = listOf(
+        "待还", "应还", "还款日", "账单日", "去还款", "立即还款", "确认还款", "还款提醒", "即将到期"
+    )
     /** 「待李梦达确认收款」里的那个名字 */
     private val transferPeerPatterns = listOf(
         Regex("待\\s*(.{1,12}?)\\s*确认收款"),
@@ -147,7 +158,7 @@ object PaymentAccessibilityParser {
                 ?.let { IngestPipeline.cleanPayee(it) }
                 ?.takeIf { it.length >= 2 }
             ?: IngestPipeline.guessPayeeFromLines(texts)
-            ?: defaultPayee(wallet)
+            ?: if (vaultCues.any { flat.contains(it) }) "还款" else defaultPayee(wallet)
 
         val account = findValue(texts, accountLabels)?.take(20).orEmpty()
 
@@ -166,9 +177,14 @@ object PaymentAccessibilityParser {
             ?.filter { it.isDigit() }
             ?.takeIf { it.length >= 10 }
 
+        // 「待还 20 元」这种提醒页上有金额、也有「还款」两个字，但它不是已经还了
+        if (vaultNotDone.any { flat.contains(it) }) return null
+
         val kind = when {
             // 退款最优先：页面上写了退款成功，这笔就是退回来的钱
             refundCues.any { flat.contains(it) } -> TxnKind.REFUND
+            // 还款、提现不分钱包都算资金转移，不进收支统计
+            vaultCues.any { flat.contains(it) } -> TxnKind.TRANSFER
             // 金额带 + 号 = 钱进来了（收款、退款到零钱都在这条上）
             texts.any { amountPosSign.containsMatchIn(it.trim()) } ->
                 if (wallet == Wallet.WECHAT && flat.contains("转账")) TxnKind.TRANSFER else TxnKind.INCOME
@@ -258,8 +274,14 @@ object PaymentAccessibilityParser {
 
         // 闸一：出现任何「没付成」的字，整页不算
         if (embeddedNotDoneCues.any { flat.contains(it) }) return null
-        // 闸二：必须有明确的「付完了」
-        if (embeddedDoneCues.none { flat.contains(it) }) return null
+        // 「待还 20 元」这种提醒页上有金额、也有「还款」两个字，但它不是已经还了
+        if (vaultNotDone.any { flat.contains(it) }) return null
+
+        val vaultHit = vaultCues.any { flat.contains(it) }
+        // 闸二：必须有明确的「付完了」。还款页不写「支付成功」，它写「还款成功」，
+        // 所以这里对还款单独放一行 —— 否则月付还款根本进不来，
+        // 或者更糟：被别的规则当成又一笔消费。
+        if (!vaultHit && embeddedDoneCues.none { flat.contains(it) }) return null
 
         // 闸三：一页上冒出好几个价格，这是订单列表 / 商品列表，不是某一笔的成交页。
         // 这一条挡住的是最坏的情况：从列表页里随手抓一个金额，记成一笔不存在的消费。
@@ -270,7 +292,12 @@ object PaymentAccessibilityParser {
         val amount = extractAmount(texts) ?: return null
         if (amount <= 0 || amount > 10_000_000_00L) return null
 
-        val kind = if (refundCues.any { flat.contains(it) }) TxnKind.REFUND else TxnKind.EXPENSE
+        val kind = when {
+            refundCues.any { flat.contains(it) } -> TxnKind.REFUND
+            // 还款是「钱换个口袋」：消费那笔已经记过支出，这里再记一笔支出就翻倍了
+            vaultHit -> TxnKind.TRANSFER
+            else -> TxnKind.EXPENSE
+        }
 
         // 钱包：App 里写了哪个就用哪个。都没写（京东支付之类）就记未知，
         // 宁可不知道走的哪张卡，也别猜

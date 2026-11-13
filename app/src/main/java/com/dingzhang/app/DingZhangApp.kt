@@ -18,6 +18,10 @@ class DingZhangApp : Application() {
         Thread {
             val changed = IngestPipeline.reclassifyOthersIfNeeded()
             if (changed > 0) bumpDataVersion()
+            // 月付 / 花呗 / 白条 / 信用卡的还款以前会被记成支出，
+            // 同一笔钱算两次。新记的已经拦住了，这里把老账也改过来
+            val repaired = IngestPipeline.fixRepaymentIfNeeded()
+            if (repaired > 0) bumpDataVersion()
         }.start()
     }
 

@@ -42,6 +42,9 @@ object BankAlertParser {
 
     private val incomeWords = listOf("工资", "入账", "收入", "存入", "转入", "到账", "汇入", "返现", "奖励")
     private val expenseWords = listOf("消费", "支出", "扣款", "转出", "取现", "付款", "还款", "代扣", "缴费", "转给")
+    /** 还款类：关键词命中就当资金转移，别当消费 */
+    private val repayWords = listOf("信用卡还款", "自动还款", "还款", "已还清", "结清")
+
     private val refundWords = listOf("退款", "退回", "冲正", "撤销")
     private val bankHints = listOf("银行", "储蓄卡", "储蓄账户", "信用卡", "借记卡", "账户")
 
@@ -65,6 +68,9 @@ object BankAlertParser {
         val kind = when {
             // 退款要排在「到账 / 入账」前面，「退款到账」否则会被算成收入
             refundWords.any { head.contains(it) } -> TxnKind.REFUND
+            // 还信用卡：钱从储蓄卡挪去还账，不是新花出去的一笔，
+            // 记成支出的话，刷卡那天已经记过一次，这里又记一次
+            repayWords.any { head.contains(it) } -> TxnKind.TRANSFER
             head.contains("工资") || head.contains("薪") -> TxnKind.INCOME
             incomeWords.any { head.contains(it) } -> TxnKind.INCOME
             expenseWords.any { head.contains(it) } -> TxnKind.EXPENSE

@@ -85,6 +85,11 @@ class Settings(context: Context) {
         get() = sp.getInt("dict_version", 1)
         set(v) = sp.edit().putInt("dict_version", v).apply()
 
+    /** 历史上误记成支出的还款，修过一次就不再重复扫 */
+    var repayFixed: Boolean
+        get() = sp.getBoolean("fix_repay_v1", false)
+        set(v) = sp.edit().putBoolean("fix_repay_v1", v).apply()
+
     /** 当前主题包 id，见 ui/theme/ThemePacks.ALL */
     var themeId: String
         get() = sp.getString("theme_id", "sakura") ?: "sakura"

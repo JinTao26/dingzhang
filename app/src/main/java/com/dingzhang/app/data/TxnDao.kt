@@ -167,6 +167,26 @@ class TxnDao(private val helper: DbHelper) {
         runCatching { insert(txn.copy(id = 0)) }
     }
 
+    /**
+     * 把「还款」类却记成支出的记录改成转账。返回改了几笔。
+     * 直接走 SQL：这类记录通常就几条，没必要全表读到内存里再逐条写回去。
+     */
+    fun reclassifyRepaymentAsTransfer(): Int {
+        val db = helper.writableDatabase
+        return db.update(
+            "txn",
+            android.content.ContentValues().apply {
+                put("kind", TxnKind.TRANSFER.db)
+                put("category_id", "other")
+            },
+            "kind = ? AND raw_text LIKE ? AND raw_text NOT LIKE ? AND raw_text NOT LIKE ? " +
+                "AND raw_text NOT LIKE ? AND raw_text NOT LIKE ?",
+            arrayOf(
+                TxnKind.EXPENSE.db, "%还款%", "%待还%", "%应还%", "%还款提醒%", "%立即还款%"
+            )
+        )
+    }
+
     fun delete(id: Long) {
         helper.writableDatabase.delete("txn", "id = ?", arrayOf(id.toString()))
     }
