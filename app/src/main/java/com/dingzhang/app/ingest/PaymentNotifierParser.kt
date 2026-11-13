@@ -29,7 +29,37 @@ object PaymentNotifierParser {
      * 所以规则必须比微信支付宝严：只认明确的成交句，绝不认裸「¥xx」。
      */
     fun isShoppingApp(pkg: String): Boolean =
-        pkg.contains("jingdong") || pkg.contains("jd.jr") || pkg.contains("jdlite")
+        pkg.contains("jingdong") || pkg.contains("jd.jr") || pkg.contains("jdlite") ||
+            // 抖音、淘宝、天猫、拼多多、美团、得物、小红书、云闪付都有自己的支付通知。
+            // 以前这些包进来就被判「不是支付 App」直接扔掉，白丢一整类订单。
+            pkg.contains("taobao") || pkg.contains("tmall") ||
+            pkg.contains("ugc.aweme") || pkg.contains("ugc.live") ||
+            pkg.contains("pinduoduo") || pkg.contains("xiaomi.market") ||
+            pkg.contains("meituan") || pkg.contains("sankuai") ||
+            pkg.contains("shizhuang") || pkg.contains("xingin") ||
+            pkg.contains("unionpay")
+
+    private fun appName(pkg: String): String = when {
+        pkg.contains("taobao") -> "淘宝"
+        pkg.contains("tmall") -> "天猫"
+        pkg.contains("pinduoduo") -> "拼多多"
+        pkg.contains("ugc.aweme") || pkg.contains("ugc.live") -> "抖音"
+        pkg.contains("meituan") || pkg.contains("sankuai") -> "美团"
+        pkg.contains("shizhuang") -> "得物"
+        pkg.contains("xingin") -> "小红书"
+        pkg.contains("unionpay") -> "云闪付"
+        pkg.contains("jingdong") || pkg.contains("jd.jr") || pkg.contains("jdlite") -> "京东"
+        else -> ""
+    }
+
+    /**
+     * 明确的「这单付掉了」。购物类 App 的通知里混着物流、评价、营销，
+     * 没有这几句就不认 —— 宁可漏，不能把「省钱金额已达 648.13 元」记成支出。
+     */
+    private val strongPayCues = listOf(
+        "支付成功", "付款成功", "交易成功", "支付完成", "付款完成", "已支付", "成功支付",
+        "已付款", "扣款成功", "付款已成功"
+    )
 
     private val shoppingExpensePatterns = listOf(
         Regex("使用【(.+?)】支付([0-9]+(?:\\.[0-9]{1,2})?)"),
@@ -190,7 +220,9 @@ object PaymentNotifierParser {
         val wallet = when (pkg) {
             PKG_WECHAT -> Wallet.WECHAT
             PKG_ALIPAY -> Wallet.ALIPAY
-            else -> return null
+            // 抖音、淘宝、美团、拼多多、云闪付自己的支付通知没有对应的钱包枚举，
+            // 记「未知」，别硬猜是从哪张卡扣的
+            else -> Wallet.UNKNOWN
         }
 
         val corpus = listOfNotNull(title?.toString(), text?.toString(), bigText?.toString())
@@ -198,6 +230,11 @@ object PaymentNotifierParser {
             .trim()
         if (corpus.isEmpty() || corpus.length > 400) return null
         if (noise.any { corpus.contains(it) }) return null
+        // 微信、支付宝的通知本身就带着支付语义，可以放宽；
+        // 购物类 App 的通知里一半是物流和营销，必须命中明确的成交句
+        if (pkg != PKG_WECHAT && pkg != PKG_ALIPAY &&
+            strongPayCues.none { corpus.contains(it) }
+        ) return null
 
         val isIncome = incomeCues.any { corpus.contains(it) }
         val isExpense = expenseCues.any { corpus.contains(it) }
@@ -219,7 +256,9 @@ object PaymentNotifierParser {
                 corpus.contains("转账") || corpus.contains("转入") -> "转账"
                 wallet == Wallet.WECHAT -> "微信支付"
                 wallet == Wallet.ALIPAY -> "支付宝"
-                else -> ""
+                // 抖音、美团这些认不出来源的，至少把 App 名写上，
+                // 否则流水里商户一栏是空的，用户根本不知道这笔是谁扣的
+                else -> appName(pkg)
             }
 
         val kind = when {

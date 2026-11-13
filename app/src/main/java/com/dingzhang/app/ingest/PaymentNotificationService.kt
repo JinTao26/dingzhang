@@ -101,14 +101,16 @@ class PaymentNotificationService : NotificationListenerService() {
         val postedAt = sbn.postTime.takeIf { it > 0 } ?: System.currentTimeMillis()
 
         var captured: Captured? = null
-        if (isPaymentApp && settings.notificationChannel) {
-            captured = PaymentNotifierParser.parse(pkg, title, text, bigText, postedAt, settings)
-        }
-        // 微信里银行公众号的提醒、以及银行 App 的推送，交给银行解析器
-        // 支付宝自己的通知已经由上面的解析器处理，不再往银行通道兜
-        // 购物 App：京东自己发的支付成功通知，严格规则在 parseShoppingApp 里
-        if (captured == null && isShopping && settings.notificationChannel) {
-            captured = PaymentNotifierParser.parseShoppingApp(pkg, title, text, bigText, postedAt)
+        if (settings.notificationChannel) {
+            // 购物类先走严格规则（京东那种「使用【xx卡】支付16.90」只有它认得出）；
+            // 认不出再交给通用解析器 —— 抖音、淘宝、美团、拼多多、云闪付的成交句
+            // 跟微信支付宝不一样，以前一律被当成「不是支付 App」扔掉。
+            if (isShopping) {
+                captured = PaymentNotifierParser.parseShoppingApp(pkg, title, text, bigText, postedAt)
+            }
+            if (captured == null) {
+                captured = PaymentNotifierParser.parse(pkg, title, text, bigText, postedAt, settings)
+            }
         }
         // 银行这两条拆开管：银行 App 自己的推送看 bankPushChannel，
         // 微信里的银行公众号看 bankWechatChannel（默认关）。
@@ -127,14 +129,14 @@ class PaymentNotificationService : NotificationListenerService() {
         // 分不清是通知压根没来、还是来了但没认出来。付款类 App 的通知留一行现场。
         // 只写判断结果，不写正文原文 —— 微信通知里可能夹着聊天内容。
         if (captured == null) {
-            if (isPaymentApp) {
+            if (isPaymentApp || isShopping) {
                 val body = title + " " + text + " " + bigText
                 val looksPay = listOf("支付", "付款", "转账", "收款", "¥", "元").any { body.contains(it) }
                 if (looksPay) {
                     val hasMoney = Regex("[¥￥]\\s*[0-9]|[0-9]\\s*元|[0-9]+\\.[0-9]{2}").containsMatchIn(body)
                     IngestLog.add(
                         "通知", if (hasMoney) "有金额但没认出" else "付款通知没带金额",
-                        "${if (pkg == PaymentNotifierParser.PKG_WECHAT) "微信" else "支付宝"}" +
+                        "${if (pkg == PaymentNotifierParser.PKG_WECHAT) "微信" else if (pkg == PaymentNotifierParser.PKG_ALIPAY) "支付宝" else pkg.takeLast(14)}" +
                             " · 标题「${title.take(10)}」· 读到 ${snap.fields.ifBlank { "空" }}" +
                             " · 正文 ${text.length} 字"
                     )
