@@ -217,6 +217,21 @@ class PaymentAccessibilityService : AccessibilityService() {
         lastParseOk[pkg] = captured != null
 
         if (captured == null) {
+            // 收付款（出示付款码让商家扫）这个场景一直没记上过，而且什么都看不到：
+            // 这一页既不像支付页、也不是账单页，走到这里就被静默丢掉。
+            // 只要页面上有付款码的味道，就把读到的开头留下来 ——
+            // 付一笔 0.01 元就能看出，是微信压根没写「成功」，还是写了但规则没认。
+            val scanPayHint = texts.any { t ->
+                t.contains("付款码") || t.contains("向商家付款") ||
+                    t.contains("收付款") || t.contains("数字码")
+            }
+            if (scanPayHint) {
+                IngestLog.add(
+                    "无障碍", "收付款页没认出来",
+                    texts.take(6).joinToString(" / ").take(120)
+                )
+                return false
+            }
             // 明显是支付/账单页却没认出来，记一行现场，方便照着补规则
             if (looksLikePaymentPage(texts)) {
                 Log.d(TAG, "未命中规则 $pkg: " + texts.take(8).joinToString(" / ").take(160))
