@@ -39,6 +39,9 @@ object PaymentNotifierParser {
             pkg.contains("shizhuang") || pkg.contains("xingin") ||
             pkg.contains("unionpay")
 
+    /** 包名换成人看得懂的名字，诊断里用 */
+    fun appLabel(pkg: String): String = appName(pkg).ifBlank { pkg.takeLast(16) }
+
     private fun appName(pkg: String): String = when {
         pkg.contains("taobao") -> "淘宝"
         pkg.contains("tmall") -> "天猫"

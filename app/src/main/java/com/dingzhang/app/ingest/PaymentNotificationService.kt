@@ -82,6 +82,22 @@ class PaymentNotificationService : NotificationListenerService() {
         // 京东这类购物 App 自己的支付成功通知：只认严格成交句，见 parseShoppingApp
         val isShopping = PaymentNotifierParser.isShoppingApp(pkg)
 
+        // 付款码付完到底有没有通知、通知里写了什么，以前只能猜。
+        // 微信付款码那一笔既没有支付页、通知又说不到，结果就是「什么都没记、也看不出为什么」。
+        // 这里把所有看起来和钱有关的通知留一行现场：有标题和字数就够判断了。
+        // 只记标题前 12 个字，不记正文 —— 微信通知里可能夹着聊天内容。
+        if (isPaymentApp || isShopping) {
+            val looksMoney = Regex("[¥￥]|[0-9]+\\.[0-9]{2}|元|支付|付款|收款|消费|扣款|转账")
+                .containsMatchIn(title + text)
+            if (looksMoney) {
+                IngestLog.add(
+                    "通知", "收到一条",
+                    PaymentNotifierParser.appLabel(pkg) + " · 标题「" + title.take(12) + "」 · " +
+                        text.length + " 字"
+                )
+            }
+        }
+
         // 微信/支付宝/购物 App 之外的包，只在「银行提醒」开着时才看
         if (!isPaymentApp && !isShopping && !settings.bankPushChannel && !settings.bankWechatChannel) return
         if ((isPaymentApp || isShopping) && !settings.notificationChannel && !settings.bankPushChannel) return
