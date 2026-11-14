@@ -293,8 +293,15 @@ object PaymentNotifierParser {
      */
     private fun extractAmount(corpus: String): Long? {
         // 先排除余额 / 优惠附近的数字
-        val sanitized = corpus
-            .replace(Regex("(余额|可用|优惠|立减|已省)[:：]?\\s*[¥￥]?\\s*[0-9][0-9,]*(?:\\.[0-9]{1,2})?\\s*元?"), " ")
+        // 词表原先只有「余额/可用/优惠/立减/已省」，可微信的推送常写成
+        // 「已优惠 5.00 元」「优惠金额 5 元」「减免 5 元」—— 这些写法一个都盖不住，
+        // 于是「省下的 5 块」被当成「花掉的 5 块」记了一笔。宁可这一条认不出金额不记，
+        // 也不能把折扣记成支出。
+        val discountRegex = Regex(
+            "(余额|可用|优惠|立减|已省|已优惠|优惠金额|优惠券|减免|折扣|抵扣|红包|满减|券)" +
+                "[:：]?[ \\s]*[¥￥]?[ \\s]*[0-9][0-9,]*(?:\\.[0-9]{1,2})?[ \\s]*元?"
+        )
+        val sanitized = corpus.replace(discountRegex, " ")
 
         AMOUNT_WITH_SYMBOL.find(sanitized)?.let { m ->
             Money.parseToCents(m.groupValues[1])?.let { if (it > 0) return it }
