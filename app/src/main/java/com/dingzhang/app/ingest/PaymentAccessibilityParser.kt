@@ -353,6 +353,20 @@ object PaymentAccessibilityParser {
      * 3. 任意带 ¥ 或「元」的
      */
     private fun extractAmount(texts: List<String>): Long? {
+        // 「原价 12 / 优惠 5 / 实付 7」这种页面，优惠那行本身也是一个金额。
+        // 扫 ¥ 符号时按页面顺序走，很容易先抓到优惠的那个 5，记成一笔根本不存在的支出。
+        // 凡是带折扣语义的行，一律不进金额候选 —— 宁可这一步找不到金额，
+        // 也不能把「省了多少钱」记成「花了多少钱」。
+        val discountHint = listOf(
+            "优惠", "立减", "减免", "折扣", "满减", "抵扣", "红包", "券", "会员价", "活动价"
+        )
+        // 一行里同时写着「实付 7 元，已省 5 元」的，不能整行跳过 —— 那样会漏记一整笔。
+        // 只有「纯粹在讲优惠」的行才算折扣行。
+        val realHint = listOf(
+            "实付", "实际支付", "实际付款", "实际扣款", "付款金额", "支付金额", "已支付", "支付成功"
+        )
+        fun isDiscountLine(t: String): Boolean =
+            discountHint.any { t.contains(it) } && realHint.none { t.contains(it) }
         // 先认明确的「实付 / 实际扣款」标签，再退回扫描 ¥ 符号。
         // 顺序反过来的话，页面同时写着「原价 ¥35.00 / 优惠 ¥5.00 / 实付 ¥30.00」，
         // 第一个扫到的 ¥ 是 35，记的就是没打折的金额。
@@ -366,18 +380,21 @@ object PaymentAccessibilityParser {
 
         // 「-25.00」这种负号在单独的节点上时，合并判断
         for (t in texts) {
+            if (isDiscountLine(t)) continue
             val m = amountWithSymbol.find(t)
             if (m != null) {
                 Money.parseToCents(m.groupValues[1])?.let { if (it > 0) return it }
             }
         }
         for (t in texts) {
+            if (isDiscountLine(t)) continue
             val m = amountSigned.find(t)
             if (m != null) {
                 Money.parseToCents(m.groupValues[1])?.let { if (it > 0) return it }
             }
         }
         for (t in texts) {
+            if (isDiscountLine(t)) continue
             val m = amountPlain.find(t)
             if (m != null) {
                 Money.parseToCents(m.groupValues[1])?.let { if (it > 0) return it }
@@ -385,6 +402,7 @@ object PaymentAccessibilityParser {
         }
         // 最后兜一层：页面上单独一行、只写了「20.00」的，基本就是这笔的金额
         for (t in texts) {
+            if (isDiscountLine(t)) continue
             val m = amountBareDecimal.find(t.trim())
             if (m != null) {
                 Money.parseToCents(m.groupValues[1])?.let { if (it > 0) return it }
