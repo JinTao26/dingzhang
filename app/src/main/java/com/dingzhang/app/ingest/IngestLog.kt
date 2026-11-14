@@ -101,7 +101,30 @@ object IngestLog {
         return "$time · $src $result" + if (detail.isNotEmpty()) "\n    $detail" else ""
     }
 
+    /**
+     * 「刚才收到的那条通知长什么样」单独一个槽位，只留最新两条。
+     *
+     * 它不属于「为什么没记上」的诊断。之前和诊断混在一起，微信通知一来就是一串
+     * （聊天里提到钱也算），12 条位置全被它占满，真正有用的
+     * 「没有可读的窗口」「认不出这页」反而被挤了出去 ——
+     * 用户打开采集记录只剩一堆「收到一条」，什么也排查不了。
+     */
+    private const val KEY_PROBE = "probe_lines"
+    private const val MAX_PROBE = 2
+
+    fun addProbe(source: String, result: String, detail: String = "") {
+        val p = prefs ?: return
+        val clean = detail.replace('\n', ' ').replace('|', '/').take(110)
+        val line = "${System.currentTimeMillis()}|$source|$result|$clean"
+        val old = p.getString(KEY_PROBE, "").orEmpty().lines().filter { it.isNotBlank() }
+        p.edit().putString(KEY_PROBE, (old + line).takeLast(MAX_PROBE).joinToString("\n")).apply()
+    }
+
+    /** 刚才收到的通知，最新的在前 */
+    fun readProbe(): List<String> =
+        prefs?.getString(KEY_PROBE, "").orEmpty().lines().filter { it.isNotBlank() }.reversed()
+
     fun clear() {
-        prefs?.edit()?.remove(KEY_OK)?.remove(KEY_DIAG)?.apply()
+        prefs?.edit()?.remove(KEY_OK)?.remove(KEY_DIAG)?.remove(KEY_PROBE)?.apply()
     }
 }

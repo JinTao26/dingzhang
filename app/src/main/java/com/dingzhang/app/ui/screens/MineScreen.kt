@@ -1567,6 +1567,18 @@ private fun IngestLogCard() {
                 com.dingzhang.app.ingest.ChannelHealth.nlsEnabled(ctx),
                 com.dingzhang.app.ingest.ChannelHealth.nlsIdleMs()
             )
+            // 刚才那条通知长什么样，单独一小行。
+            // 它跟下面的「为什么没记上」不是一回事：这里只说「收到了什么」，
+            // 那条通知有没有名字、有多少字，一看就知道是通知没带信息还是我们没认出来。
+            val probe = remember(tick) { IngestLog.readProbe().firstOrNull() }
+            if (probe != null) {
+                Text(
+                    "刚才收到：" + IngestLog.pretty(probe),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Dz.InkSoft,
+                    modifier = Modifier.padding(start = 14.dp, top = 2.dp)
+                )
+            }
             Spacer(Modifier.height(10.dp))
 
             // 先给记上的账。这部分单独存，不会被诊断信息挤掉。

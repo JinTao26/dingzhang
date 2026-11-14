@@ -90,7 +90,7 @@ class PaymentNotificationService : NotificationListenerService() {
             val looksMoney = Regex("[¥￥]|[0-9]+\\.[0-9]{2}|元|支付|付款|收款|消费|扣款|转账")
                 .containsMatchIn(title + text)
             if (looksMoney) {
-                IngestLog.add(
+                IngestLog.addProbe(
                     "通知", "收到一条",
                     PaymentNotifierParser.appLabel(pkg) + " · 标题「" + title.take(12) + "」 · " +
                         text.length + " 字"

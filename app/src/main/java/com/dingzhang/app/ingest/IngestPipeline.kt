@@ -195,6 +195,27 @@ object IngestPipeline {
                 !incomingIsBill && existingIsBill -> {
                     return Outcome(false, "已有更权威的账单记录", dup)
                 }
+                // 无障碍读的是页面本身，通知只有一行字（微信那条常常只写「微信支付」）。
+                // 同一笔钱通知先到、无障碍后到时，以无障碍为准 —— 把那条整条换成
+                // 无障碍读到的商户名、交易单号和原文，来源也改成无障碍。
+                // 用户翻流水看到的就是「无障碍」，而不是「通知」，商户名也不再是泛称。
+                // 时间差也要卡住：超过 20 分钟的「同金额通知」是另一笔消费，
+                // 不能因为来源不同就被并掉
+                gap <= DUP_WINDOW_MS &&
+                    c.source == Source.ACCESSIBILITY && dup.source == Source.NOTIFICATION &&
+                    !dup.categoryLocked -> {
+                    dao.upgradeFromAccessibility(dup.id, payee, c.externalId, c.raw, c.account)
+                    val rs = cachedRules ?: dao.rules()
+                    val cls = CategoryEngine.classify(payee, c.note, c.raw, rs)
+                    if (cls.matched != null && cls.kind == dup.kind && cls.categoryId != dup.categoryId) {
+                        dao.updateCategory(dup.id, cls.categoryId, false)
+                    }
+                    Log.d(TAG, "按无障碍补全通知记的那笔 #${dup.id} ${dup.payee} -> $payee")
+                    return Outcome(
+                        false, "同一笔，已按无障碍读到的内容更新",
+                        dao.get(dup.id) ?: dup, merged = true
+                    )
+                }
                 gap <= (if (dup.source == c.source) SAME_CHANNEL_STRICT_MS else DUP_STRICT_MS) -> {
                     // 同一笔钱被两条通道各记了一次。先记的那条常常只有泛称
                     // （银行短信里压根没有商户名），这次来了真名就顺手补上，

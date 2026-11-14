@@ -117,6 +117,26 @@ class TxnDao(private val helper: DbHelper) {
         helper.writableDatabase.update("txn", cv, "id = ?", arrayOf(id.toString()))
     }
 
+    /**
+     * 同一笔钱先被通知记下了，之后无障碍又读到完整页面 —— 把那条升级成无障碍的。
+     *
+     * 通知只有一行文字（微信那条常常只写「微信支付」），无障碍读的是页面本身，
+     * 商户名、金额、交易单号都齐全。所以来源、商户、单号、原文一律换成无障碍读到的，
+     * 金额不动（金额相同才会走到这里）。
+     */
+    fun upgradeFromAccessibility(
+        id: Long, payee: String?, externalId: String?, raw: String?, account: String?
+    ) {
+        val cv = ContentValues().apply {
+            put("source", Source.ACCESSIBILITY.db)
+            if (!payee.isNullOrBlank()) put("payee", payee)
+            if (!externalId.isNullOrBlank()) put("external_id", externalId)
+            if (!raw.isNullOrBlank()) put("raw_text", raw)
+            if (!account.isNullOrBlank()) put("account", account)
+        }
+        helper.writableDatabase.update("txn", cv, "id = ?", arrayOf(id.toString()))
+    }
+
     fun updateCategory(id: Long, categoryId: String, locked: Boolean) {
         val cv = ContentValues().apply {
             put("category_id", categoryId)
