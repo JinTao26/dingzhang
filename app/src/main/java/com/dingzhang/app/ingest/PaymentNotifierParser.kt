@@ -64,6 +64,24 @@ object PaymentNotifierParser {
         "已付款", "扣款成功", "付款已成功"
     )
 
+    /**
+     * 任何 App 的通知都适用的判断：只要有一句明确的成交话术（或退款话术）加一个金额，
+     * 就值得当一笔支付看。
+     *
+     * 充电桩、外卖、小众商户 App 的包名不可能一个个列全，它们的通知以前一律被丢掉。
+     * 但「支付成功 ¥3.00」「退款 1.80 元」这种话术本身已经够明确了 ——
+     * 靠话术判断，不靠包名白名单。
+     */
+    fun looksLikeGenericPay(s: String): Boolean {
+        if (s.length > 400) return false
+        if (noise.any { s.contains(it) }) return false
+        val hasSignal = strongPayCues.any { s.contains(it) } ||
+            refundCues.any { s.contains(it) } ||
+            expenseCues.any { s.contains(it) }
+        if (!hasSignal) return false
+        return AMOUNT_WITH_SYMBOL.containsMatchIn(s) || AMOUNT_WITH_YUAN.containsMatchIn(s)
+    }
+
     private val shoppingExpensePatterns = listOf(
         Regex("使用【(.+?)】支付([0-9]+(?:\\.[0-9]{1,2})?)"),
         Regex("(?:支付|付款)成功[，,：:]?[¥￥]?([0-9]+(?:\\.[0-9]{1,2})?)"),

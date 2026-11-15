@@ -98,13 +98,21 @@ class PaymentNotificationService : NotificationListenerService() {
             }
         }
 
+        // 微信/支付宝/购物 App 之外的包：除了「银行提醒」通道，还加一条通用入口 ——
+        // 任何 App 的通知里只要有一句明确成交话术加金额，就交给解析器。
+        // 充电桩（先扣 3 块、充完原路退差额）、外卖、小众商户 App 都在这里进来。
+        // 没有成交话术的营销推送照样丢掉。
+        val genericPay = !isPaymentApp && !isShopping &&
+            PaymentNotifierParser.looksLikeGenericPay(title + text)
         // 微信/支付宝/购物 App 之外的包，只在「银行提醒」开着时才看
-        if (!isPaymentApp && !isShopping && !settings.bankPushChannel && !settings.bankWechatChannel) return
+        if (!isPaymentApp && !isShopping && !genericPay &&
+            !settings.bankPushChannel && !settings.bankWechatChannel
+        ) return
         if ((isPaymentApp || isShopping) && !settings.notificationChannel && !settings.bankPushChannel) return
 
         // 绝大部分通知和钱无关，先用「元」粗筛，省下每条都跑正则的开销
         // （购物 App 的「使用【xx卡】支付16.90」不带「元」，所以它们跳过这道粗筛）
-        if (!isPaymentApp && !isShopping && !(text + bigText).contains("元")) return
+        if (!isPaymentApp && !isShopping && !genericPay && !(text + bigText).contains("元")) return
 
         // 同一条通知可能被重复回调，用 key + 内容摘要挡一下。
         // 注意要把 title 和 bigText 一起算进去：微信支付的通知会「更新」自己，
