@@ -212,8 +212,9 @@ private fun loadAppData(month: String): AppData {
 private fun openRelease(ctx: android.content.Context, r: UpdateChecker.Result) {
     val apk = r.apkUrl
     if (apk != null) {
-        // 先让下载器在后台测一测哪条线路快，再入队。写死一条的话，
-        // 赶上那条正好慢，用户就得干等到想摔手机（实测镜像能慢到 16 KB/s）。
+        // 直接入队，交给系统下载器走 GitHub 原始地址，不测速、不套镜像：
+        // 测速那一步自己就要先连上读 64KB，赶上线路慢，点完按钮还没动静，
+        // 还不如立刻把进度条甩到通知栏里。
         UpdateDownloader.startAsync(ctx, r.latestVersion.orEmpty(), apk) { ok ->
             if (ok) {
                 android.widget.Toast.makeText(

@@ -25,9 +25,18 @@ class PaymentAccessibilityService : AccessibilityService() {
     private val handler = Handler(Looper.getMainLooper())
     /** 三次采样的时间点（相对第一次事件）。 */
     private val probeDelays = longArrayOf(150L, 450L, 1000L)
-    private var probePkg: String? = null
-    private var probeStep = 0
-    private var probeRun: Runnable? = null
+    @Volatile private var probePkg: String? = null
+    @Volatile private var probeStep = 0
+    @Volatile private var probeRun: Runnable? = null
+
+    /**
+     * 解析用的单线程。读一整页要递归爬几百个节点，每个 child 都是一次跨进程调用，
+     * 放在主线程里跑，紧跟其后的「支付成功」事件就得排队 —— 等它轮到，用户已经切走了，
+     * 读到的只剩桌面。这里串行解析，既不离谱占资源，也不会并发摸同一棵树。
+     */
+    private val worker = java.util.concurrent.Executors.newSingleThreadExecutor { r ->
+        Thread(r, "dz-a11y").apply { isDaemon = true }
+    }
 
     /** 事件源爬到的那颗窗口根。getWindows() 读不到时拿它顶上。 */
     private var pendingRoot: AccessibilityNodeInfo? = null
@@ -87,8 +96,22 @@ class PaymentAccessibilityService : AccessibilityService() {
         // 微信支付宝自己的收银台是独立窗口，事件没那么多，可以紧一些。
         val minGap = if (isHost) HOST_SNAP_MIN_MS else SNAP_MIN_MS
         val tick = System.currentTimeMillis()
+
+        // 「支付成功」这几个字出现在事件里的那一瞬间，是这一页唯一确定还活着的时刻。
+        // 小程序支付页是在微信自己的容器里刷新页面内容的 —— 不换窗口，事件类型是「内容变化」，
+        // 而且用户常常一付完就切走。撞上限流被挡掉、等 0.15 秒再采样，前台已经是别的 App，
+        // 可读窗口里连微信都没有。这类事件不管限流，当场抓。
+        val urgentCues = listOf(
+            "支付成功", "付款成功", "支付完成", "付款完成", "交易成功",
+            "已支付", "成功支付", "支付失败", "付款失败"
+        )
+        val urgent = e.text?.any { line ->
+            val v = line?.toString() ?: return@any false
+            urgentCues.any { v.contains(it) }
+        } == true
+
         var snapped = false
-        if (tick - lastSnapAt >= minGap) {
+        if (urgent || tick - lastSnapAt >= minGap) {
             lastSnapAt = tick
 
             // 事件自带的文字先收下来。操作系统的无障碍事件本身就挂着这一页的文本，
@@ -114,7 +137,10 @@ class PaymentAccessibilityService : AccessibilityService() {
 
         // 拿到东西就当场判一次，不等采样。支付结果页只活一两秒，
         // 用户付完立刻退出的话，0.15 秒后的第一次采样已经读不到它了。
-        if (snapped && parsePage(pkg)) return
+        if (snapped) {
+            val p = pkg
+            worker.execute { runCatching { parsePage(p) } }
+        }
 
         scheduleProbe(pkg)
     }
@@ -136,18 +162,22 @@ class PaymentAccessibilityService : AccessibilityService() {
         val run = object : Runnable {
             override fun run() {
                 val p = probePkg ?: return
-                if (parsePage(p)) {
-                    probeStep = probeDelays.size
-                    probeRun = null
-                    return
-                }
-                probeStep++
-                if (probeStep < probeDelays.size) {
-                    handler.postDelayed(this, probeDelays[probeStep] - probeDelays[probeStep - 1])
-                } else {
-                    probeRun = null
-                    pendingRoot = null
-                    pendingTexts = emptyList()
+                val self = this
+                worker.execute {
+                    val ok = runCatching { parsePage(p) }.getOrDefault(false)
+                    if (ok) {
+                        probeStep = probeDelays.size
+                        probeRun = null
+                        return@execute
+                    }
+                    probeStep++
+                    if (probeStep < probeDelays.size) {
+                        handler.postDelayed(self, probeDelays[probeStep] - probeDelays[probeStep - 1])
+                    } else {
+                        probeRun = null
+                        pendingRoot = null
+                        pendingTexts = emptyList()
+                    }
                 }
             }
         }
@@ -401,6 +431,7 @@ class PaymentAccessibilityService : AccessibilityService() {
     }
 
     override fun onDestroy() {
+        runCatching { worker.shutdownNow() }
         probeRun?.let { handler.removeCallbacks(it) }
         probeRun = null
         probePkg = null

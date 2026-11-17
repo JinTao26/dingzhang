@@ -7,8 +7,6 @@ import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import java.net.HttpURLConnection
-import java.net.URL
 
 /**
  * 应用内下载新版本。
@@ -18,96 +16,24 @@ import java.net.URL
  *
  * 交给系统的下载管理器后，通知栏有一条带进度的通知，下完点一下就能装。
  *
- * 但是线路得选：GitHub 原始地址和 ghproxy 镜像，哪个快完全看当时的状态 ——
- * 实测同一天里，直链 1 秒下完，镜像只有 16 KB/s，等了 45 秒才下了一半。
- * 写死任何一个都会让另一部分人等到想摔手机。所以下之前各拉一小段测一下，
- * 谁快用谁。
+ * 线路只走 GitHub 原始地址，不套镜像、也不在下载前测速。
+ * 测速这一步本身就要先连上、再读 64KB 才能算出速度，运气不好光测速就干等十几秒 ——
+ * 用户点完按钮半天没动静，比慢更糟。直接入队交给系统下载器，进度条立刻就在通知栏里。
  */
 object UpdateDownloader {
 
     private const val TAG = "Download"
-    /** 测速读这么多就停，不为此把整个包下一遍 */
-    private const val PROBE_BYTES = 64 * 1024
-    /**
-     * 直链到这个速度就算够用，不再测镜像。
-     * 150 B/ms ≈ 150 KB/s，1.4MB 的包十来秒下完，等得起。
-     */
-    private const val FAST_ENOUGH = 150.0
 
     /**
-     * 在后台测速选线路再入队，结果回主线程。
-     * 不阻塞点击：界面立刻有反馈，选线路那点时间藏在 Toast 里。
+     * 在后台入队，结果回主线程。
+     * 入队本身很快，但别在点击的回调里直接跑。
      */
     fun startAsync(ctx: Context, version: String, apkUrl: String, onDone: (Boolean) -> Unit) {
         Thread {
-            val picked = pickFastest(candidates(apkUrl))
-            Log.i(TAG, "选用线路：" + picked)
-            val id = enqueue(ctx, version, picked)
+            val id = enqueue(ctx, version, apkUrl)
+            Log.i(TAG, "下载入队 " + (id ?: "失败"))
             Handler(Looper.getMainLooper()).post { onDone(id != null) }
         }.apply { name = "dz-download"; isDaemon = true }.start()
-    }
-
-    /**
-     * 直链和镜像各来一份。传进来的是镜像就反推回直链，两个都要试 ——
-     * 只有一条能通的时候，另一条就是留着的备胎。
-     */
-    private fun candidates(url: String): List<String> {
-        val raw = if (url.startsWith(UpdateChecker.MIRROR_PREFIX)) {
-            url.removePrefix(UpdateChecker.MIRROR_PREFIX)
-        } else url
-        val mirror = UpdateChecker.MIRROR_PREFIX + raw
-        return listOf(raw, mirror).distinct()
-    }
-
-    private fun pickFastest(urls: List<String>): String {
-        if (urls.isEmpty()) return ""
-        // 直链优先，而且先测它、够快就直接用，不等镜像那边。
-        // 镜像要是卡住，测速本身就得干等 6 秒超时 —— 点完按钮没反应，比慢更糟。
-        var best = urls.first()
-        var bestSpeed = runCatching { speedOf(best) }.getOrDefault(-1.0)
-        Log.i(TAG, "测速 " + best + " = " + bestSpeed + " B/ms")
-        if (bestSpeed >= FAST_ENOUGH) return best
-        for (u in urls.drop(1)) {
-            val speed = runCatching { speedOf(u) }.getOrDefault(-1.0)
-            Log.i(TAG, "测速 " + u + " = " + speed + " B/ms")
-            if (speed > bestSpeed) {
-                bestSpeed = speed
-                best = u
-            }
-        }
-        return best
-    }
-
-    /**
-     * 拉前 64KB 计时。返回 KB/毫秒，越大越快；连不上返回 -1。
-     * 带 Range 只取一段 —— GitHub 支持，镜像不一定，所以也接受服务器直接甩全量，
-     * 读够就断开。
-     */
-    private fun speedOf(url: String): Double {
-        var conn: HttpURLConnection? = null
-        return try {
-            conn = (URL(url).openConnection() as HttpURLConnection).apply {
-                connectTimeout = 6000
-                readTimeout = 6000
-                instanceFollowRedirects = true
-                setRequestProperty("User-Agent", "dingzhang-android")
-                setRequestProperty("Range", "bytes=0-" + (PROBE_BYTES - 1))
-            }
-            val start = System.currentTimeMillis()
-            var got = 0
-            conn.inputStream.use { input ->
-                val buf = ByteArray(16 * 1024)
-                while (got < PROBE_BYTES) {
-                    val n = input.read(buf)
-                    if (n <= 0) break
-                    got += n
-                }
-            }
-            val ms = (System.currentTimeMillis() - start).coerceAtLeast(1)
-            got.toDouble() / ms
-        } finally {
-            conn?.disconnect()
-        }
     }
 
     /** @return 下载任务 id，失败返回 null（调用方退回浏览器） */

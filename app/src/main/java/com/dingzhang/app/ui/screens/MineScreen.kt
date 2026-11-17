@@ -1783,7 +1783,7 @@ private fun HelpPage(onClose: () -> Unit) {
             HelpStep("1", "「我的」页拉到最下面，版本号旁边点「检查更新」")
             HelpStep("2", "有新版本会告诉你版本号和这次改了什么，点「去下载」")
             HelpStep("3", "会在浏览器打开下载页，下那个 apk 文件")
-            HelpStep("4", "GitHub 打不开的话，在网址前面加 https://ghproxy.net/ 再试")
+            HelpStep("4", "打不开就换个网络或稍后再试")
             HelpStep("5", "装的时候系统问「是否更新」，点更新就行，账都在")
         }
         Spacer(Modifier.height(10.dp))

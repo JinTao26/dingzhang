@@ -12,16 +12,13 @@ object ShareKit {
     // 固定名的最新版直链：点一下就下载，不用让人去 Release 页里找文件
     private const val APK =
         "https://github.com/JinTao26/dingzhang/releases/latest/download/dingzhang.apk"
-    private const val APK_MIRROR =
-        "https://ghproxy.net/https://github.com/JinTao26/dingzhang/releases/latest/download/dingzhang.apk"
 
     fun text(): String = buildString {
         append("叮账 · 自动记账（开源、免费、无广告）\n")
         append("微信、支付宝、银行的通知自动记账，红包转账这类记不到的导一次账单就补齐。\n")
         append("点开直接装（安卓）：\n")
         append(APK)
-        append("\nGitHub 打不开就用镜像：\n")
-        append(APK_MIRROR)
+
     }
 
     fun intent(): Intent = Intent(Intent.ACTION_SEND).apply {

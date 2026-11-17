@@ -17,7 +17,7 @@ import java.net.URL
  * `GET /repos/{owner}/{repo}/releases/latest`，一次请求拿到 tag、更新说明和 APK 直链。
  *
  * 只打这一个源。中间试过经 jsDelivr 分发 version.json，多一次请求、多一层缓存，
- * 国内反而更慢，已经撤掉。连不上就如实说连不上，并给出 ghproxy 镜像页。
+ * 国内反而更慢，已经撤掉。连不上就如实说连不上，给出真正的发布页让用户自己看。
  *
  * 不做静默自安装：下载完交给系统安装器，用户自己点确认。
  */
@@ -28,9 +28,6 @@ object UpdateChecker {
     const val REPO = "dingzhang"
     const val REPO_PAGE = "https://github.com/$OWNER/$REPO"
     const val RELEASE_PAGE = "https://github.com/$OWNER/$REPO/releases/latest"
-
-    /** 国内可达的下载镜像前缀 */
-    const val MIRROR_PREFIX = "https://ghproxy.net/"
 
     private const val API_URL = "https://api.github.com/repos/$OWNER/$REPO/releases/latest"
 
@@ -80,8 +77,7 @@ object UpdateChecker {
         Log.w(TAG, "两个更新源都没连上")
         Result(
             current, ok = false,
-            message = "连不上 GitHub。有网的话可以打开镜像页看看有没有新版：" +
-                "${MIRROR_PREFIX}${RELEASE_PAGE}"
+            message = "连不上 GitHub。有网的话直接开这个页面看看有没有新版：$RELEASE_PAGE"
         )
     }
 

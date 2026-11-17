@@ -115,14 +115,17 @@ class Settings(context: Context) {
         set(v) = sp.edit().putBoolean("channel_bank_push", v).apply()
 
     /**
-     * 银行公众号（在微信里）的动账提醒。默认关。
+     * 银行公众号（在微信里）的动账提醒。默认开。
      *
      * 以前和上面那条捆在同一个开关里 —— 想关公众号就得连 App 推送一起关，
      * 等于为了躲噪音把唯一能看见 POS 刷卡的路也堵了。现在拆开单独管。
      * 关掉不影响银行 App 推送：银行自己的推送包名是银行 App，公众号走的是微信。
+     *
+     * 噪音不靠「默认关」来挡：标题里得是本行名字（招行/工行/信用卡…），
+     * 正文里还得有动账话术，两道都过了才记。普通公众号的推送走不到这一步。
      */
     var bankWechatChannel: Boolean
-        get() = sp.getBoolean("channel_bank_wechat", false)
+        get() = sp.getBoolean("channel_bank_wechat", true)
         set(v) = sp.edit().putBoolean("channel_bank_wechat", v).apply()
 
     /** 开 App 时顺带查一次更新。默认开，嫌烦可以在「我的」里关掉。 */

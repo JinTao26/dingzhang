@@ -95,9 +95,14 @@ class PaymentNotificationService : NotificationListenerService() {
                 val body = title + " " + text + " " + bigText
                 val hasAmount = Regex("[¥￥]\\s*[0-9]|[0-9]\\s*元|[0-9]+\\.[0-9]{2}")
                     .containsMatchIn(body)
+                // 微信里冒出来的通知，如果标题上是家银行，单独标一句 ——
+                // 公众号动账和微信支付走的是同一个包名，混在一起看不出是哪条来的。
+                val bankTag = if (pkg == PaymentNotifierParser.PKG_WECHAT && looksLikeBankAccount(title)) {
+                    "银行公众号 · "
+                } else ""
                 IngestLog.addProbe(
                     "通知", "收到一条",
-                    PaymentNotifierParser.appLabel(pkg) + " · 标题「" + title.take(12) + "」 · " +
+                    bankTag + PaymentNotifierParser.appLabel(pkg) + " · 标题「" + title.take(12) + "」 · " +
                         text.length + " 字 · " + (if (hasAmount) "带金额" else "不带金额")
                 )
             }
