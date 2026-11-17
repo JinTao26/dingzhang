@@ -37,6 +37,14 @@ class PaymentAccessibilityService : AccessibilityService() {
 
     private var lastSnapAt = 0L
 
+    /**
+     * 最近一次进来的事件是什么类型。
+     *
+     * 「窗口切换」和「窗口关闭」都会触发回调：前者说明页面刚出现、我们没赶上；
+     * 后者说明页面已经没了、注定读不到。诊断里带上它，一眼能分清是哪种。
+     */
+    private var lastEventType = 0
+
     override fun onServiceConnected() {
         super.onServiceConnected()
         IngestPipeline.init(applicationContext)
@@ -65,6 +73,7 @@ class PaymentAccessibilityService : AccessibilityService() {
 
         val settings = IngestPipeline.settings ?: return
         if (!settings.accessibilityChannel) return
+        lastEventType = e.eventType
 
         // 事件刚到这一刻是唯一能百分之百拿到这一页的时机。
         // 等 0.15s 之后再去 getWindows()，页面可能已经切走、或被系统权限弹窗盖住，
@@ -185,7 +194,7 @@ class PaymentAccessibilityService : AccessibilityService() {
             IngestLog.add(
                 "无障碍", "没有可读的窗口",
                 "活动窗口是 ${rootInActiveWindow?.packageName ?: "无"}，事件来自 $pkg" +
-                    "（${eventLabel(e.eventType)}），" +
+                    "（${eventLabel(lastEventType)}），" +
                     "可读窗口 $windowCount 个" +
                     if (pkgs.isEmpty()) "" else "（${pkgs.joinToString("、").take(90)}）"
             )
