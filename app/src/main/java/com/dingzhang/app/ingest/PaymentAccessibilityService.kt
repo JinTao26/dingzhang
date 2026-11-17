@@ -142,6 +142,20 @@ class PaymentAccessibilityService : AccessibilityService() {
         handler.postDelayed(run, probeDelays[0])
     }
 
+    /**
+     * 事件类型换成中文。
+     *
+     * 「窗口切换」和「窗口关闭」都会走到这里：前者说明页面出现了，但我们没赶上；
+     * 后者说明页面已经没了，注定读不到。看诊断能一眼分清，不用再猜。
+     */
+    private fun eventLabel(type: Int): String = when (type) {
+        AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> "窗口切换"
+        AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> "内容变化"
+        AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED -> "文字变化"
+        AccessibilityEvent.TYPE_WINDOWS_CHANGED -> "窗口集合变化"
+        else -> "类型$type"
+    }
+
     private fun parsePage(pkg: String): Boolean {
         if (!IngestPipeline.isReady) IngestPipeline.init(applicationContext)
 
@@ -170,7 +184,8 @@ class PaymentAccessibilityService : AccessibilityService() {
             Log.d(TAG, "没有这个 App 的可读窗口")
             IngestLog.add(
                 "无障碍", "没有可读的窗口",
-                "活动窗口是 ${rootInActiveWindow?.packageName ?: "无"}，事件来自 $pkg，" +
+                "活动窗口是 ${rootInActiveWindow?.packageName ?: "无"}，事件来自 $pkg" +
+                    "（${eventLabel(e.eventType)}），" +
                     "可读窗口 $windowCount 个" +
                     if (pkgs.isEmpty()) "" else "（${pkgs.joinToString("、").take(90)}）"
             )

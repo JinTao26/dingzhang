@@ -148,7 +148,16 @@ object PaymentAccessibilityParser {
         if (matchedRules.isEmpty()) return null
 
         // 金额
-        val amount = extractAmount(texts) ?: return null
+        val amount = extractAmount(texts) ?: run {
+            // 规则都命中了、页面确实像支付页，却取不到金额 ——
+            // 大概率是金额那一行被当成「优惠行」剔掉了（上一版加过滤时误伤过）。
+            // 把当时读到的原文留下来，一眼能看出是哪种情况。
+            IngestLog.add(
+                "无障碍", "像支付页但没取到金额",
+                texts.take(6).joinToString(" / ").take(110)
+            )
+            return null
+        }
         if (amount <= 0 || amount > 10_000_000_00L) return null
 
         // 有「商户全称：」标签就用标签；微信的支付结果页没这个标签，
@@ -366,7 +375,10 @@ object PaymentAccessibilityParser {
         // 一行里同时写着「实付 7 元，已省 5 元」的，不能整行跳过 —— 那样会漏记一整笔。
         // 只有「纯粹在讲优惠」的行才算折扣行。
         val realHint = listOf(
-            "实付", "实际支付", "实际付款", "实际扣款", "付款金额", "支付金额", "已支付", "支付成功"
+            "实付", "实际支付", "实际付款", "实际扣款", "付款金额", "支付金额", "已支付", "支付成功",
+            // 小程序支付页常写成「已用红包 ¥7.00」—— 那是实付金额，不是折扣金额。
+            // 不把它捞出来，整行就会被当成优惠行跳过，这一笔直接归零。
+            "已用", "使用"
         )
         fun isDiscountLine(t: String): Boolean =
             discountHint.any { t.contains(it) } && realHint.none { t.contains(it) }
