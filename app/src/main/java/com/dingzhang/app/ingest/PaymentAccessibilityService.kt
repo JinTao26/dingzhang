@@ -74,6 +74,10 @@ class PaymentAccessibilityService : AccessibilityService() {
         val settings = IngestPipeline.settings ?: return
         if (!settings.accessibilityChannel) return
         lastEventType = e.eventType
+        // 事件一到就打点，不等解析成功。
+        // 「几分钟前收到过」这行以前只在解析走完时才更新，跑偏的时候看着像服务没在干活，
+        // 分不清是「事件压根没来」还是「来了但没认出来」—— 现在这行只说明事件到了。
+        ChannelHealth.markAlive("a11y")
 
         // 事件刚到这一刻是唯一能百分之百拿到这一页的时机。
         // 等 0.15s 之后再去 getWindows()，页面可能已经切走、或被系统权限弹窗盖住，

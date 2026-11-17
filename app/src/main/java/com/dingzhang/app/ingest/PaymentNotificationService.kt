@@ -90,10 +90,15 @@ class PaymentNotificationService : NotificationListenerService() {
             val looksMoney = Regex("[¥￥]|[0-9]+\\.[0-9]{2}|元|支付|付款|收款|消费|扣款|转账")
                 .containsMatchIn(title + text)
             if (looksMoney) {
+                // 「带不带金额」直接写在这一行：用户看采集记录第一屏就能判断
+                // 是通知没发、还是发了但里面压根没有金额，不用再展开诊断区。
+                val body = title + " " + text + " " + bigText
+                val hasAmount = Regex("[¥￥]\\s*[0-9]|[0-9]\\s*元|[0-9]+\\.[0-9]{2}")
+                    .containsMatchIn(body)
                 IngestLog.addProbe(
                     "通知", "收到一条",
                     PaymentNotifierParser.appLabel(pkg) + " · 标题「" + title.take(12) + "」 · " +
-                        text.length + " 字"
+                        text.length + " 字 · " + (if (hasAmount) "带金额" else "不带金额")
                 )
             }
         }
