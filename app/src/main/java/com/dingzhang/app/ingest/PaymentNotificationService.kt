@@ -184,9 +184,14 @@ class PaymentNotificationService : NotificationListenerService() {
                     // 微信支付的凭证卡片是一张自定义视图：金额、商户名都画在那张图里，
                     // 系统的通知接口只肯给标题和一句十几字的纯文本，图里的字一概读不到。
                     // 把这点写进诊断，用户就不用再怀疑是规则没写对。
+                    // customContentView 是系统的隐藏字段，源码里能看见、公开 API 里没有，
+                    // 只能反射读。读不到就算了 —— 这条只是让诊断更清楚，不影响记账。
                     val custom = runCatching {
-                        sbn.notification?.customContentView != null ||
-                            sbn.notification?.customBigContentView != null
+                        val n = sbn.notification ?: return@runCatching false
+                        val f = android.app.Notification::class.java.getField("customContentView")
+                        f.get(n) != null || runCatching {
+                            android.app.Notification::class.java.getField("customBigContentView").get(n)
+                        }.getOrNull() != null
                     }.getOrDefault(false)
                     val preview =
                         (if (isPaySource && text.isNotBlank()) " · 正文「" + text.take(12) + "」" else "") +
