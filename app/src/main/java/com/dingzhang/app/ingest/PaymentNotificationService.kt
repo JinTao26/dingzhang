@@ -122,7 +122,12 @@ class PaymentNotificationService : NotificationListenerService() {
 
         // 绝大部分通知和钱无关，先用「元」粗筛，省下每条都跑正则的开销
         // （购物 App 的「使用【xx卡】支付16.90」不带「元」，所以它们跳过这道粗筛）
-        if (!isPaymentApp && !isShopping && !genericPay && !(text + bigText).contains("元")) return
+        // 银行提醒常写成「¥1.48」，压根没有那个「元」字 —— 只按「元」粗筛，整类都会被挡在这里。
+        // 先判一下像不像银行提醒，像就放进去，由 BankAlertParser 自己决定记不记。
+        val looksBank = BankAlertParser.looksLikeBank(title + " " + text)
+        if (!isPaymentApp && !isShopping && !genericPay && !looksBank &&
+            !(text + bigText).contains("元")
+        ) return
 
         // 同一条通知可能被重复回调，用 key + 内容摘要挡一下。
         // 注意要把 title 和 bigText 一起算进去：微信支付的通知会「更新」自己，
@@ -168,13 +173,40 @@ class PaymentNotificationService : NotificationListenerService() {
                 val looksPay = listOf("支付", "付款", "转账", "收款", "¥", "元").any { body.contains(it) }
                 if (looksPay) {
                     val hasMoney = Regex("[¥￥]\\s*[0-9]|[0-9]\\s*元|[0-9]+\\.[0-9]{2}").containsMatchIn(body)
+                    // 标题是「微信支付」「支付宝」这类明确的支付来源时，把正文前 12 个字抄下来。
+                    // 反复出现「正文 12 字，但不带金额」这种现场时，光看字数什么也判断不了 ——
+                    // 到底写的是「账单已更新」还是「退款成功」，差的就是这一句。
+                    // 聊天内容不会走到这里：这里只处理标题本身就是支付来源的通知。
+                    val isPaySource = pkg == PaymentNotifierParser.PKG_WECHAT &&
+                        (title.contains("微信支付") || title.contains("支付")) ||
+                        pkg == PaymentNotifierParser.PKG_ALIPAY &&
+                        (title.contains("支付宝") || title.contains("支付"))
+                    // 微信支付的凭证卡片是一张自定义视图：金额、商户名都画在那张图里，
+                    // 系统的通知接口只肯给标题和一句十几字的纯文本，图里的字一概读不到。
+                    // 把这点写进诊断，用户就不用再怀疑是规则没写对。
+                    val custom = runCatching {
+                        sbn.notification?.customContentView != null ||
+                            sbn.notification?.customBigContentView != null
+                    }.getOrDefault(false)
+                    val preview =
+                        (if (isPaySource && text.isNotBlank()) " · 正文「" + text.take(12) + "」" else "") +
+                            (if (custom) " · 卡片是自定义视图，图里的金额读不到" else "")
                     IngestLog.add(
                         "通知", if (hasMoney) "有金额但没认出" else "付款通知没带金额",
                         "${if (pkg == PaymentNotifierParser.PKG_WECHAT) "微信" else if (pkg == PaymentNotifierParser.PKG_ALIPAY) "支付宝" else pkg.takeLast(14)}" +
                             " · 标题「${title.take(10)}」· 读到 ${snap.fields.ifBlank { "空" }}" +
-                            " · 正文 ${text.length} 字"
+                            " · 正文 ${text.length} 字" + preview
                     )
                 }
+            } else if (looksBank) {
+                // 银行这条一直是个哑巴：认不出就什么都不留，用户只看到「一笔都没记」。
+                // 这里写清楚它到过、有没有金额、正文多长，排查才有起点。
+                IngestLog.add(
+                    "通知", "银行通知没认出",
+                    "标题「${title.take(10)}」· 读到 ${snap.fields.ifBlank { "空" }}" +
+                        " · 正文 ${text.length} 字" +
+                        (if (text.contains("¥") || text.contains("元")) " · 带金额" else " · 不带金额")
+                )
             }
             return
         }

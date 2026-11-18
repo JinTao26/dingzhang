@@ -24,6 +24,8 @@ object BankAlertParser {
 
     private val bankSign = Regex("""【(.+?)】""")
     private val amountRe = Regex("""([0-9][0-9,]{0,12}(?:\.[0-9]{1,2})?)\s*元""")
+    /** 有的银行不写「元」，直接「¥1.48」。没有这一条，整类都认不出 */
+    private val amountYenRe = Regex("""(?:¥|￥)\s*([0-9][0-9,]{0,12}(?:\.[0-9]{1,2})?)""")
     private val tailRe = Regex("""(?:尾号|卡号末四位|卡号后四位|账户末四位)[：:\s]*(\d{4})""")
     private val merchantRe = Regex("""(?:商户|商户名称|交易场所|收款方)[：:]\s*([^，,。；;、\s]+)""")
     private val balanceCut = Regex("""(?:余额|可用余额|账户余额)""")
@@ -49,19 +51,37 @@ object BankAlertParser {
     private val bankHints = listOf("银行", "储蓄卡", "储蓄账户", "信用卡", "借记卡", "账户")
 
     /**
+     * 这段文字像不像一条银行动账提醒。
+     *
+     * 服务端拿它做两件事：一是别让银行通知被「正文必须有『元』」那道粗筛挡在门外
+     * （宁波银行写的是「¥1.48」，没有那个「元」字）；二是没认出时能留一行记录，
+     * 让人知道这条通知确实到过。
+     */
+    fun looksLikeBank(body: String): Boolean {
+        if (body.isBlank()) return false
+        if (!bankHints.any { body.contains(it) }) return false
+        if (notTxn.any { body.take(80).contains(it) }) return false
+        return true
+    }
+
+    /**
      * @param source App 推送 / 公众号提醒都传 [Source.NOTIFICATION]。
      */
     fun parse(body: String, at: Long, source: Source = Source.NOTIFICATION): Captured? {
         val flat = body.replace('\n', ' ').replace('\r', ' ').trim()
         if (flat.isBlank()) return null
         if (!bankHints.any { flat.contains(it) }) return null
-        if (notTxn.any { flat.contains(it) }) return null
+        // 只看前 80 个字。银行通知末尾爱挂一句营销语（「详情见网点活动」「退订回T」），
+        // 全文匹配的话，正文再准也会被这条尾巴整条毙掉。
+        if (notTxn.any { flat.take(80).contains(it) }) return null
 
         // 「余额 12345.67 元」在后面，不切掉会把余额当成交易金额
         val cutAt = balanceCut.find(flat)?.range?.first ?: flat.length
         val head = flat.substring(0, cutAt)
 
-        val amountText = amountRe.find(head)?.groupValues?.get(1) ?: return null
+        val amountText = amountRe.find(head)?.groupValues?.get(1)
+            ?: amountYenRe.find(head)?.groupValues?.get(1)
+            ?: return null
         val cents = Money.parseToCents(amountText) ?: return null
         if (cents <= 0) return null
 
