@@ -261,7 +261,11 @@ object PaymentNotifierParser {
         val isExpense = expenseCues.any { corpus.contains(it) }
         val isTransfer = transferCues.any { corpus.contains(it) }
         val isOutgoing = outgoingCues.any { corpus.contains(it) }
-        if (!isIncome && !isExpense && !isTransfer && !isOutgoing) return null
+        // 退款要单独算一路。以前只认收/支/转账三类，纯粹的退款通知
+        // （「退款提醒：¥1.48」）一个词都不沾，明明带着金额也被判成「不是支付」扔掉。
+        // 退回的钱也是钱，而且它决定这笔支出最后算多少。
+        val isRefund = refundCues.any { corpus.contains(it) }
+        if (!isIncome && !isExpense && !isTransfer && !isOutgoing && !isRefund) return null
 
         val amount = extractAmount(corpus) ?: return null
 

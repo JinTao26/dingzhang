@@ -1,13 +1,12 @@
 {
-  "version": "0.5.29",
-  "notes": "银行动账提醒放开四处硬门槛：金额认「¥1.48」、末尾营销语不再一票否决、银行通知不再被「元」粗筛挡在解析之前、认不出时留一行记录。采集记录里会显示通知正文前 12 个字。",
-  "apk": "https://github.com/JinTao26/dingzhang/releases/download/v0.5.29/dingzhang.apk",
-  "page": "https://github.com/JinTao26/dingzhang/releases/tag/v0.5.29",
-  "published_at": "2026-11-18T13:10:00Z",
+  "version": "0.5.30",
+  "notes": "修退款通知漏记：以前只认收入、支出、转账三类方向词，纯退款通知（「退款提醒：¥1.48」）一个都不沾，带着金额也被当成「不是支付」扔掉。现在退款单独算一路。",
+  "apk": "https://github.com/JinTao26/dingzhang/releases/download/v0.5.30/dingzhang.apk",
+  "page": "https://github.com/JinTao26/dingzhang/releases/tag/v0.5.30",
+  "published_at": "2026-11-19T10:40:00Z",
   "highlights": [
-    "银行通知现在能记了：金额认「¥1.48」这种写法，末尾营销语不再否决整条",
-    "银行通知没认出时会留一行，写着它到过、有没有金额、正文多长",
-    "采集记录里显示通知正文前 12 个字 —— 认不出到底写了什么，这下能看见",
-    "微信支付那种图里的金额读不到时，会写明是自定义视图"
+    "退款通知不再漏记：只是写着「退款」的通知，现在也会被认成一笔退款",
+    "退款在统计里算减项，不会把支出算多",
+    "上一版的银行通道放开、通知正文显示都还在"
   ]
 }
