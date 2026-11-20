@@ -236,7 +236,7 @@ object IngestPipeline {
                 gap <= DUP_WINDOW_MS && dup.source == c.source &&
                     c.source == Source.ACCESSIBILITY &&
                     pageFingerprint(c.raw).isNotEmpty() &&
-                    pageFingerprint(c.raw) == pageFingerprint(dup.raw) -> {
+                    pageFingerprint(c.raw) == pageFingerprint(dup.rawText) -> {
                     Log.d(TAG, "同一页重复读到，跳过 " + c.payee + " " + (c.amountCents / 100.0))
                     return Outcome(false, "同一页重复读到，已跳过", dup, merged = true)
                 }
