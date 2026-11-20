@@ -41,7 +41,11 @@ object PaymentAccessibilityParser {
         PageRule(
             Wallet.ALIPAY, "支付宝-付款成功",
             mustContain = listOf("付款成功", "支付成功", "成功付款"),
-            mustNotContain = listOf("收款码", "扫一扫", "首页", "我的"),
+            // 「首页」这两个字不能再当排除词了。支付结果页上就有一个「回首页」按钮，
+            // 它带着「首页」二字，整页直接被判成「不是支付页」——
+            // 碰一碰的结果页正是这个结构：支付成功 / 回首页 / ￥13.20 / 加贝购物超市。
+            // 真正要防的收款码、扫一扫那种工具页，本来也不会写「支付成功」。
+            mustNotContain = listOf("收款码", "扫一扫", "我的"),
             minHits = 1
         ),
         PageRule(
