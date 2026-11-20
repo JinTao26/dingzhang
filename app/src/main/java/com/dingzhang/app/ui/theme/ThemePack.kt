@@ -34,7 +34,9 @@ data class ThemePack(
     val income: Color,
     val rLarge: Int,
     val rMedium: Int,
-    val rSmall: Int
+    val rSmall: Int,
+    // 有背景层的主题在这里写上画哪一层（starfield / rain），没有的留空走纯色底
+    val backdrop: String? = null
 )
 
 object ThemePacks {
@@ -67,7 +69,8 @@ object ThemePacks {
         line = Color(0xFF242E56),
         warn = Color(0xFFF5C05A), warnSoft = Color(0xFF3A2F18),
         expense = Color(0xFFFF8DA6), income = Color(0xFF6EE0BE),
-        rLarge = 22, rMedium = 16, rSmall = 11
+        rLarge = 22, rMedium = 16, rSmall = 11,
+        backdrop = "starfield"
     )
 
     /** 薄荷：白底 + 薄荷绿，白天看着最省眼的浅色方案。 */
@@ -84,25 +87,59 @@ object ThemePacks {
         rLarge = 24, rMedium = 18, rSmall = 12
     )
 
-    /** 夜桜：深色版的樱粉，夜里记账不刺眼。 */
-    val YOZAKURA = ThemePack(
-        id = "yozakura", name = "夜桜", tagline = "暗紫底 + 樱粉，夜间用", dark = true,
-        primary = Color(0xFFFF9DBE), primaryDeep = Color(0xFFFFC2D6), primarySoft = Color(0xFF3B2533),
-        secondary = Color(0xFFB79BF5), secondarySoft = Color(0xFF2C2540),
-        accent = Color(0xFF74D6BE), accentSoft = Color(0xFF1D3330),
-        bg = Color(0xFF17131B), card = Color(0xFF221B27),
-        ink = Color(0xFFF5EAF1), inkSoft = Color(0xFFA79AA6), inkFaint = Color(0xFF6C6070),
-        line = Color(0xFF352B3A),
-        warn = Color(0xFFF2B34C), warnSoft = Color(0xFF3A2C1A),
-        expense = Color(0xFFFF809A), income = Color(0xFF4FD1AE),
-        rLarge = 28, rMedium = 20, rSmall = 14
+    /**
+     * 深海：墨蓝发青的底 + 薄荷青主色。
+     *
+     * 深色主题最容易做坏的地方，是把底压成纯黑、再放一个高饱和的亮色 ——
+     * 那就是霓虹灯，不是界面上班看的。这套的底带明显的青绿倾向（0A1519），
+     * 主色压到中明度的薄荷青，跟底之间留出层，看得久不累。
+     */
+    val DEEPSEA = ThemePack(
+        id = "deepsea", name = "深海", tagline = "墨蓝底 + 薄荷青，冷调耐看", dark = true,
+        primary = Color(0xFF5FD9C7), primaryDeep = Color(0xFFA5F2E6), primarySoft = Color(0xFF123732),
+        secondary = Color(0xFF7FA8FF), secondarySoft = Color(0xFF1A2B4C),
+        accent = Color(0xFFFFC978), accentSoft = Color(0xFF392D17),
+        bg = Color(0xFF0A1519), card = Color(0xFF132229),
+        ink = Color(0xFFE8F5F2), inkSoft = Color(0xFF9BB5B0), inkFaint = Color(0xFF62787A),
+        line = Color(0xFF1E3038),
+        warn = Color(0xFFF0BE5C), warnSoft = Color(0xFF392D17),
+        expense = Color(0xFFFF8FA5), income = Color(0xFF4FD9B0),
+        rLarge = 20, rMedium = 15, rSmall = 10
     )
 
-    val ALL = listOf(SAKURA, STARFIELD, MINT, YOZAKURA)
+    /**
+     * 夜灯：暖棕黑底 + 琥珀金主色 + 一整幅夜景插画（少女站在路灯下的旧街）。
+     *
+     * 跟深海正好相反的一套暖调。底色不是灰黑也不是冷黑，是带木色调的暖棕黑。
+     * 背景层是画出来的整幅夜景 —— 人物的轮廓光、地上的反光、远处的灯
+     * 都在同一张图里，铺满不会像贴纸。跟星空物语也拉开得很开：
+     * 那边是抽象的星点，这边是具体的人和街。
+     * 圆角给得比深海大一点，整体更软。
+     */
+    val NIGHT = ThemePack(
+        id = "nightlamp", name = "夜灯", tagline = "暖棕黑 + 夜街插画，路灯下有个人", dark = true,
+        primary = Color(0xFFE9A964), primaryDeep = Color(0xFFFCD3A3), primarySoft = Color(0xFF362818),
+        secondary = Color(0xFFC1A2EC), secondarySoft = Color(0xFF2C2340),
+        accent = Color(0xFF7FD6C0), accentSoft = Color(0xFF1A332F),
+        bg = Color(0xFF14100D), card = Color(0xFF201A15),
+        ink = Color(0xFFF5EDE4), inkSoft = Color(0xFFB0A090), inkFaint = Color(0xFF7A6C60),
+        line = Color(0xFF302720),
+        warn = Color(0xFFFFB347), warnSoft = Color(0xFF362714),
+        expense = Color(0xFFFF8A7A), income = Color(0xFF6FD9A8),
+        rLarge = 24, rMedium = 18, rSmall = 12,
+        backdrop = "character"
+    )
+
+    val ALL = listOf(SAKURA, STARFIELD, MINT, DEEPSEA, NIGHT)
 
     fun byId(id: String?): ThemePack {
         // 老版本第二套叫 teyvat，改版后统一走星空物语，别让已经选过的人被重置回樱粉
-        val fixed = if (id == "teyvat") "starfield" else id
+        // yozakura（夜桜）已经换掉了，选过的人挪到新那套深色，别掉回樱粉
+        val fixed = when (id) {
+            "teyvat" -> "starfield"
+            "yozakura" -> "deepsea"
+            else -> id
+        }
         return ALL.firstOrNull { it.id == fixed } ?: SAKURA
     }
 }

@@ -1,12 +1,13 @@
 {
-  "version": "0.5.32",
-  "notes": "修同一笔被记两次：用户付完停在结果页没退，同一页隔几分钟被无障碍再读一遍，两次都记了账。以前同通道只挡 90 秒，靠不住；现在用页面文字做指纹，同一个页面的两次读取会并成一笔。",
-  "apk": "https://github.com/JinTao26/dingzhang/releases/download/v0.5.32/dingzhang.apk",
-  "page": "https://github.com/JinTao26/dingzhang/releases/tag/v0.5.32",
-  "published_at": "2026-11-20T04:30:00Z",
+  "version": "0.5.33",
+  "notes": "主题两处改动：第四套夜桜换成深海（墨蓝底+薄荷青），第五套换成夜灯（暖棕黑底 + 一整幅夜景插画，路灯下的少女）。选过夜桜的会自动迁到深海。",
+  "apk": "https://github.com/JinTao26/dingzhang/releases/download/v0.5.33/dingzhang.apk",
+  "page": "https://github.com/JinTao26/dingzhang/releases/tag/v0.5.33",
+  "published_at": "2026-11-20T05:10:00Z",
   "highlights": [
-    "同一笔不再记两次：页面文字一样就当成同一页的重复读取",
-    "真买两件、页面文字完全一样的情况会被并掉 —— 按「宁可漏不可错记」处理",
-    "上一版的「回首页」误判修复、退款单独一路都还在"
+    "第四套「深海」：墨蓝发青的底 + 薄荷青，换掉原来那套黑配亮粉",
+    "第五套「夜灯」：整幅夜景插画，路灯下的旧街，一个抱着账本的姑娘",
+    "「夜灯」里的人物放在列表下方，只露头肩，不压分类金额",
+    "选过旧「夜桜」的会自动变成「深海」，不会掉回樱粉"
   ]
 }

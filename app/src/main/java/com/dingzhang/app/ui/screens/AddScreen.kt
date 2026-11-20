@@ -84,7 +84,7 @@ fun AddScreen(onClose: () -> Unit, onSaved: () -> Unit) {
         modifier = Modifier
             .fillMaxSize()
             // 星空物语底下由 AppRoot 铺星空，这里透明才不会盖住星星
-            .background(if (ThemeController.current.id == "starfield") Color.Transparent else Dz.Cream)
+            .background(if (ThemeController.current.backdrop != null) Color.Transparent else Dz.Cream)
             .systemBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 18.dp, vertical = 10.dp)

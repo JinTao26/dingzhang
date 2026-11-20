@@ -66,6 +66,8 @@ import com.dingzhang.app.ui.screens.BillsScreen
 import com.dingzhang.app.ui.screens.HomeScreen
 import com.dingzhang.app.ui.screens.MineScreen
 import com.dingzhang.app.ui.screens.StatsScreen
+import com.dingzhang.app.ui.components.NightCharBackdrop
+import com.dingzhang.app.ui.components.RainBackdrop
 import com.dingzhang.app.ui.components.StarfieldBackdrop
 import com.dingzhang.app.ui.components.UpdateDialog
 import com.dingzhang.app.ui.theme.Dz
@@ -260,8 +262,9 @@ private fun openPageOnly(ctx: android.content.Context, url: String) {
 
 @Composable
 fun AppRoot() {
-    // 星空物语要多铺一层背景，其它主题走原来的纯色底
-    val starry = ThemeController.current.id == "starfield"
+    // 主题自己声明要不要铺背景层，没声明的走纯色底
+    val backdrop = ThemeController.current.backdrop
+    val hasBackdrop = backdrop != null
     var tab by remember { mutableStateOf(0) }
     var showAdd by remember { mutableStateOf(false) }
     var month by remember { mutableStateOf(Dates.monthOf(System.currentTimeMillis())) }
@@ -336,7 +339,11 @@ fun AppRoot() {
 
     if (showAdd) {
         Box(Modifier.fillMaxSize().background(Dz.Cream)) {
-            if (starry) StarfieldBackdrop(Modifier.fillMaxSize())
+            when (backdrop) {
+                "starfield" -> StarfieldBackdrop(Modifier.fillMaxSize())
+                "rain" -> RainBackdrop(Modifier.fillMaxSize())
+                "character" -> NightCharBackdrop(Modifier.fillMaxSize())
+            }
             AddScreen(
                 onClose = { showAdd = false },
                 onSaved = { showAdd = false }
@@ -346,9 +353,13 @@ fun AppRoot() {
     }
 
     Box(Modifier.fillMaxSize().background(Dz.Cream)) {
-        if (starry) StarfieldBackdrop(Modifier.fillMaxSize())
+        when (backdrop) {
+            "starfield" -> StarfieldBackdrop(Modifier.fillMaxSize())
+            "rain" -> RainBackdrop(Modifier.fillMaxSize())
+            "character" -> NightCharBackdrop(Modifier.fillMaxSize())
+        }
         Scaffold(
-        containerColor = if (starry) Color.Transparent else Dz.Cream,
+        containerColor = if (hasBackdrop) Color.Transparent else Dz.Cream,
         bottomBar = { DzBottomBar(tab) { tab = it } },
         floatingActionButton = {
             if (!(tab == 1 && billsSelect)) {
