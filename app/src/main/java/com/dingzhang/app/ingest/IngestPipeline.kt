@@ -76,6 +76,15 @@ object IngestPipeline {
     private fun isGenericPayee(s: String): Boolean = s.trim() in genericPayees
 
     /**
+     * 页面指纹：只留汉字和字母，数字和标点全去掉。
+     *
+     * 同一页被读两次，时间戳和订单号会变，但「支付成功」「回首页」「加贝购物超市」
+     * 这些字一个不差 —— 去掉会变的那部分，剩下的就是这一页的身份证。
+     */
+    private fun pageFingerprint(raw: String?): String =
+        raw.orEmpty().filter { it.isLetter() }.take(160)
+
+    /**
      * 「弱商户名」= 泛称，或者压根不像店名（不含店铺词、又太短或太长）。
      *
      * 为什么要单独判这个：页面猜错时可能写出「订单支付」「查看详情」这种名字，
@@ -215,6 +224,21 @@ object IngestPipeline {
                         false, "同一笔，已按无障碍读到的内容更新",
                         dao.get(dup.id) ?: dup, merged = true
                     )
+                }
+                // 同一页被无障碍反复抓到，是拖时间重复记录最常见的一种：
+                // 付完停在结果页没退，隔几分钟又来一次事件，第二次照样读得全。
+                // 这种靠时间窗口（同通道 90 秒）根本抓不住 —— 现场那两笔相隔 5 分 53 秒，
+                // 并不是两笔真消费，是同一页被读了两次。
+                //
+                // 用页面文字做指纹：只留汉字和字母，去掉数字和标点。
+                // 同一页的指纹必然一模一样，不同页几乎撞不上 —— 而真买两件的话，
+                // 商户和按钮文字也会一样，这种情况按「宁可漏不可错记」并掉。
+                gap <= DUP_WINDOW_MS && dup.source == c.source &&
+                    c.source == Source.ACCESSIBILITY &&
+                    pageFingerprint(c.raw).isNotEmpty() &&
+                    pageFingerprint(c.raw) == pageFingerprint(dup.raw) -> {
+                    Log.d(TAG, "同一页重复读到，跳过 " + c.payee + " " + (c.amountCents / 100.0))
+                    return Outcome(false, "同一页重复读到，已跳过", dup, merged = true)
                 }
                 gap <= (if (dup.source == c.source) SAME_CHANNEL_STRICT_MS else DUP_STRICT_MS) -> {
                     // 同一笔钱被两条通道各记了一次。先记的那条常常只有泛称

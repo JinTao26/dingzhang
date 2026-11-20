@@ -1,12 +1,12 @@
 {
-  "version": "0.5.31",
-  "notes": "修支付宝支付结果页被误判：排除词表里写着「首页」，而结果页上就有个「回首页」按钮，整页被判成不是支付页。碰一碰、以及任何带这个按钮的结果页都受影响。",
-  "apk": "https://github.com/JinTao26/dingzhang/releases/download/v0.5.31/dingzhang.apk",
-  "page": "https://github.com/JinTao26/dingzhang/releases/tag/v0.5.31",
-  "published_at": "2026-11-20T03:50:00Z",
+  "version": "0.5.32",
+  "notes": "修同一笔被记两次：用户付完停在结果页没退，同一页隔几分钟被无障碍再读一遍，两次都记了账。以前同通道只挡 90 秒，靠不住；现在用页面文字做指纹，同一个页面的两次读取会并成一笔。",
+  "apk": "https://github.com/JinTao26/dingzhang/releases/download/v0.5.32/dingzhang.apk",
+  "page": "https://github.com/JinTao26/dingzhang/releases/tag/v0.5.32",
+  "published_at": "2026-11-20T04:30:00Z",
   "highlights": [
-    "支付宝支付结果页不再被误判：「回首页」按钮里的两个字以前会把整页毙掉",
-    "碰一碰支付能记上了，金额和商户名都读得到",
-    "上一版的退款单独一路、银行通道放开都还在"
+    "同一笔不再记两次：页面文字一样就当成同一页的重复读取",
+    "真买两件、页面文字完全一样的情况会被并掉 —— 按「宁可漏不可错记」处理",
+    "上一版的「回首页」误判修复、退款单独一路都还在"
   ]
 }
