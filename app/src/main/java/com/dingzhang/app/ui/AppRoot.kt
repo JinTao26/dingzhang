@@ -57,6 +57,7 @@ import com.dingzhang.app.core.model.CategoryTotal
 import com.dingzhang.app.core.model.Dates
 import com.dingzhang.app.core.model.LearnedRule
 import com.dingzhang.app.core.model.Source
+import com.dingzhang.app.R
 import com.dingzhang.app.core.model.Txn
 import com.dingzhang.app.data.RecurringDetector
 import com.dingzhang.app.data.RecurringItem
@@ -66,8 +67,7 @@ import com.dingzhang.app.ui.screens.BillsScreen
 import com.dingzhang.app.ui.screens.HomeScreen
 import com.dingzhang.app.ui.screens.MineScreen
 import com.dingzhang.app.ui.screens.StatsScreen
-import com.dingzhang.app.ui.components.NightCharBackdrop
-import com.dingzhang.app.ui.components.RainBackdrop
+import com.dingzhang.app.ui.components.PhotoBackdrop
 import com.dingzhang.app.ui.components.StarfieldBackdrop
 import com.dingzhang.app.ui.components.UpdateDialog
 import com.dingzhang.app.ui.theme.Dz
@@ -341,8 +341,8 @@ fun AppRoot() {
         Box(Modifier.fillMaxSize().background(Dz.Cream)) {
             when (backdrop) {
                 "starfield" -> StarfieldBackdrop(Modifier.fillMaxSize())
-                "rain" -> RainBackdrop(Modifier.fillMaxSize())
-                "character" -> NightCharBackdrop(Modifier.fillMaxSize())
+                "rivernight" -> PhotoBackdrop(R.drawable.theme_rivernight, modifier = Modifier.fillMaxSize())
+                "qinglv" -> PhotoBackdrop(R.drawable.theme_qinglv, light = true, modifier = Modifier.fillMaxSize())
             }
             AddScreen(
                 onClose = { showAdd = false },
@@ -355,8 +355,8 @@ fun AppRoot() {
     Box(Modifier.fillMaxSize().background(Dz.Cream)) {
         when (backdrop) {
             "starfield" -> StarfieldBackdrop(Modifier.fillMaxSize())
-            "rain" -> RainBackdrop(Modifier.fillMaxSize())
-            "character" -> NightCharBackdrop(Modifier.fillMaxSize())
+            "rivernight" -> PhotoBackdrop(R.drawable.theme_rivernight, modifier = Modifier.fillMaxSize())
+            "qinglv" -> PhotoBackdrop(R.drawable.theme_qinglv, light = true, modifier = Modifier.fillMaxSize())
         }
         Scaffold(
         containerColor = if (hasBackdrop) Color.Transparent else Dz.Cream,

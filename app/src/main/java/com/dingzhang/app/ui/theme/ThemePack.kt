@@ -88,56 +88,57 @@ object ThemePacks {
     )
 
     /**
-     * 深海：墨蓝发青的底 + 薄荷青主色。
+     * 水乡夜：江南古镇的夜，河两岸的灯全亮着。
      *
-     * 深色主题最容易做坏的地方，是把底压成纯黑、再放一个高饱和的亮色 ——
-     * 那就是霓虹灯，不是界面上班看的。这套的底带明显的青绿倾向（0A1519），
-     * 主色压到中明度的薄荷青，跟底之间留出层，看得久不累。
+     * 跟「星空物语」那种干净的深空是两回事 —— 这套要的是热闹：
+     * 一串串灯笼、水面上的倒影、石桥上也挂满灯，灯火一层层往巷子里退。
+     * 主色取灯笼的暖黄，次色取河的青蓝，强调色是灯笼红。
      */
-    val DEEPSEA = ThemePack(
-        id = "deepsea", name = "深海", tagline = "墨蓝底 + 薄荷青，冷调耐看", dark = true,
-        primary = Color(0xFF5FD9C7), primaryDeep = Color(0xFFA5F2E6), primarySoft = Color(0xFF123732),
-        secondary = Color(0xFF7FA8FF), secondarySoft = Color(0xFF1A2B4C),
-        accent = Color(0xFFFFC978), accentSoft = Color(0xFF392D17),
-        bg = Color(0xFF0A1519), card = Color(0xFF132229),
-        ink = Color(0xFFE8F5F2), inkSoft = Color(0xFF9BB5B0), inkFaint = Color(0xFF62787A),
-        line = Color(0xFF1E3038),
-        warn = Color(0xFFF0BE5C), warnSoft = Color(0xFF392D17),
-        expense = Color(0xFFFF8FA5), income = Color(0xFF4FD9B0),
-        rLarge = 20, rMedium = 15, rSmall = 10
+    val RIVERNIGHT = ThemePack(
+        id = "rivernight", name = "水乡夜", tagline = "河两岸灯全亮着，船停在水上", dark = true,
+        primary = Color(0xFFE8B45A), primaryDeep = Color(0xFFFBD08A), primarySoft = Color(0xFF382C1A),
+        secondary = Color(0xFF8FB4C9), secondarySoft = Color(0xFF1F2E3A),
+        accent = Color(0xFFD9634F), accentSoft = Color(0xFF35211D),
+        bg = Color(0xFF141821), card = Color(0xFF1E242E),
+        ink = Color(0xFFF2EFE7), inkSoft = Color(0xFFABA69A), inkFaint = Color(0xFF75736C),
+        line = Color(0xFF2A3038),
+        warn = Color(0xFFE8A33C), warnSoft = Color(0xFF3A2C14),
+        expense = Color(0xFFF08070), income = Color(0xFF7FD6B0),
+        rLarge = 16, rMedium = 12, rSmall = 8,
+        backdrop = "rivernight"
     )
 
     /**
-     * 夜灯：暖棕黑底 + 琥珀金主色 + 一整幅夜景插画（少女站在路灯下的旧街）。
+     * 青绿：一张青绿山水 —— 石青石绿罩染的层山，绢面织纹，云气留白。
      *
-     * 跟深海正好相反的一套暖调。底色不是灰黑也不是冷黑，是带木色调的暖棕黑。
-     * 背景层是画出来的整幅夜景 —— 人物的轮廓光、地上的反光、远处的灯
-     * 都在同一张图里，铺满不会像贴纸。跟星空物语也拉开得很开：
-     * 那边是抽象的星点，这边是具体的人和街。
-     * 圆角给得比深海大一点，整体更软。
+     * 主色直接用画里的青绿，次色是石青，强调色是山脚的赭石。
+     * 这是五套里唯一带「颜色」的浅色主题，之前几套浅色都是灰的，
+     * 这套是照着老绢本配的：颜色有，但不艳，像旧画挂了很多年之后的那个调。
      */
-    val NIGHT = ThemePack(
-        id = "nightlamp", name = "夜灯", tagline = "暖棕黑 + 夜街插画，路灯下有个人", dark = true,
-        primary = Color(0xFFE9A964), primaryDeep = Color(0xFFFCD3A3), primarySoft = Color(0xFF362818),
-        secondary = Color(0xFFC1A2EC), secondarySoft = Color(0xFF2C2340),
-        accent = Color(0xFF7FD6C0), accentSoft = Color(0xFF1A332F),
-        bg = Color(0xFF14100D), card = Color(0xFF201A15),
-        ink = Color(0xFFF5EDE4), inkSoft = Color(0xFFB0A090), inkFaint = Color(0xFF7A6C60),
-        line = Color(0xFF302720),
-        warn = Color(0xFFFFB347), warnSoft = Color(0xFF362714),
-        expense = Color(0xFFFF8A7A), income = Color(0xFF6FD9A8),
-        rLarge = 24, rMedium = 18, rSmall = 12,
-        backdrop = "character"
+    val QINGLV = ThemePack(
+        id = "qinglv", name = "青绿", tagline = "石青石绿罩着的山，绢上旧色", dark = false,
+        primary = Color(0xFF4A7C6F), primaryDeep = Color(0xFF37635A), primarySoft = Color(0xFFE2EDE7),
+        secondary = Color(0xFF6B8FA8), secondarySoft = Color(0xFFE6EEF3),
+        accent = Color(0xFFB08A5A), accentSoft = Color(0xFFF4EADD),
+        bg = Color(0xFFF7F4EA), card = Color(0xFFFFFFFF),
+        ink = Color(0xFF2A2F2C), inkSoft = Color(0xFF6E7A72), inkFaint = Color(0xFFA2ADA4),
+        line = Color(0xFFE4E6DC),
+        warn = Color(0xFFC08A3E), warnSoft = Color(0xFFF8EEDC),
+        expense = Color(0xFFB84C38), income = Color(0xFF2F7A5E),
+        rLarge = 12, rMedium = 8, rSmall = 6,
+        backdrop = "qinglv"
     )
 
-    val ALL = listOf(SAKURA, STARFIELD, MINT, DEEPSEA, NIGHT)
+    val ALL = listOf(SAKURA, STARFIELD, MINT, RIVERNIGHT, QINGLV)
 
     fun byId(id: String?): ThemePack {
         // 老版本第二套叫 teyvat，改版后统一走星空物语，别让已经选过的人被重置回樱粉
         // yozakura（夜桜）已经换掉了，选过的人挪到新那套深色，别掉回樱粉
         val fixed = when (id) {
             "teyvat" -> "starfield"
-            "yozakura" -> "deepsea"
+            // 前面几版存在过、现在已经换掉的 id，一个个挪到现在的对应位置
+            "yozakura", "deepsea", "mist", "shijing", "jiangnan" -> "rivernight"
+            "dusk", "rainnight", "nightlamp", "coast", "shiji", "shuimo" -> "qinglv"
             else -> id
         }
         return ALL.firstOrNull { it.id == fixed } ?: SAKURA

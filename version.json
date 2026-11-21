@@ -1,13 +1,13 @@
 {
-  "version": "0.5.33",
-  "notes": "主题两处改动：第四套夜桜换成深海（墨蓝底+薄荷青），第五套换成夜灯（暖棕黑底 + 一整幅夜景插画，路灯下的少女）。选过夜桜的会自动迁到深海。",
-  "apk": "https://github.com/JinTao26/dingzhang/releases/download/v0.5.33/dingzhang.apk",
-  "page": "https://github.com/JinTao26/dingzhang/releases/tag/v0.5.33",
-  "published_at": "2026-11-20T05:10:00Z",
+  "version": "0.5.34",
+  "notes": "第四第五套主题重做：水乡夜是江南古镇夜景，河两岸灯笼全亮；青绿是青绿山水，石青石绿罩染、绢面织纹。两张图的下半截都做过压暗/渐白，列表的字压上去看得清。",
+  "apk": "https://github.com/JinTao26/dingzhang/releases/download/v0.5.34/dingzhang.apk",
+  "page": "https://github.com/JinTao26/dingzhang/releases/tag/v0.5.34",
+  "published_at": "2026-11-21T05:40:00Z",
   "highlights": [
-    "第四套「深海」：墨蓝发青的底 + 薄荷青，换掉原来那套黑配亮粉",
-    "第五套「夜灯」：整幅夜景插画，路灯下的旧街，一个抱着账本的姑娘",
-    "「夜灯」里的人物放在列表下方，只露头肩，不压分类金额",
-    "选过旧「夜桜」的会自动变成「深海」，不会掉回樱粉"
+    "「水乡夜」：江南古镇的夜，河两岸灯笼全亮，石桥挂满灯，水面有倒影",
+    "「青绿」：石青石绿罩染的层山，山脚赭石，绢面织纹与皴法",
+    "两张图下半截压暗或渐白，分类和金额压在图上照样看得清",
+    "旧主题选过的人都会自动迁到这两套，不会掉回樱粉"
   ]
 }
