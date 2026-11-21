@@ -35,9 +35,9 @@ fun PhotoBackdrop(resId: Int, light: Boolean = false, modifier: Modifier = Modif
                 // 暗色主题压黑，浅色主题压白 —— 浅底上的深色字，只能靠白雾把图推远
                 if (light) {
                     Brush.verticalGradient(
-                        0.00f to Color(0x2AFFFFFF),
-                        0.50f to Color(0x55FFFFFF),
-                        1.00f to Color(0x86FFFFFF)
+                        0.00f to Color(0x3CFFFFFF),
+                        0.50f to Color(0x60FFFFFF),
+                        1.00f to Color(0x8CFFFFFF)
                     )
                 } else {
                     Brush.verticalGradient(

@@ -1,13 +1,13 @@
 {
-  "version": "0.5.34",
-  "notes": "第四第五套主题重做：水乡夜是江南古镇夜景，河两岸灯笼全亮；青绿是青绿山水，石青石绿罩染、绢面织纹。两张图的下半截都做过压暗/渐白，列表的字压上去看得清。",
-  "apk": "https://github.com/JinTao26/dingzhang/releases/download/v0.5.34/dingzhang.apk",
-  "page": "https://github.com/JinTao26/dingzhang/releases/tag/v0.5.34",
-  "published_at": "2026-11-21T05:40:00Z",
+  "version": "0.5.35",
+  "notes": "两张主题图压小（省了 140 KB），卡片改成半透明让背景透出来，首页标题区压暗一档，日期和金额看得清。",
+  "apk": "https://github.com/JinTao26/dingzhang/releases/download/v0.5.35/dingzhang.apk",
+  "page": "https://github.com/JinTao26/dingzhang/releases/tag/v0.5.35",
+  "published_at": "2026-11-21T06:10:00Z",
   "highlights": [
-    "「水乡夜」：江南古镇的夜，河两岸灯笼全亮，石桥挂满灯，水面有倒影",
-    "「青绿」：石青石绿罩染的层山，山脚赭石，绢面织纹与皴法",
-    "两张图下半截压暗或渐白，分类和金额压在图上照样看得清",
-    "旧主题选过的人都会自动迁到这两套，不会掉回樱粉"
+    "卡片半透明：背景从卡片后面透出来，不再只在边角露一点",
+    "首页顶部的日期和结余压暗了一档，看得清",
+    "水乡夜那张图往上挪了，月亮挪出屏幕，标题压在纯夜色上",
+    "两张主题图从 1080 压到 900 宽，包小了 140 KB"
   ]
 }

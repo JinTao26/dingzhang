@@ -38,7 +38,8 @@ object Dz {
     val Mint: Color get() = p.accent
     val MintSoft: Color get() = p.accentSoft
     val Cream: Color get() = p.bg
-    val Card: Color get() = p.card
+    // 卡片带一点透明：背景主题下让图从卡片后面透出来
+    val Card: Color get() = if (p.cardAlpha >= 1f) p.card else p.card.copy(alpha = p.cardAlpha)
     val Ink: Color get() = p.ink
     val InkSoft: Color get() = p.inkSoft
     val InkFaint: Color get() = p.inkFaint

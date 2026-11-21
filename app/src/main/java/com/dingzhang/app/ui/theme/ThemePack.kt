@@ -35,8 +35,11 @@ data class ThemePack(
     val rLarge: Int,
     val rMedium: Int,
     val rSmall: Int,
-    // 有背景层的主题在这里写上画哪一层（starfield / rain），没有的留空走纯色底
-    val backdrop: String? = null
+    // 有背景层的主题在这里写上画哪一层，没有的留空走纯色底
+    val backdrop: String? = null,
+    // 卡片不透明度：带背景的主题调低一点，让背景从卡片后面透出来，
+    // 不然整屏像糊了一层皮，背景只在边角露一点点，看着憋屈
+    val cardAlpha: Float = 1f
 )
 
 object ThemePacks {
@@ -70,7 +73,7 @@ object ThemePacks {
         warn = Color(0xFFF5C05A), warnSoft = Color(0xFF3A2F18),
         expense = Color(0xFFFF8DA6), income = Color(0xFF6EE0BE),
         rLarge = 22, rMedium = 16, rSmall = 11,
-        backdrop = "starfield"
+        backdrop = "starfield", cardAlpha = 0.90f
     )
 
     /** 薄荷：白底 + 薄荷绿，白天看着最省眼的浅色方案。 */
@@ -105,7 +108,7 @@ object ThemePacks {
         warn = Color(0xFFE8A33C), warnSoft = Color(0xFF3A2C14),
         expense = Color(0xFFF08070), income = Color(0xFF7FD6B0),
         rLarge = 16, rMedium = 12, rSmall = 8,
-        backdrop = "rivernight"
+        backdrop = "rivernight", cardAlpha = 0.82f
     )
 
     /**
@@ -126,7 +129,7 @@ object ThemePacks {
         warn = Color(0xFFC08A3E), warnSoft = Color(0xFFF8EEDC),
         expense = Color(0xFFB84C38), income = Color(0xFF2F7A5E),
         rLarge = 12, rMedium = 8, rSmall = 6,
-        backdrop = "qinglv"
+        backdrop = "qinglv", cardAlpha = 0.86f
     )
 
     val ALL = listOf(SAKURA, STARFIELD, MINT, RIVERNIGHT, QINGLV)
