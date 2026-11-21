@@ -37,6 +37,7 @@ import androidx.compose.material.icons.rounded.FileDownload
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -149,7 +150,7 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                         "填 0 就是不设。每月预算会出现在首页的「预算还剩」上"
                     },
                     style = MaterialTheme.typography.labelSmall,
-                    color = Dz.InkFaint
+                    color = Dz.InkSoft
                 )
                 Spacer(Modifier.height(12.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
@@ -308,7 +309,7 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                 Text(
                     "让自动记账更准一点的开关都在这儿",
                     style = MaterialTheme.typography.bodySmall,
-                    color = Dz.InkFaint,
+                    color = Dz.InkSoft,
                     modifier = Modifier.padding(top = 2.dp)
                 )
             }
@@ -336,7 +337,7 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
             if (a11yOn && a11yDead) {
                 Text(
                     "系统里是开着的，但已经很久没收到过页面事件了，多半被系统停掉了。点这里关掉再开一次",
-                    fontSize = 11.sp,
+                    fontSize = 12.5.sp,
                     color = Dz.SakuraDeep,
                     modifier = Modifier
                         .padding(top = 4.dp, start = 2.dp)
@@ -347,8 +348,8 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
             } else if (a11yOn && a11yIdleMs in 1..86_400_000L) {
                 Text(
                     "上次收到页面事件：${a11yIdleMs / 60_000} 分钟前",
-                    fontSize = 11.sp,
-                    color = Dz.InkFaint,
+                    fontSize = 12.5.sp,
+                    color = Dz.InkSoft,
                     modifier = Modifier.padding(top = 4.dp, start = 2.dp)
                 )
             }
@@ -366,11 +367,9 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
             )
             // 通知这条最容易「看着开着、其实收不到」：权限给了，但微信的通知被系统折叠掉
             Text(
-                "只要系统里微信的通知是「允许」的，叮账就收得到 —— 哪怕它被折叠进「其他通知」、" +
-                    "被静音、没声音没横幅，都不影响。真正会断的是两种：微信里把这条消息设了免打扰，" +
-                    "或者系统里把微信通知整个关掉。收付款、碰一碰这类没有支付页的付款，全靠这一条。",
+                "折叠、静音、没横幅都不影响。只有微信里设了免打扰、或系统里关了微信通知才会断。",
                 style = MaterialTheme.typography.labelSmall,
-                color = Dz.InkFaint,
+                color = Dz.InkSoft,
                 modifier = Modifier.padding(top = 4.dp, start = 2.dp)
             )
             // 下面这三条管的都是「钱不经过微信支付宝」的情况，用得比上面少得多。
@@ -397,7 +396,7 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                         "钱不经过微信支付宝的：银行 App 推送、银行公众号、银行短信 · 已开 " +
                             otherOn + " 条",
                         style = MaterialTheme.typography.labelSmall,
-                        color = Dz.InkFaint
+                        color = Dz.InkSoft
                     )
                 }
                 Text(
@@ -475,10 +474,9 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                 )
 
                 Text(
-                    "这三条都还没有在你手机上验证过。第一次用建议照着上面的自测走一遍；" +
-                        "不成的话，把「采集记录」整段复制发过来。",
+                    "这三条还没在你手机上验证过。先按上面自测，不成就把采集记录复制发我。",
                     style = MaterialTheme.typography.labelSmall,
-                    color = Dz.InkFaint,
+                    color = Dz.InkSoft,
                     modifier = Modifier.padding(top = 10.dp, start = 2.dp)
                 )
             }
@@ -498,14 +496,14 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                     Text(
                         Dates.relativeLabel(data.lastImportAt),
                         style = MaterialTheme.typography.labelSmall,
-                        color = Dz.InkFaint
+                        color = Dz.InkSoft
                     )
                 }
             }
             Text(
                 "支持 zip · csv · txt · xlsx",
                 style = MaterialTheme.typography.labelMedium,
-                color = Dz.InkFaint,
+                color = Dz.InkSoft,
                 modifier = Modifier.padding(top = 4.dp)
             )
             Spacer(Modifier.height(12.dp))
@@ -548,7 +546,7 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                     )
                     val range = BillImporter.describeRange(r.earliest, r.latest)
                     if (range.isNotBlank()) {
-                        Text(range, style = MaterialTheme.typography.labelSmall, color = Dz.InkFaint)
+                        Text(range, style = MaterialTheme.typography.labelSmall, color = Dz.InkSoft)
                     }
                 }
             }
@@ -606,7 +604,7 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                 Text(
                     if (alertPct > 0) "花到 $alertPct% 时提醒" else "已关闭",
                     style = MaterialTheme.typography.labelLarge,
-                    color = if (alertPct > 0) Dz.Ink else Dz.InkFaint
+                    color = if (alertPct > 0) Dz.Ink else Dz.InkSoft
                 )
             }
             Spacer(Modifier.height(8.dp))
@@ -635,7 +633,7 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                     data.ignoredPayees.take(6).forEach { p ->
                         Text(
                             p,
-                            fontSize = 11.sp,
+                            fontSize = 12.5.sp,
                             color = Dz.InkSoft,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(9.dp))
@@ -676,7 +674,7 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
             Text(
                 ThemeController.current.tagline,
                 style = MaterialTheme.typography.labelSmall,
-                color = Dz.InkFaint
+                color = Dz.InkSoft
             )
         }
 
@@ -723,7 +721,7 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                     Text(
                         "共 ${data.monthTxns.size} 笔（本月）。清空后不可恢复",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Dz.InkFaint
+                        color = Dz.InkSoft
                     )
                 }
                 Text(
@@ -743,12 +741,12 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                     Text(
                         "叮账 ${BuildConfig.VERSION_NAME} · 数据只存在这台手机，不上传",
                         style = MaterialTheme.typography.labelSmall,
-                        color = Dz.InkFaint
+                        color = Dz.InkSoft
                     )
                     Text(
                         "上次检查：${agoText(lastCheck)}",
                         style = MaterialTheme.typography.labelSmall,
-                        color = Dz.InkFaint,
+                        color = Dz.InkSoft,
                         modifier = Modifier.padding(top = 1.dp)
                     )
                     autoNewer?.let { nr ->
@@ -944,7 +942,7 @@ private fun ActionRow(title: String, desc: String, onClick: () -> Unit) {
     ) {
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.titleMedium, color = Dz.Ink)
-            Text(desc, style = MaterialTheme.typography.labelSmall, color = Dz.InkFaint)
+            Text(desc, style = MaterialTheme.typography.labelSmall, color = Dz.InkSoft)
         }
         Icon(
             Icons.Rounded.ChevronRight,
@@ -991,7 +989,7 @@ private fun ChannelRow(
                     .clip(CircleShape)
                     .background(
                         when {
-                            !on -> Dz.InkFaint
+                            !on -> Dz.InkSoft
                             systemGranted -> Dz.Mint
                             else -> Dz.Warn
                         }
@@ -1002,7 +1000,7 @@ private fun ChannelRow(
                 Text(
                     desc,
                     style = MaterialTheme.typography.bodySmall,
-                    color = Dz.InkFaint
+                    color = Dz.InkSoft
                 )
             }
             Switch(
@@ -1231,7 +1229,7 @@ private fun ThemeSwatch(
         Spacer(Modifier.height(6.dp))
         Text(
             pack.name,
-            fontSize = 11.sp,
+            fontSize = 12.5.sp,
             fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
             color = pack.ink,
             maxLines = 1
@@ -1253,7 +1251,7 @@ private fun BudgetRow(
         Text(
             if (cents > 0) "¥${Money.short(cents)}" else "未设置",
             style = MaterialTheme.typography.labelLarge,
-            color = if (cents > 0) Dz.Ink else Dz.InkFaint
+            color = if (cents > 0) Dz.Ink else Dz.InkSoft
         )
         Spacer(Modifier.width(8.dp))
         Box(
@@ -1303,7 +1301,7 @@ private fun ExplainLine(mark: String, name: String, desc: String) {
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.padding(start = 6.dp, end = 6.dp)
         )
-        Text(desc, fontSize = 12.sp, color = Dz.InkFaint, modifier = Modifier.weight(1f))
+        Text(desc, fontSize = 12.sp, color = Dz.InkSoft, modifier = Modifier.weight(1f))
     }
 }
 
@@ -1375,25 +1373,25 @@ private fun FeedbackPage(ctx: Context, onClose: () -> Unit) {
             Text(
                 "反馈直接发到作者的邮箱，收件人和机型信息自动填好。",
                 style = MaterialTheme.typography.bodySmall,
-                color = Dz.InkFaint
+                color = Dz.InkSoft
             )
             Text(
                 "只在找不到邮箱 App 时，才会把内容复制一份到剪贴板 —— 平时不会动你的剪贴板。",
                 style = MaterialTheme.typography.bodySmall,
-                color = Dz.InkFaint,
+                color = Dz.InkSoft,
                 modifier = Modifier.padding(top = 4.dp, bottom = 6.dp)
             )
             // 「总是」是系统记住的默认应用，App 改不了它，但得让用户知道去哪儿改
             Text(
-                "如果每次都直接跳到同一个 App、想换一个：手机设置 → 应用 → 默认应用 → 邮件，清掉默认值再试。",
+                "总跳到同一个 App：系统设置 → 应用 → 默认应用 → 邮件，清掉默认值再试。",
                 style = MaterialTheme.typography.labelSmall,
-                color = Dz.InkFaint,
+                color = Dz.InkSoft,
                 modifier = Modifier.padding(bottom = 10.dp)
             )
             OutlinedTextField(
                 value = feedback,
                 onValueChange = { feedback = it },
-                placeholder = { Text("说说哪里不对…", color = Dz.InkFaint, fontSize = 13.sp) },
+                placeholder = { Text("说说哪里不对…", color = Dz.InkSoft, fontSize = 13.sp) },
                 textStyle = MaterialTheme.typography.bodyMedium,
                 shape = RoundedCornerShape(14.dp),
                 modifier = Modifier
@@ -1444,7 +1442,7 @@ private fun SetupHints(steps: List<String>, selfTest: String) {
             Text(
                 "· " + step,
                 style = MaterialTheme.typography.labelSmall,
-                color = Dz.InkFaint,
+                color = Dz.InkSoft,
                 modifier = Modifier.padding(bottom = 2.dp)
             )
         }
@@ -1467,7 +1465,7 @@ private fun ChannelStatusLine(name: String, enabled: Boolean, idleMs: Long) {
         Text(
             name,
             style = MaterialTheme.typography.labelSmall,
-            color = Dz.InkFaint,
+            color = Dz.InkSoft,
             modifier = Modifier.width(44.dp)
         )
         Text(
@@ -1645,29 +1643,42 @@ private fun IngestLogCard() {
             }
 
             if (oks.isNotEmpty() || diags.isNotEmpty()) {
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(14.dp))
+                HorizontalDivider(color = Dz.Line, thickness = 1.dp)
+                Spacer(Modifier.height(12.dp))
+                // 这两个以前是一左一右的小字，中间只靠 weight 撑着，
+                // 手指宽一点就点到旁边去了 —— 现在做成两个带边框的胶囊，中间留死间距，
+                // 谁也不挨着谁。清空用警示色，跟复制分开。
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     // 反馈「没记上」时，截图只能说现象。这里把两段记录连机型、版本一起
                     // 复制成一段话，直接发过来就能照着查。
                     Text(
                         "复制全部",
-                        style = MaterialTheme.typography.labelMedium,
+                        style = MaterialTheme.typography.labelLarge,
                         color = Dz.Sakura,
-                        modifier = Modifier.clickable {
-                            copyIngestLog(ctx)
-                            diagOpen = false
-                        }
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .border(1.dp, Dz.Sakura, RoundedCornerShape(12.dp))
+                            .clickable {
+                                copyIngestLog(ctx)
+                                diagOpen = false
+                            }
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
                     )
-                    Spacer(Modifier.weight(1f))
+                    Spacer(Modifier.width(18.dp))
                     Text(
                         "清空记录",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = Dz.Sakura,
-                        modifier = Modifier.clickable {
-                            IngestLog.clear()
-                            diagOpen = false
-                            tick++
-                        }
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Dz.Expense,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .border(1.dp, Dz.Expense, RoundedCornerShape(12.dp))
+                            .clickable {
+                                IngestLog.clear()
+                                diagOpen = false
+                                tick++
+                            }
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
                     )
                 }
             }
@@ -1742,7 +1753,7 @@ private fun HelpPage(onClose: () -> Unit) {
         Text(
             "点一下标题展开步骤，看完再收起来，页面不会太长",
             style = MaterialTheme.typography.bodyMedium,
-            color = Dz.InkFaint,
+            color = Dz.InkSoft,
             modifier = Modifier.padding(start = 2.dp, bottom = 10.dp)
         )
 
@@ -1790,10 +1801,7 @@ private fun HelpPage(onClose: () -> Unit) {
 
         FoldCard("还是没记上？", "先分清是没开通道，还是这类消息本来就拿不到") {
             Text(
-                "先看「自动记账原理与限制」那一页。两种情况要分清：通道没开（回到上一块把权限开上），" +
-                    "还是这类消息本来就拿不到 —— 微信红包和转账不出通知、通知里没写金额、" +
-                    "云闪付的支付页不弹出来。" +
-                    "后一种只能靠导入账单补。",
+                "要么是通道没开，要么这类消息本来就没通知、没金额，只能靠导入账单补。",
                 style = MaterialTheme.typography.bodyMedium,
                 color = Dz.InkSoft
             )
@@ -1834,7 +1842,7 @@ private fun PermissionGuideCard(ctx: Context, a11yOn: Boolean, nlsOn: Boolean) {
                 ) {
                     Text(
                         r.label,
-                        fontSize = 11.sp,
+                        fontSize = 12.5.sp,
                         fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal,
                         color = if (sel) Color.White else Dz.InkSoft,
                         maxLines = 1
@@ -1862,10 +1870,9 @@ private fun PermissionGuideCard(ctx: Context, a11yOn: Boolean, nlsOn: Boolean) {
                     color = Dz.Warn
                 )
                 Text(
-                    "安卓不允许从浏览器、聊天软件装进来的 App 直接开这两个权限，" +
-                        "点开关会弹「受限设置」或者干脆没反应。就在同一个页面的右上角点三个点，" +
-                        "选「允许受限制的设置」，再回来点开关。①② 两步各要做一次",
-                    fontSize = 11.sp,
+                    "从浏览器装的 App 直接开不了，会弹「受限设置」。在同一页右上角点三个点，" +
+                        "选「允许受限制的设置」，再回来点。①② 各做一次。",
+                    fontSize = 12.5.sp,
                     color = Dz.InkSoft,
                     lineHeight = 17.sp,
                     modifier = Modifier.padding(top = 3.dp)
@@ -1899,10 +1906,9 @@ private fun PermissionGuideCard(ctx: Context, a11yOn: Boolean, nlsOn: Boolean) {
         )
 
         Text(
-            "各家的系统版本之间有出入，上面找不到就在设置最上面的搜索框里搜「无障碍」或「通知使用权」，" +
-                "一般都能直接跳过去。步骤 ③ 是自动记账能不能一直在后台说话的关键，比前两步更容易被忽略",
-            fontSize = 11.sp,
-            color = Dz.InkFaint,
+            "找不到就在设置顶部搜索框搜「无障碍」或「通知使用权」。③ 决定它能不能一直在后台记着，最容易漏。",
+            fontSize = 12.5.sp,
+            color = Dz.InkSoft,
             modifier = Modifier.padding(top = 10.dp)
         )
     }
@@ -1929,14 +1935,14 @@ private fun GuideStep(
             if (state == 1) {
                 Text(
                     "已开启",
-                    fontSize = 11.sp,
+                    fontSize = 12.5.sp,
                     color = Dz.Mint,
                     modifier = Modifier.padding(start = 6.dp)
                 )
             } else if (state == 0) {
                 Text(
                     "未开启",
-                    fontSize = 11.sp,
+                    fontSize = 12.5.sp,
                     color = Dz.Warn,
                     modifier = Modifier.padding(start = 6.dp)
                 )
@@ -1993,7 +1999,7 @@ private fun FoldCard(title: String, subtitle: String, content: @Composable () ->
                     Text(
                         subtitle,
                         style = MaterialTheme.typography.labelSmall,
-                        color = Dz.InkFaint,
+                        color = Dz.InkSoft,
                         modifier = Modifier.padding(top = 2.dp)
                     )
                 }

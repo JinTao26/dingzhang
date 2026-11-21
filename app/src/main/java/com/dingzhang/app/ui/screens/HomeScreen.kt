@@ -155,7 +155,7 @@ fun HomeScreen(
                 Text(
                     "${Dates.dayOf(System.currentTimeMillis())} ${Dates.weekdayOf(System.currentTimeMillis())}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = Dz.InkFaint,
+                    color = Dz.InkSoft,
                     modifier = Modifier.padding(top = 2.dp)
                 )
             }
@@ -271,7 +271,7 @@ fun HomeScreen(
                 Spacer(Modifier.height(10.dp))
                 Text(
                     "共 ${data.monthCount} 笔 · 今天 ¥${Money.short(data.todayExpense)}",
-                    color = Color.White.copy(alpha = 0.82f),
+                    color = Color.White.copy(alpha = 0.93f),
                     style = MaterialTheme.typography.bodySmall
                 )
 
@@ -282,7 +282,7 @@ fun HomeScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             "年预算 ¥${Money.short(data.yearBudgetCents)} · 已用 ${(yearRatio * 100).coerceAtLeast(0f).toInt()}%",
-                            color = Color.White.copy(alpha = 0.82f),
+                            color = Color.White.copy(alpha = 0.93f),
                             style = MaterialTheme.typography.bodySmall
                         )
                         Spacer(Modifier.weight(1f))
@@ -356,7 +356,7 @@ fun HomeScreen(
                 Text(
                     "同商户同金额反复出现，我猜是订阅。退订之后这里会自己消失",
                     style = MaterialTheme.typography.bodySmall,
-                    color = Dz.InkFaint,
+                    color = Dz.InkSoft,
                     modifier = Modifier.padding(top = 2.dp, bottom = 8.dp)
                 )
                 data.recurring.take(4).forEach { r ->
@@ -377,7 +377,7 @@ fun HomeScreen(
                             Text(
                                 "${r.cycleLabel} · 已扣 ${r.count} 次",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = Dz.InkFaint
+                                color = Dz.InkSoft
                             )
                         }
                         Text(
@@ -391,7 +391,7 @@ fun HomeScreen(
                     Text(
                         "还有 ${data.recurring.size - 4} 项",
                         style = MaterialTheme.typography.labelSmall,
-                        color = Dz.InkFaint,
+                        color = Dz.InkSoft,
                         modifier = Modifier.padding(top = 4.dp)
                     )
                 }
@@ -438,7 +438,7 @@ private fun MetricChip(label: String, value: String, accent: Color, modifier: Mo
             .background(Dz.Card)
             .padding(horizontal = 14.dp, vertical = 12.dp)
     ) {
-        Text(label, style = MaterialTheme.typography.labelSmall, color = Dz.InkFaint)
+        Text(label, style = MaterialTheme.typography.labelMedium, color = Dz.Ink)
         Spacer(Modifier.height(4.dp))
         Text(
             value,
@@ -487,11 +487,11 @@ fun TxnRow(txn: Txn, modifier: Modifier = Modifier, onClick: (() -> Unit)? = nul
                 }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(cat.name, style = MaterialTheme.typography.bodySmall, color = Dz.InkFaint)
+                Text(cat.name, style = MaterialTheme.typography.bodySmall, color = Dz.InkSoft)
                 Text(
                     " · ${Dates.timeOf(txn.occurredAt)}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = Dz.InkFaint
+                    color = Dz.InkSoft
                 )
                 if (txn.status == com.dingzhang.app.core.model.TxnStatus.AUTO) {
                     Text(
@@ -510,7 +510,7 @@ fun TxnRow(txn: Txn, modifier: Modifier = Modifier, onClick: (() -> Unit)? = nul
             color = when (txn.kind) {
                 TxnKind.EXPENSE -> Dz.Ink
                 TxnKind.INCOME -> Dz.Income
-                TxnKind.TRANSFER -> Dz.InkFaint
+                TxnKind.TRANSFER -> Dz.InkSoft
                 TxnKind.REFUND -> Dz.Income
             }
         )

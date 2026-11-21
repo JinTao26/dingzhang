@@ -40,10 +40,13 @@ fun PhotoBackdrop(resId: Int, light: Boolean = false, modifier: Modifier = Modif
                         1.00f to Color(0x8CFFFFFF)
                     )
                 } else {
+                    // 蒙版比之前松：原来底下一路压到 0xA6，图本身又是压暗过的，
+                    // 两层叠起来就是一团黑，得把手机亮度拉满才看得见。现在图留亮，
+                    // 蒙版只负责把白字托住
                     Brush.verticalGradient(
                         0.00f to Color(0x14000000),
-                        0.50f to Color(0x36000000),
-                        1.00f to Color(0xA6000000)
+                        0.50f to Color(0x2E000000),
+                        1.00f to Color(0x5A000000)
                     )
                 }
             )

@@ -39,7 +39,9 @@ data class ThemePack(
     val backdrop: String? = null,
     // 卡片不透明度：带背景的主题调低一点，让背景从卡片后面透出来，
     // 不然整屏像糊了一层皮，背景只在边角露一点点，看着憋屈
-    val cardAlpha: Float = 1f
+    val cardAlpha: Float = 1f,
+    // 标题换成一款楷体。只有水墨那套开，别的主题一换上去就不对味
+    val serifTitle: Boolean = false
 )
 
 object ThemePacks {
@@ -103,12 +105,12 @@ object ThemePacks {
         secondary = Color(0xFF8FB4C9), secondarySoft = Color(0xFF1F2E3A),
         accent = Color(0xFFD9634F), accentSoft = Color(0xFF35211D),
         bg = Color(0xFF141821), card = Color(0xFF1E242E),
-        ink = Color(0xFFF2EFE7), inkSoft = Color(0xFFABA69A), inkFaint = Color(0xFF75736C),
+        ink = Color(0xFFF6F3EC), inkSoft = Color(0xFFCCC6BA), inkFaint = Color(0xFF9A968C),
         line = Color(0xFF2A3038),
         warn = Color(0xFFE8A33C), warnSoft = Color(0xFF3A2C14),
         expense = Color(0xFFF08070), income = Color(0xFF7FD6B0),
         rLarge = 16, rMedium = 12, rSmall = 8,
-        backdrop = "rivernight", cardAlpha = 0.82f
+        backdrop = "rivernight", cardAlpha = 0.72f
     )
 
     /**
@@ -124,12 +126,12 @@ object ThemePacks {
         secondary = Color(0xFF6B8FA8), secondarySoft = Color(0xFFE6EEF3),
         accent = Color(0xFFB08A5A), accentSoft = Color(0xFFF4EADD),
         bg = Color(0xFFF7F4EA), card = Color(0xFFFFFFFF),
-        ink = Color(0xFF2A2F2C), inkSoft = Color(0xFF6E7A72), inkFaint = Color(0xFFA2ADA4),
+        ink = Color(0xFF232824), inkSoft = Color(0xFF57645D), inkFaint = Color(0xFF87938C),
         line = Color(0xFFE4E6DC),
         warn = Color(0xFFC08A3E), warnSoft = Color(0xFFF8EEDC),
         expense = Color(0xFFB84C38), income = Color(0xFF2F7A5E),
         rLarge = 12, rMedium = 8, rSmall = 6,
-        backdrop = "qinglv", cardAlpha = 0.86f
+        backdrop = "qinglv", cardAlpha = 0.76f, serifTitle = true
     )
 
     val ALL = listOf(SAKURA, STARFIELD, MINT, RIVERNIGHT, QINGLV)

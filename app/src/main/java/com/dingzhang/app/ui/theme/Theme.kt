@@ -15,10 +15,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
+
+import com.dingzhang.app.R
 
 /**
  * 界面里所有颜色的入口。
@@ -104,11 +108,45 @@ private val typography = Typography(
     titleMedium = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 15.sp),
     bodyLarge = TextStyle(fontSize = 15.sp, lineHeight = 22.sp),
     bodyMedium = TextStyle(fontSize = 13.5.sp, lineHeight = 20.sp),
-    bodySmall = TextStyle(fontSize = 12.sp, lineHeight = 17.sp),
+    bodySmall = TextStyle(fontSize = 12.5.sp, lineHeight = 18.sp),
     labelLarge = TextStyle(fontWeight = FontWeight.SemiBold, fontSize = 14.sp),
-    labelMedium = TextStyle(fontWeight = FontWeight.Medium, fontSize = 12.sp, letterSpacing = 0.4.sp),
-    labelSmall = TextStyle(fontSize = 11.sp, letterSpacing = 0.6.sp)
+    // 小字往上提了一档：11-sp 那种在带背景的主题上根本吃不住，
+    // 而且这 App 也不是给大屏平板看的，都按最小的手机算
+    labelMedium = TextStyle(fontWeight = FontWeight.Medium, fontSize = 12.5.sp, letterSpacing = 0.3.sp),
+    labelSmall = TextStyle(fontSize = 12.sp, lineHeight = 17.sp, letterSpacing = 0.3.sp)
 )
+
+/**
+ * 青绿那套的标题字体：霞鹜文楷。
+ *
+ * 完整字库十九兆，为了一套主题的标题背那么一大包不值，所以子集到 App 里
+ * 真正会出现的字（约一千二百个）。金额那一档故意不换 —— 楷体的数字是
+ * 比例宽度，列表里金额会左右跳，而且数字本来就是无衬线的更清楚。
+ */
+private val WenKai = FontFamily(Font(R.font.wenkai))
+
+private val typographySerif = typography.copy(
+    headlineLarge = typography.headlineLarge.copy(
+        fontFamily = WenKai, fontWeight = FontWeight.Normal,
+        fontSize = 27.sp, letterSpacing = 0.8.sp
+    ),
+    headlineSmall = typography.headlineSmall.copy(
+        fontFamily = WenKai, fontWeight = FontWeight.Normal,
+        fontSize = 20.sp, letterSpacing = 0.6.sp
+    ),
+    titleLarge = typography.titleLarge.copy(
+        fontFamily = WenKai, fontWeight = FontWeight.Normal,
+        fontSize = 18.sp, letterSpacing = 0.5.sp
+    ),
+    titleMedium = typography.titleMedium.copy(
+        fontFamily = WenKai, fontWeight = FontWeight.Normal,
+        fontSize = 16.sp, letterSpacing = 0.3.sp
+    ),
+    titleSmall = typography.titleSmall.copy(
+        fontFamily = WenKai, fontWeight = FontWeight.Normal
+    )
+)
+
 
 @Composable
 fun DingZhangTheme(content: @Composable () -> Unit) {
@@ -135,7 +173,7 @@ fun DingZhangTheme(content: @Composable () -> Unit) {
 
     MaterialTheme(
         colorScheme = scheme,
-        typography = typography,
+        typography = if (pack.serifTitle) typographySerif else typography,
         shapes = shapes,
         content = content
     )
