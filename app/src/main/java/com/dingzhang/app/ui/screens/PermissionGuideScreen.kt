@@ -3,6 +3,7 @@ package com.dingzhang.app.ui.screens
 import android.content.Context
 import android.content.Intent
 import android.provider.Settings
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -58,6 +59,9 @@ fun PermissionGuideScreen(onClose: () -> Unit) {
     val mine = remember { RomGuides.currentId() }
     var romId by remember { mutableStateOf(mine) }
     val g = RomGuides.byId(romId)
+
+    // 系统返回键和侧滑返回也得关这一页。没有这一句，按返回直接把整个 App 退掉了
+    BackHandler { onClose() }
 
     Column(
         Modifier

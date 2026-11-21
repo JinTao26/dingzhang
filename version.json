@@ -1,15 +1,14 @@
 {
-  "version": "0.5.37",
-  "notes": "「我的」页瘦身：开权限的步骤全部挪到单独一页，通道说明压成一句。最后一支主题改成水墨，标题换成毛笔行楷。",
-  "apk": "https://github.com/JinTao26/dingzhang/releases/download/v0.5.37/dingzhang.apk",
-  "page": "https://github.com/JinTao26/dingzhang/releases/tag/v0.5.37",
-  "published_at": "2026-11-21T07:20:00Z",
+  "version": "0.5.38",
+  "notes": "「怎么开权限」的返回不再退出 App；毛笔字只留在页面大标题和卡片题头上，商户名不再混字形；水乡夜和水墨的卡片各自再透一档。",
+  "apk": "https://github.com/JinTao26/dingzhang/releases/download/v0.5.38/dingzhang.apk",
+  "page": "https://github.com/JinTao26/dingzhang/releases/tag/v0.5.38",
+  "published_at": "2026-11-21T07:55:00Z",
   "highlights": [
-    "「我的」里的自动记账通道只留一句状态，不再一圈圈展开一堆步骤",
-    "开权限的完整路径收进单独一页：「怎么开这些权限」",
-    "通道说明不再列举淘宝、拼多多这类 App，只说能读什么",
-    "最后一支主题改成水墨：墨写的山，赭石和花青各点到为止",
-    "水墨那套的标题换成毛笔行楷，像画上题字",
-    "主题名从「青绿」改成「水墨」"
+    "「怎么开这些权限」按返回只回上一页，不会再退出整个 App",
+    "毛笔字只用在页面大标题和卡片题头上，商户名、分类名回到正文字体",
+    "水乡夜、水墨的卡片各自再透一档（0.62 / 0.72），灯笼和山透得上来",
+    "弹层和输入框也跟着半透，但比卡片实一点，保证能读",
+    "背景蒙版加重一档，给透出来的字垫底"
   ]
 }

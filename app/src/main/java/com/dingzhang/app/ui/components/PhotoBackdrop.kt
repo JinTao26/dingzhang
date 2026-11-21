@@ -35,18 +35,18 @@ fun PhotoBackdrop(resId: Int, light: Boolean = false, modifier: Modifier = Modif
                 // 暗色主题压黑，浅色主题压白 —— 浅底上的深色字，只能靠白雾把图推远
                 if (light) {
                     Brush.verticalGradient(
-                        0.00f to Color(0x3CFFFFFF),
-                        0.50f to Color(0x60FFFFFF),
-                        1.00f to Color(0x8CFFFFFF)
+                        0.00f to Color(0x50FFFFFF),
+                        0.50f to Color(0x70FFFFFF),
+                        1.00f to Color(0x92FFFFFF)
                     )
                 } else {
                     // 蒙版比之前松：原来底下一路压到 0xA6，图本身又是压暗过的，
                     // 两层叠起来就是一团黑，得把手机亮度拉满才看得见。现在图留亮，
                     // 蒙版只负责把白字托住
                     Brush.verticalGradient(
-                        0.00f to Color(0x14000000),
-                        0.50f to Color(0x2E000000),
-                        1.00f to Color(0x5A000000)
+                        0.00f to Color(0x26000000),
+                        0.50f to Color(0x46000000),
+                        1.00f to Color(0x74000000)
                     )
                 }
             )

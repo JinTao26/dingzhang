@@ -110,7 +110,7 @@ object ThemePacks {
         warn = Color(0xFFE8A33C), warnSoft = Color(0xFF3A2C14),
         expense = Color(0xFFF08070), income = Color(0xFF7FD6B0),
         rLarge = 16, rMedium = 12, rSmall = 8,
-        backdrop = "rivernight", cardAlpha = 0.72f
+        backdrop = "rivernight", cardAlpha = 0.62f
     )
 
     /**
@@ -132,7 +132,7 @@ object ThemePacks {
         warn = Color(0xFFBF863A), warnSoft = Color(0xFFF8EFDD),
         expense = Color(0xFFB24A36), income = Color(0xFF2C7659),
         rLarge = 12, rMedium = 8, rSmall = 6,
-        backdrop = "qinglv", cardAlpha = 0.76f, serifTitle = true
+        backdrop = "qinglv", cardAlpha = 0.72f, serifTitle = true
     )
 
     val ALL = listOf(SAKURA, STARFIELD, MINT, RIVERNIGHT, QINGLV)

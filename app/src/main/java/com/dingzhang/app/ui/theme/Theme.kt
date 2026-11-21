@@ -54,6 +54,15 @@ object Dz {
     val Income: Color get() = p.income
 }
 
+/**
+ * 弹层、输入框、底部面板用的「面」色。
+ *
+ * 它比卡片再实一档：卡片只是衬在画上，弹层是真要读字的地方 ——
+ * 跟卡片一样透的话，对话框里那几行字直接糊在背景上，没法看。
+ */
+private val ThemePack.surface: Color
+    get() = if (cardAlpha >= 1f) card else card.copy(alpha = (cardAlpha + 0.22f).coerceAtMost(0.96f))
+
 private fun schemeOf(p: ThemePack) = if (p.dark) {
     darkColorScheme(
         primary = p.primary,
@@ -66,7 +75,7 @@ private fun schemeOf(p: ThemePack) = if (p.dark) {
         tertiary = p.accent,
         background = p.bg,
         onBackground = p.ink,
-        surface = p.card,
+        surface = p.surface,
         onSurface = p.ink,
         surfaceVariant = p.primarySoft,
         onSurfaceVariant = p.inkSoft,
@@ -85,7 +94,7 @@ private fun schemeOf(p: ThemePack) = if (p.dark) {
         tertiary = p.accent,
         background = p.bg,
         onBackground = p.ink,
-        surface = p.card,
+        surface = p.surface,
         onSurface = p.ink,
         surfaceVariant = p.primarySoft,
         onSurfaceVariant = p.inkSoft,
@@ -139,13 +148,6 @@ private val typographySerif = typography.copy(
         fontFamily = BiMo, fontWeight = FontWeight.Normal,
         fontSize = 18.5.sp, letterSpacing = 0.9.sp
     ),
-    titleMedium = typography.titleMedium.copy(
-        fontFamily = BiMo, fontWeight = FontWeight.Normal,
-        fontSize = 16.sp, letterSpacing = 0.6.sp
-    ),
-    titleSmall = typography.titleSmall.copy(
-        fontFamily = BiMo, fontWeight = FontWeight.Normal
-    )
 )
 
 
