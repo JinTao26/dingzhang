@@ -117,33 +117,34 @@ private val typography = Typography(
 )
 
 /**
- * 青绿那套的标题字体：霞鹜文楷。
+ * 水墨那套的标题字体：马善政毛笔行楷。
  *
- * 完整字库十九兆，为了一套主题的标题背那么一大包不值，所以子集到 App 里
- * 真正会出现的字（约一千二百个）。金额那一档故意不换 —— 楷体的数字是
- * 比例宽度，列表里金额会左右跳，而且数字本来就是无衬线的更清楚。
+ * 要的是「画上题字」那个劲，不是印刷楷体 —— 笔画连带、起收有锋，字距要松，
+ * 压得太紧就变成宋体了。只换标题层：金额一律不换，毛笔数字是比例宽度，
+ * 列表里金额会左右跳，而且数字本来就该是无衬线的。
+ * 全字库五兆多，子集到 App 里会出现的字（约一千二百个），不到八百 KB。
  */
-private val WenKai = FontFamily(Font(R.font.wenkai))
+private val BiMo = FontFamily(Font(R.font.mashan))
 
 private val typographySerif = typography.copy(
     headlineLarge = typography.headlineLarge.copy(
-        fontFamily = WenKai, fontWeight = FontWeight.Normal,
-        fontSize = 27.sp, letterSpacing = 0.8.sp
+        fontFamily = BiMo, fontWeight = FontWeight.Normal,
+        fontSize = 28.sp, letterSpacing = 1.6.sp
     ),
     headlineSmall = typography.headlineSmall.copy(
-        fontFamily = WenKai, fontWeight = FontWeight.Normal,
-        fontSize = 20.sp, letterSpacing = 0.6.sp
+        fontFamily = BiMo, fontWeight = FontWeight.Normal,
+        fontSize = 21.sp, letterSpacing = 1.2.sp
     ),
     titleLarge = typography.titleLarge.copy(
-        fontFamily = WenKai, fontWeight = FontWeight.Normal,
-        fontSize = 18.sp, letterSpacing = 0.5.sp
+        fontFamily = BiMo, fontWeight = FontWeight.Normal,
+        fontSize = 18.5.sp, letterSpacing = 0.9.sp
     ),
     titleMedium = typography.titleMedium.copy(
-        fontFamily = WenKai, fontWeight = FontWeight.Normal,
-        fontSize = 16.sp, letterSpacing = 0.3.sp
+        fontFamily = BiMo, fontWeight = FontWeight.Normal,
+        fontSize = 16.sp, letterSpacing = 0.6.sp
     ),
     titleSmall = typography.titleSmall.copy(
-        fontFamily = WenKai, fontWeight = FontWeight.Normal
+        fontFamily = BiMo, fontWeight = FontWeight.Normal
     )
 )
 

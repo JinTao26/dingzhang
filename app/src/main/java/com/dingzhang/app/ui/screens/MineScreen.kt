@@ -91,7 +91,12 @@ import com.dingzhang.app.update.UpdateDownloader
 import kotlinx.coroutines.launch
 
 @Composable
-fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
+fun MineScreen(
+    data: AppData,
+    month: String,
+    onMonthChange: (String) -> Unit,
+    onOpenGuide: () -> Unit = {}
+) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     val settings = IngestPipeline.settings
@@ -325,7 +330,7 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
 
             ChannelRow(
                 title = "无障碍读取",
-                desc = "读微信 / 支付宝的支付结果页和账单详情页；淘宝、闲鱼、京东、拼多多里直接付掉的钱也能认出来。能拿到商户、金额和单号",
+                desc = "读支付结果页和账单详情，最准也最实时",
                 systemGranted = a11yOn,
                 appEnabled = settings?.accessibilityChannel ?: true,
                 onToggle = { v ->
@@ -356,7 +361,7 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
             Spacer(Modifier.height(6.dp))
             ChannelRow(
                 title = "通知监听",
-                desc = "解析支付通知做实时兜底。部分机型微信只推「支付凭证」不带金额，所以只当补充",
+                desc = "读支付通知做兜底，有的机型不带金额",
                 systemGranted = nlsOn,
                 appEnabled = settings?.notificationChannel ?: true,
                 onToggle = { v ->
@@ -393,8 +398,7 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                         color = Dz.InkSoft
                     )
                     Text(
-                        "钱不经过微信支付宝的：银行 App 推送、银行公众号、银行短信 · 已开 " +
-                            otherOn + " 条",
+                        "银行推送、公众号、短信 · 已开 " + otherOn + " 条",
                         style = MaterialTheme.typography.labelSmall,
                         color = Dz.InkSoft
                     )
@@ -409,7 +413,7 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                 Spacer(Modifier.height(8.dp))
                 ChannelRow(
                     title = "银行 App 推送",
-                    desc = "POS 直接刷卡、云闪付、银行自动代扣 —— 这些微信支付宝看不见，只有银行会告诉你",
+                    desc = "POS 刷卡、云闪付、自动代扣，只有银行知道",
                     systemGranted = nlsOn,
                     appEnabled = bankPushOn,
                     onToggle = { v ->
@@ -418,19 +422,10 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                     },
                     onGrant = { openSystem(ctx, android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS) }
                 )
-                SetupHints(
-                    steps = listOf(
-                        "在这个银行 App 里打开「动账提醒」或「消息通知」",
-                        "系统设置 → 通知 → 找到该银行 App，允许它发通知",
-                        "别把它的通知折叠或静音（MIUI、OriginOS 会把不常用的单独折叠）",
-                        "注意：银行代扣、POS 刷卡走这条，微信支付宝看不到"
-                    ),
-                    selfTest = "自测：去超市刷卡一次，回来看看采集记录里有没有「记上了」"
-                )
                 Spacer(Modifier.height(6.dp))
                 ChannelRow(
                     title = "银行公众号",
-                    desc = "微信里银行公众号发的动账提醒。消息常被折叠，也容易和微信支付本身的记录重复，默认关",
+                    desc = "微信里银行公众号的动账提醒，默认关",
                     systemGranted = nlsOn,
                     appEnabled = bankWechatOn,
                     onToggle = { v ->
@@ -439,19 +434,10 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                     },
                     onGrant = { openSystem(ctx, android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS) }
                 )
-                SetupHints(
-                    steps = listOf(
-                        "先在微信里关注该行的公众号（没关注就什么都收不到）",
-                        "这个公众号的消息不要设「消息免打扰」——设了微信就不发通知，叮账什么都收不到",
-                        "系统设置里微信的通知要允许（折叠、静音都没关系，别整个关掉）",
-                        "和微信支付本身的记录会重复，重复的自己会合并"
-                    ),
-                    selfTest = "自测：用微信付 0.01 元，回来看看采集记录里有没有相关一条"
-                )
                 Spacer(Modifier.height(6.dp))
                 ChannelRow(
                     title = "银行短信",
-                    desc = "工资到账、线下刷卡这类不经过微信支付宝的钱，从银行动账短信里读。只收实时广播，不读历史短信箱，余额和完整卡号不入库",
+                    desc = "工资到账、线下刷卡，只读实时短信",
                     systemGranted = smsGranted,
                     appEnabled = smsOn,
                     onToggle = { v ->
@@ -464,26 +450,36 @@ fun MineScreen(data: AppData, month: String, onMonthChange: (String) -> Unit) {
                     },
                     onGrant = { smsPermission.launch(Manifest.permission.RECEIVE_SMS) }
                 )
-                SetupHints(
-                    steps = listOf(
-                        "先在银行开通「短信动账提醒」——有的行收费、有的免费，没开就收不到",
-                        "给叮账「短信」权限，上面那个开关会申请",
-                        "只认动账短信，账单提醒、验证码、余额提醒都会被跳过"
-                    ),
-                    selfTest = "自测：转 0.01 元到另一个账户，回来看采集记录"
-                )
-
-                Text(
-                    "这三条还没在你手机上验证过。先按上面自测，不成就把采集记录复制发我。",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Dz.InkSoft,
-                    modifier = Modifier.padding(top = 10.dp, start = 2.dp)
-                )
             }
         }
 
         Spacer(Modifier.height(12.dp))
-        PermissionGuideCard(ctx, a11yOn, nlsOn)
+        // 详细步骤全在帮助页里。这页只留一个入口 —— 以前把七八条路径和自测全摊在这儿，
+        // 「我的」一屏滑半天才到头
+        DzCard(padding = 16.dp) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable { onOpenGuide() },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("怎么开这些权限", style = MaterialTheme.typography.titleMedium, color = Dz.Ink)
+                    Text(
+                        "各家系统的路径不一样，按你手机那一款照着走",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Dz.InkSoft,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
+                Icon(
+                    Icons.Rounded.ChevronRight, null,
+                    tint = Dz.SakuraDeep,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
 
         Spacer(Modifier.height(12.dp))
 
@@ -1436,25 +1432,6 @@ private fun FeedbackPage(ctx: Context, onClose: () -> Unit) {
  * 只写「它干什么」没用 —— 权限只是其中一步，前面还有好几步在别的 App 里。
  */
 @Composable
-private fun SetupHints(steps: List<String>, selfTest: String) {
-    Column(Modifier.padding(start = 4.dp, top = 4.dp, bottom = 2.dp)) {
-        steps.forEach { step ->
-            Text(
-                "· " + step,
-                style = MaterialTheme.typography.labelSmall,
-                color = Dz.InkSoft,
-                modifier = Modifier.padding(bottom = 2.dp)
-            )
-        }
-        Text(
-            selfTest,
-            style = MaterialTheme.typography.labelSmall,
-            color = Dz.Sakura,
-            modifier = Modifier.padding(top = 3.dp)
-        )
-    }
-}
-
 /** 一行通道状态 */
 @Composable
 private fun ChannelStatusLine(name: String, enabled: Boolean, idleMs: Long) {
@@ -1816,104 +1793,6 @@ private fun HelpPage(onClose: () -> Unit) {
  * 所以这里认当前这台手机的品牌，直接给到能照着点的层级，再配一个跳到对应设置页的按钮。
  */
 @Composable
-private fun PermissionGuideCard(ctx: Context, a11yOn: Boolean, nlsOn: Boolean) {
-    val mine = com.dingzhang.app.core.RomGuides.currentId()
-    var romId by remember { mutableStateOf(mine) }
-    val g = com.dingzhang.app.core.RomGuides.byId(romId)
-
-    FoldCard(
-        title = "开权限的具体路径",
-        subtitle = if (romId == mine) "认到你这台是 ${g.label}（${g.rom}）" else "在看 ${g.label} 的路径"
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            com.dingzhang.app.core.RomGuides.all.forEach { r ->
-                val sel = r.id == romId
-                Box(
-                    Modifier
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(if (sel) Dz.Sakura else Dz.Cream)
-                        .clickable { romId = r.id }
-                        .padding(horizontal = 9.dp, vertical = 5.dp)
-                ) {
-                    Text(
-                        r.label,
-                        fontSize = 12.5.sp,
-                        fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal,
-                        color = if (sel) Color.White else Dz.InkSoft,
-                        maxLines = 1
-                    )
-                }
-            }
-        }
-
-        // 安卓从 11 起就把侧载应用的这类高权限锁住了，13 以后更严：从浏览器、聊天软件
-        // 装进来的 App，主动去开无障碍或通知使用权会被系统拦下，表现是「点不动」或者
-        // 弹一句「受限设置」。这一步不放开，下面两步根本开不起来 —— 所以放在最前面。
-        if (android.os.Build.VERSION.SDK_INT >= 30) {
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(top = 10.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Dz.Warn.copy(alpha = 0.12f))
-                    .padding(horizontal = 11.dp, vertical = 9.dp)
-            ) {
-                Text(
-                    "点开关没反应？先把「受限设置」放开",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Dz.Warn
-                )
-                Text(
-                    "从浏览器装的 App 直接开不了，会弹「受限设置」。在同一页右上角点三个点，" +
-                        "选「允许受限制的设置」，再回来点。①② 各做一次。",
-                    fontSize = 12.5.sp,
-                    color = Dz.InkSoft,
-                    lineHeight = 17.sp,
-                    modifier = Modifier.padding(top = 3.dp)
-                )
-            }
-        }
-
-        GuideStep(
-            no = "①",
-            title = "无障碍服务",
-            path = g.a11y,
-            state = if (a11yOn) 1 else 0,
-            actionLabel = if (a11yOn) "已开启" else "去打开",
-            onGo = { openSystem(ctx, android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS) }
-        )
-        GuideStep(
-            no = "②",
-            title = "通知使用权",
-            path = g.nls,
-            state = if (nlsOn) 1 else 0,
-            actionLabel = if (nlsOn) "已开启" else "去打开",
-            onGo = { openSystem(ctx, android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS) }
-        )
-        GuideStep(
-            no = "③",
-            title = "别让它被系统杀掉",
-            path = if (g.keep2.isBlank()) g.keep else g.keep + "\n" + g.keep2,
-            state = -1,
-            actionLabel = "去应用信息",
-            onGo = { openAppInfo(ctx) }
-        )
-
-        Text(
-            "找不到就在设置顶部搜索框搜「无障碍」或「通知使用权」。③ 决定它能不能一直在后台记着，最容易漏。",
-            fontSize = 12.5.sp,
-            color = Dz.InkSoft,
-            modifier = Modifier.padding(top = 10.dp)
-        )
-    }
-}
-
 /** 一条路径。state：1 已开启、0 未开启、-1 没有系统状态可查。 */
 @Composable
 private fun GuideStep(

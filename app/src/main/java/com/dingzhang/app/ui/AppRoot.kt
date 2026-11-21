@@ -66,6 +66,7 @@ import com.dingzhang.app.ui.screens.AddScreen
 import com.dingzhang.app.ui.screens.BillsScreen
 import com.dingzhang.app.ui.screens.HomeScreen
 import com.dingzhang.app.ui.screens.MineScreen
+import com.dingzhang.app.ui.screens.PermissionGuideScreen
 import com.dingzhang.app.ui.screens.StatsScreen
 import com.dingzhang.app.ui.components.PhotoBackdrop
 import com.dingzhang.app.ui.components.StarfieldBackdrop
@@ -267,6 +268,8 @@ fun AppRoot() {
     val hasBackdrop = backdrop != null
     var tab by remember { mutableStateOf(0) }
     var showAdd by remember { mutableStateOf(false) }
+    // 开权限的路径单独一页，「我的」不再被这些步骤撑长
+    var showGuide by remember { mutableStateOf(false) }
     var month by remember { mutableStateOf(Dates.monthOf(System.currentTimeMillis())) }
     // 明细进批量模式时，让「记一笔」的加号躲开，省得压住底部的批量条
     var billsSelect by remember { mutableStateOf(false) }
@@ -337,6 +340,18 @@ fun AppRoot() {
         )
     }
 
+    if (showGuide) {
+        Box(Modifier.fillMaxSize().background(Dz.Cream)) {
+            when (backdrop) {
+                "starfield" -> StarfieldBackdrop(Modifier.fillMaxSize())
+                "rivernight" -> PhotoBackdrop(R.drawable.theme_rivernight, modifier = Modifier.fillMaxSize())
+                "qinglv" -> PhotoBackdrop(R.drawable.theme_qinglv, light = true, modifier = Modifier.fillMaxSize())
+            }
+            PermissionGuideScreen(onClose = { showGuide = false })
+        }
+        return
+    }
+
     if (showAdd) {
         Box(Modifier.fillMaxSize().background(Dz.Cream)) {
             when (backdrop) {
@@ -391,7 +406,11 @@ fun AppRoot() {
                     onSelectModeChange = { billsSelect = it }
                 )
                 2 -> StatsScreen(data, month, onMonthChange = { month = it })
-                else -> MineScreen(data, month, onMonthChange = { month = it })
+                else -> MineScreen(
+                    data, month,
+                    onMonthChange = { month = it },
+                    onOpenGuide = { showGuide = true }
+                )
             }
         }
     }

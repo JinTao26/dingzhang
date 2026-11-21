@@ -114,22 +114,23 @@ object ThemePacks {
     )
 
     /**
-     * 青绿：一张青绿山水 —— 石青石绿罩染的层山，绢面织纹，云气留白。
+     * 水墨：一张墨写的山。
      *
-     * 主色直接用画里的青绿，次色是石青，强调色是山脚的赭石。
-     * 这是五套里唯一带「颜色」的浅色主题，之前几套浅色都是灰的，
-     * 这套是照着老绢本配的：颜色有，但不艳，像旧画挂了很多年之后的那个调。
+     * 以前这套是青绿山水，石青石绿罩得太满，看着像年画。现在墨是主体：
+     * 近石浓墨、中景淡墨、远山化进纸里，颜色只留三处 —— 坡脚的赭石、
+     * 远山一抹花青、还有两粒朱砂。界面上的主色也跟着从青绿收到墨绿，
+     * 强调色就是那点赭石。
      */
     val QINGLV = ThemePack(
-        id = "qinglv", name = "青绿", tagline = "石青石绿罩着的山，绢上旧色", dark = false,
-        primary = Color(0xFF4A7C6F), primaryDeep = Color(0xFF37635A), primarySoft = Color(0xFFE2EDE7),
-        secondary = Color(0xFF6B8FA8), secondarySoft = Color(0xFFE6EEF3),
-        accent = Color(0xFFB08A5A), accentSoft = Color(0xFFF4EADD),
-        bg = Color(0xFFF7F4EA), card = Color(0xFFFFFFFF),
-        ink = Color(0xFF232824), inkSoft = Color(0xFF57645D), inkFaint = Color(0xFF87938C),
-        line = Color(0xFFE4E6DC),
-        warn = Color(0xFFC08A3E), warnSoft = Color(0xFFF8EEDC),
-        expense = Color(0xFFB84C38), income = Color(0xFF2F7A5E),
+        id = "qinglv", name = "水墨", tagline = "墨写的山，留白比墨多", dark = false,
+        primary = Color(0xFF3A4440), primaryDeep = Color(0xFF28302C), primarySoft = Color(0xFFE6E9E3),
+        secondary = Color(0xFF6E8085), secondarySoft = Color(0xFFE9EFF0),
+        accent = Color(0xFFAE8A5C), accentSoft = Color(0xFFF3E8DA),
+        bg = Color(0xFFFAF9F5), card = Color(0xFFFFFFFF),
+        ink = Color(0xFF1D2320), inkSoft = Color(0xFF4E5651), inkFaint = Color(0xFF7E8782),
+        line = Color(0xFFE3E6DF),
+        warn = Color(0xFFBF863A), warnSoft = Color(0xFFF8EFDD),
+        expense = Color(0xFFB24A36), income = Color(0xFF2C7659),
         rLarge = 12, rMedium = 8, rSmall = 6,
         backdrop = "qinglv", cardAlpha = 0.76f, serifTitle = true
     )
