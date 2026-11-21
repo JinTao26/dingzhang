@@ -1427,11 +1427,6 @@ private fun FeedbackPage(ctx: Context, onClose: () -> Unit) {
     }
 }
 
-/**
- * 「要用这条通道，你还得先去开这些」。
- * 只写「它干什么」没用 —— 权限只是其中一步，前面还有好几步在别的 App 里。
- */
-@Composable
 /** 一行通道状态 */
 @Composable
 private fun ChannelStatusLine(name: String, enabled: Boolean, idleMs: Long) {
@@ -1787,12 +1782,6 @@ private fun HelpPage(onClose: () -> Unit) {
     }
 }
 
-/** 默认收起的说明卡：点标题展开，省得整页太长 */
-/**
- * 开权限的具体路径。同一个开关各家藏在不同地方、叫不同名字，纯文字讲一遍没人找得到，
- * 所以这里认当前这台手机的品牌，直接给到能照着点的层级，再配一个跳到对应设置页的按钮。
- */
-@Composable
 /** 一条路径。state：1 已开启、0 未开启、-1 没有系统状态可查。 */
 @Composable
 private fun GuideStep(
