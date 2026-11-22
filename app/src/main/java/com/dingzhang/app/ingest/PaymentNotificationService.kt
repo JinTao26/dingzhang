@@ -100,10 +100,16 @@ class PaymentNotificationService : NotificationListenerService() {
                 val bankTag = if (pkg == PaymentNotifierParser.PKG_WECHAT && looksLikeBankAccount(title)) {
                     "银行公众号 · "
                 } else ""
+                // 支付宝、购物 App 的通知里全是账单信息，把正文摘要也带上：
+                // 「收到了、带金额、还是没记上」这种时候，没有正文就只能靠猜。
+                // 微信那条不动 —— 同一个包里会混进聊天内容
+                val snippet = if (pkg == PaymentNotifierParser.PKG_ALIPAY || isShopping) {
+                    " · 「" + text.take(30) + "」"
+                } else ""
                 IngestLog.addProbe(
                     "通知", "收到一条",
                     bankTag + PaymentNotifierParser.appLabel(pkg) + " · 标题「" + title.take(12) + "」 · " +
-                        text.length + " 字 · " + (if (hasAmount) "带金额" else "不带金额")
+                        text.length + " 字 · " + (if (hasAmount) "带金额" else "不带金额") + snippet
                 )
             }
         }

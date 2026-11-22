@@ -104,6 +104,10 @@ object PaymentNotifierParser {
     private val AMOUNT_WITH_YUAN = Regex("([0-9][0-9,]*(?:\\.[0-9]{1,2})?)\\s*元")
     /** 少数银行 App / 境外卡通知写成 CNY32.00、RMB 32 */
     private val AMOUNT_WITH_CODE = Regex("(?:CNY|RMB)\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)")
+    /** 「金额 / 实付 / 合计」后面的数字，单位可能一个都没有 */
+    private val BARE_AMOUNT = Regex(
+        "(金额|实付|实付款|合计|交易额|支付金额)\\s*[:：]?\\s*[¥￥]?\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)"
+    )
 
     private val incomeCues = listOf(
         "收款到账", "收款成功", "已收款", "到账", "入账", "退款到账", "已退回", "收入到账",
@@ -112,6 +116,9 @@ object PaymentNotifierParser {
     )
     private val expenseCues = listOf(
         "支付成功", "付款成功", "已支付", "已付款", "扣款", "消费", "付款", "支付",
+        // 支付宝的「交易提醒」不写「支付成功」，写的是「你有一笔支出」「消费成功」。
+        // 少了这几个词，一条 44 字、金额清清楚楚的通知会被整条判成「不是支付」扔进回收站
+        "支出", "支出成功", "消费成功", "已扣款", "笔支出", "交易成功",
         // 发红包 / 转给朋友：这是实打实花出去的钱
         "发红包", "发出红包", "已转账给", "转账给"
     )
@@ -128,7 +135,10 @@ object PaymentNotifierParser {
     /** 这些通知肯定不是一笔消费，先挡掉，省得后面误判。 */
     private val noise = listOf(
         "验证码", "登录", "优惠券", "红包雨", "活动", "升级", "版本更新", "为您推荐",
-        "账单已出", "还款提醒", "待还款", "即将到期", "签到", "积分"
+        "账单已出", "还款提醒", "待还款", "即将到期", "签到", "积分",
+        // 「活动」原来是单字一刀切，打车、外卖的通知里常带「参与活动」「活动详情」，
+        // 真金白银的扣款也跟着被砍掉。收窄成三个明确的营销说法
+        "限时活动", "活动规则", "活动详情"
     )
 
     private val payeePatterns = listOf(
@@ -136,6 +146,9 @@ object PaymentNotifierParser {
         Regex("付款给(.{2,24}?)(?:\\s|，|,|$|。|的)"),
         Regex("在(.{2,24}?)(?:消费|付款|支付)"),
         Regex("(?:收款方|商户名称|交易对方|对方)[:：\\s]\\s*(.{2,24}?)(?:\\s|，|,|$|。|\\n)"),
+        // 「你有一笔 12.00 元的支出，来自高德打车」—— 打车、外卖这类第三方下单常写「来自」，
+        // 只认「向 XX 付款」会把商户名整段漏掉，最后记成「支付宝」
+        Regex("来自(.{2,20}?)(?:的|，|,|$|。|\\s)"),
         Regex("微信支付[\\-—]\\s*(.{2,24}?)(?:\\s|，|,|$|。|\\n)"),
         Regex("付款[\\-—]\\s*(.{2,24}?)(?:\\s|，|,|$|。|\\n)")
     )
@@ -265,7 +278,10 @@ object PaymentNotifierParser {
         // （「退款提醒：¥1.48」）一个词都不沾，明明带着金额也被判成「不是支付」扔掉。
         // 退回的钱也是钱，而且它决定这笔支出最后算多少。
         val isRefund = refundCues.any { corpus.contains(it) }
-        if (!isIncome && !isExpense && !isTransfer && !isOutgoing && !isRefund) return null
+        // 「交易成功」这种话术写在 strongPayCues 里，却没进 expenseCues，结果在下面这道闸
+        // 被当成「不是支付」扔掉 —— 白底上写着成交，人却以为没付过
+        val strongPay = strongPayCues.any { corpus.contains(it) }
+        if (!isIncome && !isExpense && !isTransfer && !isOutgoing && !isRefund && !strongPay) return null
 
         val amount = extractAmount(corpus) ?: return null
 
@@ -292,7 +308,7 @@ object PaymentNotifierParser {
             // 提现、还款、零钱转余额：钱只是换了位置，不进收支统计
             isTransfer -> TxnKind.TRANSFER
             isIncome && !isExpense -> TxnKind.INCOME
-            isExpense || isOutgoing -> TxnKind.EXPENSE
+            isExpense || isOutgoing || strongPay -> TxnKind.EXPENSE
             // 只写「转账成功」看不出方向时按支出处理：收钱那一侧一般会带「已收款 / 收款到账」
             else -> TxnKind.EXPENSE
         }
@@ -333,6 +349,13 @@ object PaymentNotifierParser {
         }
         AMOUNT_WITH_CODE.find(sanitized)?.let { m ->
             Money.parseToCents(m.groupValues[1])?.let { if (it > 0) return it }
+        }
+        // 最后一档：有明确成交话术，金额却是光秃秃一个数（「金额 12.00」「实付12.00」）。
+        // 只认这几种限定词后面的数字，裸数字一概不碰 —— 通知里数字太多了
+        if (strongPayCues.any { sanitized.contains(it) }) {
+            BARE_AMOUNT.find(sanitized)?.let { m ->
+                Money.parseToCents(m.groupValues[2])?.let { if (it > 0) return it }
+            }
         }
         return null
     }
