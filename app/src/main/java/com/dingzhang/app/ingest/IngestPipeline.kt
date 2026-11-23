@@ -180,6 +180,21 @@ object IngestPipeline {
             val b = d.externalId
             !(a != null && b != null && a != b)
         }
+        // 支付宝/微信绑卡付款时，同一笔钱会走两遍：支付 App 记一条，银行再推一条。
+        // 两条都留着，用户翻流水看到的就是一倍的数字 —— 这是「重复记录」里最难解释的一种，
+        // 因为两条各自都是真的，只是同一笔。
+        // 银行这条如果对得上 20 分钟内支付宝/微信同金额、同方向的记录，直接不记，保留支付那条
+        // （支付那条带真商户名）。银行卡直接刷卡、代扣、工资到账不会有支付 App 的记录，不会被误吞。
+        if (dup == null && c.wallet == Wallet.BANK && c.source != Source.BILL_IMPORT) {
+            val payKind = (c.kindHint ?: TxnKind.EXPENSE).db
+            val sibling = listOf(Wallet.ALIPAY, Wallet.WECHAT).firstNotNullOfOrNull { w ->
+                dao.findNearDuplicate(w, c.amountCents, c.occurredAt, DUP_WINDOW_MS, kindDb = payKind)
+            }
+            if (sibling != null) {
+                Log.d(TAG, "银行提醒与支付通道重合，不重复记：${c.payee} ${c.amountCents / 100.0} -> #${sibling.id}")
+                return Outcome(false, "支付宝/微信已记过同一笔，银行这条不重复记", sibling, merged = true)
+            }
+        }
         if (dup != null) {
             val incomingIsBill = c.source == Source.BILL_IMPORT
             val existingIsBill = dup.source == Source.BILL_IMPORT

@@ -26,8 +26,20 @@ object BankAlertParser {
     private val amountRe = Regex("""([0-9][0-9,]{0,12}(?:\.[0-9]{1,2})?)\s*元""")
     /** 有的银行不写「元」，直接「¥1.48」。没有这一条，整类都认不出 */
     private val amountYenRe = Regex("""(?:¥|￥)\s*([0-9][0-9,]{0,12}(?:\.[0-9]{1,2})?)""")
+    /**
+     * 宁波银行写「交易金额 人民币2.00」—— 既没有「元」也没有「¥」，
+     * 上面两个正则一个都匹配不上，整条动账直接 return null。
+     * 这是这条银行通道「从来没成功过」的最主要原因。
+     */
+    private val amountRmbRe = Regex("""人民币\s*([-+]?\s*[0-9][0-9,]*(?:\.[0-9]{1,2})?)""")
+    /** 「交易金额 人民币2.00」这种标签紧跟金额的写法最准，优先用 */
+    private val amountLabelRe = Regex("""(?:交易金额|发生金额|金额)\s*[:：]?\s*(?:人民币)?\s*([-+]?\s*[0-9][0-9,]*(?:\.[0-9]{1,2})?)""")
     private val tailRe = Regex("""(?:尾号|卡号末四位|卡号后四位|账户末四位)[：:\s]*(\d{4})""")
-    private val merchantRe = Regex("""(?:商户|商户名称|交易场所|收款方)[：:]\s*([^，,。；;、\s]+)""")
+    /**
+     * 「交易对象 驴充充」「商户名称：XX」—— 冒号可有可无。
+     * 宁波银行的卡片根本不写冒号，老正则要求 [：:] 必须存在，整段商户名全抓不到。
+     */
+    private val merchantRe = Regex("""(?:商户|商户名称|交易场所|收款方|交易对象)[：:]?\s*([^，,。；;、\s¥]+)""")
     private val balanceCut = Regex("""(?:余额|可用余额|账户余额)""")
     private val longDigits = Regex("""\d{9,}""")
     private val dateTimeRe = Regex("""(\d{1,2})月(\d{1,2})日\s*(\d{1,2})[:：](\d{2})""")
@@ -39,7 +51,10 @@ object BankAlertParser {
      */
     private val notTxn = listOf(
         "应还", "待还", "还款日", "账单日", "账单已出", "额度", "验证码", "请于", "即将",
-        "剩余可用", "可用额度不足", "累计积分", "活动", "优惠券", "推送通知已关闭", "退订"
+        "剩余可用", "可用额度不足", "累计积分", "优惠券", "推送通知已关闭", "退订",
+        // 「活动」原来是单字一刀切，可银行动账提醒的尾巴上常常挂着「参与活动享立减」，
+        // 真金白银的扣款也跟着被砍。收窄成三个明确的营销说法
+        "限时活动", "活动规则", "活动详情", "活动期间"
     )
 
     private val incomeWords = listOf("工资", "入账", "收入", "存入", "转入", "到账", "汇入", "返现", "奖励")
@@ -79,10 +94,14 @@ object BankAlertParser {
         val cutAt = balanceCut.find(flat)?.range?.first ?: flat.length
         val head = flat.substring(0, cutAt)
 
-        val amountText = amountRe.find(head)?.groupValues?.get(1)
+        val amountText = amountLabelRe.find(head)?.groupValues?.get(1)
+            ?: amountRe.find(head)?.groupValues?.get(1)
             ?: amountYenRe.find(head)?.groupValues?.get(1)
+            ?: amountRmbRe.find(head)?.groupValues?.get(1)
             ?: return null
-        val cents = Money.parseToCents(amountText) ?: return null
+        // 退款那笔写「人民币-1.48」，负号是方向不是金额，取绝对值再交给 kind 判方向
+        val cents = Money.parseToCents(amountText.replace(" ", ""))?.let { kotlin.math.abs(it) }
+            ?: return null
         if (cents <= 0) return null
 
         val kind = when {

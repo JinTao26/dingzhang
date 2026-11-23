@@ -212,11 +212,15 @@ class PaymentNotificationService : NotificationListenerService() {
             } else if (looksBank) {
                 // 银行这条一直是个哑巴：认不出就什么都不留，用户只看到「一笔都没记」。
                 // 这里写清楚它到过、有没有金额、正文多长，排查才有起点。
+                // 「不带金额」只说明没金额，看不出它到底写了什么。
+                // 抄前 40 个字，并把 5 位以上连续数字换成 ***（卡号后四位、余额、流水号都不外露）
+                val masked = text.take(40).replace(Regex("\\d{5,}"), "***")
                 IngestLog.add(
                     "通知", "银行通知没认出",
                     "标题「${title.take(10)}」· 读到 ${snap.fields.ifBlank { "空" }}" +
                         " · 正文 ${text.length} 字" +
-                        (if (text.contains("¥") || text.contains("元")) " · 带金额" else " · 不带金额")
+                        (if (text.contains("¥") || text.contains("元")) " · 带金额" else " · 不带金额") +
+                        (if (masked.isNotBlank()) " · 正文「$masked」" else "")
                 )
             }
             return
