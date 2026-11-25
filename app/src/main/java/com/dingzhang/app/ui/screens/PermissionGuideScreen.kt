@@ -165,6 +165,16 @@ fun PermissionGuideScreen(onClose: () -> Unit) {
                 note = "误手清了后台就收不到消息",
                 onGo = { goAppInfo(ctx) }
             )
+            // 只在系统真有这个开关的 ROM 上出现。用户反馈「开了一阵子又失效」，
+            // 十条里有八条是这条 —— 系统嫌它闲着就把无障碍关了
+            if (g.a11yAutoOff.isNotBlank()) {
+                Spacer(Modifier.height(12.dp))
+                PathStep(
+                    no = "④", title = "无障碍会被系统自己关掉", path = g.a11yAutoOff,
+                    note = "开了几天又失效，八成是这里",
+                    onGo = { go(ctx, Settings.ACTION_ACCESSIBILITY_SETTINGS) }
+                )
+            }
             Spacer(Modifier.height(12.dp))
             Text(
                 "开完回「我的」看看三个通道是不是都显示「已连接」。第一次建议各付一笔 0.01 元试一试。",

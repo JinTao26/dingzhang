@@ -70,7 +70,9 @@ fun HomeScreen(
     data: AppData,
     month: String,
     onMonthChange: (String) -> Unit,
-    onGoTab: (Int) -> Unit
+    onGoTab: (Int) -> Unit,
+    /** 无障碍掉了时点提示条去哪 —— 直接进「怎么开这些权限」那一页，不甩给用户一个系统设置页 */
+    onOpenGuide: () -> Unit = {}
 ) {
     var showPicker by remember { mutableStateOf(false) }
     var pickTxn by remember { mutableStateOf<Txn?>(null) }
@@ -328,6 +330,45 @@ fun HomeScreen(
                     color = Dz.Ink,
                     modifier = Modifier.padding(start = 8.dp).weight(1f)
                 )
+                Icon(Icons.Rounded.ChevronRight, null, tint = Dz.Warn, modifier = Modifier.size(18.dp))
+            }
+        }
+
+        // ---------- 无障碍掉了 ----------
+        // 澎湃/EMUI 会自己把无障碍关掉：闲置自动关闭、开省电、安全中心一键清理、
+        // 重启后受限设置重置，都会。用户只会觉得「怎么又突然不记了」。
+        // 所以这里说一句，点一下直接去授权页。
+        val a11yRevoked = remember(data.monthCount, month) {
+            runCatching {
+                // 授过 adb 权限的话先自己写回去，写成功了就不用拿这条提示烦用户
+                com.dingzhang.app.ingest.ChannelHealth.tryRestoreA11y(ctx)
+                com.dingzhang.app.ingest.ChannelHealth.a11yRevoked(ctx)
+            }.getOrDefault(false)
+        }
+        if (a11yRevoked) {
+            Spacer(Modifier.height(12.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Dz.WarnSoft)
+                    .clickable { onOpenGuide() }
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Rounded.ErrorOutline, null, tint = Dz.Warn, modifier = Modifier.size(20.dp))
+                Column(Modifier.padding(start = 8.dp).weight(1f)) {
+                    Text(
+                        "无障碍被系统关掉了",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Dz.Ink
+                    )
+                    Text(
+                        "付款不会再自动记上，点这里重新打开",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Dz.InkSoft
+                    )
+                }
                 Icon(Icons.Rounded.ChevronRight, null, tint = Dz.Warn, modifier = Modifier.size(18.dp))
             }
         }

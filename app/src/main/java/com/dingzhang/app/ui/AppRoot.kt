@@ -399,7 +399,12 @@ fun AppRoot() {
                 .padding(pad)
         ) {
             when (tab) {
-                0 -> HomeScreen(data, month, onMonthChange = { month = it }, onGoTab = { tab = it })
+                0 -> HomeScreen(
+                    data, month,
+                    onMonthChange = { month = it },
+                    onGoTab = { tab = it },
+                    onOpenGuide = { showGuide = true }
+                )
                 1 -> BillsScreen(
                     data, month,
                     onMonthChange = { month = it },

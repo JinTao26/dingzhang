@@ -77,6 +77,56 @@ object ChannelHealth {
      * 勾着，但很久没收到过任何事件 —— 多半是被系统停了。
      * 只在「以前收到过」时才判断，避免刚装好还没用过就误报。
      */
+    /**
+     * 授权「掉了」：以前确实跑过（有心跳落盘），现在系统里却勾不上了。
+     *
+     * 这跟「从来不认识这功能」是两回事 —— 前者要提醒，后者闭嘴。
+     * 澎湃/EMUI 这类系统会自己关无障碍：闲置自动关闭、省电模式、
+     * 安全中心一键清理、重启后受限设置重置，都会出现这种情况。
+     * 用户那边只会觉得「怎么又突然不记了」，所以首页要说一句。
+     */
+    /** 我们自己那个无障碍服务的组件名，写进系统设置时要用这种 "包名/类名" 形式 */
+    private fun a11yComponent(ctx: Context): String =
+        android.content.ComponentName(ctx, PaymentAccessibilityService::class.java)
+            .flattenToString()
+
+    /**
+     * 尝试把被系统关掉的无障碍自己写回去。
+     *
+     * 需要用户用 adb 授过一次 WRITE_SECURE_SETTINGS：
+     * `adb shell pm grant com.dingzhang.app android.permission.WRITE_SECURE_SETTINGS`
+     * 没授过就写不进去，这里直接返回 false，调用方照常走「首页提示 → 点一下去开」。
+     *
+     * 只往前加，不改别的服务的条目：系统里可能还勾着 TalkBack 之类的东西，
+     * 覆盖整串会把别人的开关弄丢，那是比不记账严重得多的事故。
+     */
+    fun tryRestoreA11y(ctx: Context): Boolean {
+        // 从没开过就不去碰系统设置：那是用户自己的选择，不是「掉了」
+        val settings = IngestPipeline.settings ?: return false
+        if (settings.a11yLastAt <= 0L) return false
+        if (a11yEnabled(ctx)) return false
+        return try {
+            val cr = ctx.contentResolver
+            val self = a11yComponent(ctx)
+            val cur = Settings.Secure.getString(cr, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES).orEmpty()
+            if (cur.split(':').any { it.trim().equals(self, true) }) return false
+            val next = (cur.split(':').filter { it.isNotBlank() } + self).joinToString(":")
+            Settings.Secure.putString(cr, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, next)
+            Settings.Secure.putInt(cr, Settings.Secure.ACCESSIBILITY_ENABLED, 1)
+            Log.i(TAG, "无障碍被系统关掉了，已自己写回去")
+            true
+        } catch (t: Throwable) {
+            // 多数情况是 SecurityException：没有 WRITE_SECURE_SETTINGS
+            Log.d(TAG, "无障碍无法自愈（没授 adb 权限）：${t.javaClass.simpleName}")
+            false
+        }
+    }
+
+    fun a11yRevoked(ctx: Context): Boolean {
+        val settings = IngestPipeline.settings ?: return false
+        return settings.a11yLastAt > 0L && !a11yEnabled(ctx)
+    }
+
     fun a11yLooksDead(ctx: Context): Boolean {
         if (!a11yEnabled(ctx)) return false
         val last = lastAt(A11Y)

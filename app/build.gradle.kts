@@ -12,10 +12,14 @@ android {
         applicationId = "com.dingzhang.app"
         minSdk = 26          // Android 8.0，覆盖绝大多数在用机型
         targetSdk = 35
-        versionCode = 43
-        versionName = "0.5.40"
+        versionCode = 44
+        versionName = "0.5.41"
         // 只留中文资源，库自带的其他语言翻译全删掉（界面本来就只有中文）
         resourceConfigurations += listOf("zh")
+        // 包里唯一一个 native 库是 Compose 的 libandroidx.graphics.path.so，
+        // 默认打四个 ABI 一共 37 KB，而 26 以上在用的机器几乎全是 arm64。
+        // 只留 arm64-v8a，少 27 KB，也不影响红米 K90 这类机器安装。
+        ndk { abiFilters += listOf("arm64-v8a") }
     }
 
     buildFeatures {

@@ -13,6 +13,12 @@
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- 无障碍会被系统偷偷关掉：闲置自动关闭、开省电、重启后受限设置重置。
+         用户用 adb 授过一次这个权限，App 就能自己把开关写回去，不用每次手动打开。
+         普通安装拿不到它，没有也不影响使用，只是回到「首页提示 + 点一下去开」 -->
+    <uses-permission
+        android:name="android.permission.WRITE_SECURE_SETTINGS"
+        tools:ignore="ProtectedPermissions" />
 
     <!-- Android 11+ 需要显式声明要读取通知/无障碍的宿主包 -->
     <queries>

@@ -22,5 +22,13 @@ class BootReceiver : BroadcastReceiver() {
         } catch (t: Throwable) {
             Log.w("Boot", "开机重绑失败：${t.message}")
         }
+        // 重启后无障碍最容易掉：Android 13 对侧载 App 有受限设置，
+        // 澎湃/EMUI 还可能在开机阶段就把无障碍关掉。授过 adb 权限的话这里直接写回去，
+        // 用户开机后什么都不用做。没授过就是一次快速失败，不会有副作用。
+        try {
+            ChannelHealth.tryRestoreA11y(context)
+        } catch (t: Throwable) {
+            Log.w("Boot", "无障碍自愈失败：${t.message}")
+        }
     }
 }
