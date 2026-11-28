@@ -29,7 +29,7 @@ object CategoryEngine {
         raw: String,
         rules: List<LearnedRule>
     ): Result {
-        val text = sequenceOf(payee, note, raw)
+        val text = sequenceOf(payee, note, stripPromo(raw))
             .filter { it.isNotBlank() }
             .joinToString(" ")
             .trim()
@@ -66,6 +66,24 @@ object CategoryEngine {
 
         // 3. 没命中
         return Result("other", TxnKind.EXPENSE, null, false, 0.24f)
+    }
+
+    /**
+     * 把通知里的营销尾巴剪掉。
+     *
+     * 支付宝的交易提醒经常是「你有一笔20.90元的支出，点击领3元话费券。」——
+     * 分类是拿整段原文去匹配词典的，「话费券」一命中，这笔 20.90 就被归成话费，
+     * 可它跟话费没有半点关系。所以带「点击 / 领取」的那一句整句丢掉，
+     * 只留描述这笔钱本身的句子。别的分句不动 —— 「超市立减 2 元」里的「超市」还得留着。
+     */
+    private fun stripPromo(raw: String): String {
+        if (raw.isBlank()) return raw
+        return raw.split(Regex("[，,。！!；;]"))
+            .filterNot { c ->
+                val t = c.trim()
+                t.contains("点击") || t.contains("领取") || t.contains("立即抢")
+            }
+            .joinToString(" ")
     }
 }
 

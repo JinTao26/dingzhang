@@ -93,6 +93,18 @@ object PaymentNotifierParser {
         // 后者会把「省钱金额已达648.13元」记成一笔支出
     )
 
+    /**
+     * 带营销词的订单值不值得救回来。
+     *
+     * 两个条件必须同时成立：有明确的成交句（支付成功/已支付/实付…），
+     * 并且写着「实付 / 实付款 / 合计 / 支付金额」这类标签。
+     * 只有营销没有成交句的（「省钱金额已达 648.13 元」「红包即将过期」）照样丢。
+     */
+    private fun strictPaidOrder(corpus: String): Boolean {
+        if (strongPayCues.none { corpus.contains(it) }) return false
+        return BARE_AMOUNT.containsMatchIn(corpus)
+    }
+
     /** 出现任何一个就整条不算：这是营销文案、账单提醒、还没付的状态。 */
     private val shoppingNoise = listOf(
         "省钱", "优惠", "立减", "满减", "红包", "优惠券", "领券", "余额", "额度",
@@ -172,8 +184,11 @@ object PaymentNotifierParser {
             .trim()
         if (corpus.isEmpty() || corpus.length > 400) return null
 
-        // 闸一：营销文案、账单提醒、未付款状态，一律不算
-        if (shoppingNoise.any { corpus.contains(it) }) return null
+        // 闸一：营销文案、账单提醒、未付款状态，一律不算。
+        // 但「订单已支付，实付 ¥20.90，优惠 3 元」这种也会被里面的「优惠」一刀切掉，
+        // 丢的是真订单 —— 所以留一条口子：有明确成交句、并且写着「实付/合计」的才放回来。
+        val noisy = shoppingNoise.any { corpus.contains(it) }
+        if (noisy && !strictPaidOrder(corpus)) return null
 
         // 闸二：必须命中明确的成交句
         var amountCents: Long? = null
@@ -192,7 +207,14 @@ object PaymentNotifierParser {
             }
             break
         }
-        val amount = amountCents ?: return null
+        // 走「有营销词但有成交句」那条口子进来的订单，往往不写「支付成功 ¥xx」，
+        // 只写「实付 ¥20.90」，这里用带标签的金额接住
+        val amount = amountCents
+            ?: (if (noisy) {
+                BARE_AMOUNT.find(corpus)?.groupValues?.get(2)
+                    ?.let { Money.parseToCents(it) }?.takeIf { it > 0 }
+            } else null)
+            ?: return null
 
         val isRefund = corpus.contains("退款成功") || corpus.contains("已退款") ||
             corpus.contains("退款到账")
@@ -224,7 +246,9 @@ object PaymentNotifierParser {
 
     private fun defaultShoppingPayee(pkg: String): String = when {
         pkg.contains("jingdong") || pkg.contains("jd.jr") || pkg.contains("jdlite") -> "京东"
-        else -> "网店"
+        // 淘宝、美团、拼多多的订单通知以前全落成「网店」，流水里看不出这笔是谁扣的。
+        // 平台名至少能让人知道该去哪儿找单，也能把分类先归到「购物」
+        else -> appName(pkg).ifBlank { "网店" }
     }
 
     /** 通知里能认出店铺就认，认不出就用平台名。 */

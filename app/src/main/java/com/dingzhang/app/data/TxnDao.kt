@@ -84,6 +84,36 @@ class TxnDao(private val helper: DbHelper) {
         cursor.use { return if (it.moveToFirst()) it.toTxn() else null }
     }
 
+    /**
+     * 不挑钱包的邻近查重。
+     *
+     * 淘宝闪购那笔就是这么重复的：支付宝 SDK 的结果页读一次（钱包 = 支付宝），
+     * 淘宝内嵌收银台又读一次（页面上没写走哪个渠道，钱包 = 未知），
+     * 同一个 159.22、相隔 2 秒，因为钱包名对不上，按钱包查重直接查不到，
+     * 于是记成两笔 —— 用户翻流水看到的就是多扣了一倍的钱。
+     * 只在「有一边说不清钱包」时才用这个，窗口也短，不会把两笔真消费并掉。
+     */
+    fun findNearDuplicateAnyWallet(
+        amountCents: Long,
+        at: Long,
+        windowMs: Long,
+        kindDb: String? = null
+    ): Txn? {
+        val cursor = helper.readableDatabase.rawQuery(
+            "SELECT * FROM txn WHERE amount_cents = ? AND occurred_at BETWEEN ? AND ? " +
+                (if (kindDb != null) "AND kind = ? " else "") +
+                "ORDER BY ABS(occurred_at - ?) ASC LIMIT 1",
+            if (kindDb != null) {
+                arrayOf(amountCents.toString(), (at - windowMs).toString(),
+                    (at + windowMs).toString(), kindDb, at.toString())
+            } else {
+                arrayOf(amountCents.toString(), (at - windowMs).toString(),
+                    (at + windowMs).toString(), at.toString())
+            }
+        )
+        cursor.use { return if (it.moveToFirst()) it.toTxn() else null }
+    }
+
     /** 账单导入命中通知记录：升级成「已对账」，补上交易单号和更准确的商户名。 */
     fun promoteToMatched(id: Long, externalId: String?, payee: String?, account: String?) {
         val cv = ContentValues().apply {

@@ -24,7 +24,14 @@ class PaymentAccessibilityService : AccessibilityService() {
     private val recentPages = ArrayDeque<String>()
     private val handler = Handler(Looper.getMainLooper())
     /** 三次采样的时间点（相对第一次事件）。 */
-    private val probeDelays = longArrayOf(150L, 450L, 1000L)
+    // 淘宝闪购、美团这类「点了确认就直接扣」的付款页，往往只闪一下：
+    // 150ms 才去看第一次，页面已经跳回订单页了。第一次提到 80ms，
+    // 后面再补两次晚的 —— 有的页面是 WebView，文字是慢慢渲染出来的
+    private val probeDelays = longArrayOf(80L, 300L, 900L, 1800L)
+
+    /** 上一次在白名单外撞见付款页的包名，避免同一页反复写诊断 */
+    private var lastOutsiderPkg: String? = null
+    private var lastOutsiderAt = 0L
     @Volatile private var probePkg: String? = null
     @Volatile private var probeStep = 0
     @Volatile private var probeRun: Runnable? = null
@@ -68,7 +75,29 @@ class PaymentAccessibilityService : AccessibilityService() {
         val pkg = e.packageName?.toString() ?: return
         val isDirect = pkg == PaymentNotifierParser.PKG_WECHAT || pkg == PaymentNotifierParser.PKG_ALIPAY
         val isHost = PaymentAccessibilityParser.hostDisplayName(pkg) != null
-        if (!isDirect && !isHost) return
+        if (!isDirect && !isHost) {
+            // 白名单外的 App 也可能是付款页：淘宝闪购这类内嵌容器、小众商家的收银台。
+            // 以前一律 return，用户看到的就是「什么都记不上」，而且连线索都没有。
+            // 这里只在一件事上放行：窗口切换、并且文字里明明白白写着「付完了」。
+            // 只留包名和开头几个字，不读正文、不读聊天。
+            if (e.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+                val lines = e.text?.mapNotNull { it?.toString()?.trim() } ?: emptyList()
+                val paid = lines.any { l -> outsiderPaidCues.any { l.contains(it) } }
+                if (paid) {
+                    val nowTick = System.currentTimeMillis()
+                    if (pkg != lastOutsiderPkg || nowTick - lastOutsiderAt > 120_000L) {
+                        lastOutsiderPkg = pkg
+                        lastOutsiderAt = nowTick
+                        Log.d(TAG, "白名单外的付款页 $pkg")
+                        IngestLog.add(
+                            "无障碍", "白名单外的付款页",
+                            "$pkg · " + lines.take(4).joinToString(" / ").take(80)
+                        )
+                    }
+                }
+            }
+            return
+        }
 
         // 只要这两类事件。购物 App 以前只放行「窗口状态变化」，赌的是收银台是独立窗口 ——
         // 赌错了：得物这类是在同一个 Activity 里弹出支付宝 SDK 的，
@@ -443,6 +472,10 @@ class PaymentAccessibilityService : AccessibilityService() {
 
         /** 事件快照的最小间隔，内容变化事件最快 120ms 一次，没必要每次都走全树 */
         private const val SNAP_MIN_MS = 400L
+        /** 白名单外只看「付完了」这一件事，宁可漏也不能把聊天、商品页抄进采集记录 */
+        private val outsiderPaidCues = listOf(
+            "支付成功", "付款成功", "交易成功", "已支付", "支付完成", "付款完成"
+        )
 
         /**
          * 购物 App 的快照间隔放宽到 800ms。

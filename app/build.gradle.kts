@@ -12,8 +12,8 @@ android {
         applicationId = "com.dingzhang.app"
         minSdk = 26          // Android 8.0，覆盖绝大多数在用机型
         targetSdk = 35
-        versionCode = 44
-        versionName = "0.5.41"
+        versionCode = 45
+        versionName = "0.5.42"
         // 只留中文资源，库自带的其他语言翻译全删掉（界面本来就只有中文）
         resourceConfigurations += listOf("zh")
         // 包里唯一一个 native 库是 Compose 的 libandroidx.graphics.path.so，

@@ -91,6 +91,20 @@ object IngestPipeline {
      * 它不是泛称，按老规则就永远不许被覆盖 —— 一笔错名锁死一辈子。
      * 只要新来的名字更像店名，就允许覆盖；反过来不允许，免得好名字被烂名字冲掉。
      */
+    /**
+     * 这个名字说明的是「钱从哪走」，不是「花在哪」：
+     * 微信支付、支付宝、云闪付、银行卡消费 —— 全是通道名，不是商户名。
+     * 只有通道名的记录谈不上「记对了」，后面来任何更具体的信息都该覆盖它。
+     */
+    private fun isChannelOnlyPayee(s: String): Boolean {
+        val t = s.trim()
+        if (t.isEmpty()) return false
+        return listOf(
+            "微信支付", "支付宝", "云闪付", "银行卡消费", "银行卡", "银行卡支出",
+            "银行入账", "银行退款", "微信", "支付宝支付", "收款方", "商户"
+        ).any { t == it || t.startsWith(it) }
+    }
+
     private fun isWeakPayee(s: String): Boolean {
         val t = s.trim()
         if (t.isEmpty() || isGenericPayee(t)) return true
@@ -169,10 +183,21 @@ object IngestPipeline {
         val byNo = c.externalId?.let { dao.findByExternalId(c.wallet, it) }
         // 单号找不到时按「钱包 + 金额 + 方向 + 时间」找；先按方向收窄，
         // 否则 50 元消费和 50 元退款会互相被当成重复
+        val kindForDup = (c.kindHint ?: TxnKind.EXPENSE).db
         val nearDup = byNo ?: dao.findNearDuplicate(
             c.wallet, c.amountCents, c.occurredAt, DUP_WINDOW_MS,
-            kindDb = (c.kindHint ?: TxnKind.EXPENSE).db
-        )
+            kindDb = kindForDup
+        ) ?: run {
+            // 无障碍读到的同一笔，两次可能落在不同的「钱包」上：
+            // 支付宝 SDK 的结果页上写着支付宝，淘宝内嵌收银台那页压根没写走了哪个渠道，
+            // 钱包就成了「未知」。钱包对不上，按钱包判重永远判不到，于是记成两笔。
+            // 只在「这条根本没读出钱包」时放开：两边都写了钱包却不一样，说明是两笔真消费，
+            // 不能因为金额一样就并掉（宁可多留一笔，也不能吞掉一笔真的钱）。
+            if (c.source == Source.ACCESSIBILITY && c.wallet == Wallet.UNKNOWN) {
+                dao.findNearDuplicateAnyWallet(c.amountCents, c.occurredAt, SAME_CHANNEL_STRICT_MS, kindForDup)
+                    ?.also { Log.d(TAG, "同额同刻但钱包不同，按同一笔处理：${c.payee} -> #${it.id} ${it.payee}") }
+            } else null
+        }
         // 两边都带了交易单号却不一样，那就是同店同金额的两笔真消费，不能并成一笔。
         // 只有单号缺失时，才靠金额 + 时间 + 商户去猜重复。
         val dup = nearDup?.takeIf { d ->
@@ -260,7 +285,13 @@ object IngestPipeline {
                     // （银行短信里压根没有商户名），这次来了真名就顺手补上，
                     // 不必等用户去导账单
                     // 旧名字是泛称或不像店名，新名字更像店名 —— 才允许覆盖
-                    if (isWeakPayee(dup.payee) && !isWeakPayee(payee)) {
+                    // 第二种情况：旧名字只是「钱从哪走」，不是「花在哪」。
+                    // 微信支付的通知只有「微信支付 5.5元」，商户名是硬塞的通道名；
+                    // 这种时候哪怕新名字只有两个字（「美团」「瑞幸」），也比通道名有用得多。
+                    // 旧逻辑碰到「微信支付 → 美团」两个都是弱名，直接放弃补名，等于白等。
+                    if ((isWeakPayee(dup.payee) && !isWeakPayee(payee)) ||
+                        (isChannelOnlyPayee(dup.payee) && payee.isNotBlank() && payee != dup.payee)
+                    ) {
                         dao.updatePayee(dup.id, payee, c.account)
                         // 商户名换了必须按新名字重算分类：否则「微信支付」补成「海底捞」
                         // 之后还挂在「其他」上，等于白补。用户手动改过的分类不动。
@@ -521,6 +552,11 @@ object IngestPipeline {
             if (t.length !in 2..30) continue
             if (payeeNoise.any { t.contains(it) }) continue
             if (t.endsWith("：") || t.endsWith(":")) continue
+            // 一句完整的话不是店名。支付宝的交易提醒整条就是一句话：
+            // 「你有一笔20.90元的支出，点击领3元话费券。」——以前这整句话被当成商户名记进流水。
+            // 店名里不会有句号逗号，也不会写「点击」「领取」
+            if (t.any { it in "，。！;；!?？" }) continue
+            if (t.contains("点击") || t.contains("领取") || t.contains("立即")) continue
             // 「11.50」这种金额、「11月9日 18:12」这种时间都排除：数字占一半以上
             val digits = t.count { it.isDigit() }
             if (digits > 0 && digits * 2 >= t.length) continue
